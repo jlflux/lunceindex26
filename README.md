@@ -33,28 +33,32 @@ stored — only a PBKDF2 hash.
 
 ### 3. Load the data
 
+**No terminal? Use the SQL editor.** Open your Supabase project → SQL Editor,
+paste the contents of `supabase/seed.sql`, and run it. That is the whole
+dataset — 393 teams, 392 preseason ratings, 90 name aliases, the formula
+config, and the 139-game Week 0 schedule.
+
+Ratings appear as soon as you open the site. Hit **Recompute & publish** in the
+admin once to cache them.
+
+**With a terminal**, this does the same thing and also publishes the snapshot:
+
 ```bash
 npm install
 npm run setup -- --dry-run   # report everything, write nothing
 npm run setup                # write it
 ```
 
-One command does the lot, from the files already in `data/`:
+Either route is idempotent and safe to re-run mid-season. Teams upsert by name,
+games upsert on their natural key, and **a game that already has scores is
+never touched** — nor is a formula config you have already tuned. Both
+behaviours are verified against a real Postgres instance, not just asserted.
 
-- all 393 teams from `AHSAA_Class_List_2026.csv`
-- preseason carry-over ratings from `alpreps_preseason_2026.csv`
-- the alias table mapping schedule-PDF spellings to roster names
-- every `*Week_N*.pdf` schedule in `data/`, week taken from the filename
-- the default formula config
-- the first published ratings snapshot
+Regenerate the SQL after changing anything in `data/`:
 
-It is idempotent. Teams upsert by name, games upsert on their natural key, and
-**a game that already has scores is never overwritten**, so re-running
-mid-season will not wipe results. An existing formula config is left untouched.
-
-Run the dry run first: it prints classification counts, which teams matched a
-preseason rating, the parse report for each schedule PDF, and the resulting top
-10 — without touching the database.
+```bash
+npm run seed:sql
+```
 
 ### 4. Run
 

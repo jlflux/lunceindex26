@@ -18,26 +18,22 @@ export default function StatCard({
   delta?: number;
 }) {
   return (
-    <div className="card p-4">
-      <div className="flex items-center gap-2.5">
+    <div className="card px-4 py-3.5">
+      <div className="flex items-center gap-2">
+        <Icon
+          name={icon}
+          size={14}
+          className="shrink-0"
+        />
         <span
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px]"
-          style={{
-            background: "rgb(var(--surface-3))",
-            color: "rgb(var(--text-muted))",
-          }}
-        >
-          <Icon name={icon} size={15} />
-        </span>
-        <span
-          className="truncate text-[13px] font-medium"
+          className="truncate text-[12.5px] font-medium"
           style={{ color: "rgb(var(--text-muted))" }}
         >
           {label}
         </span>
       </div>
 
-      <div className="mt-3 text-[28px] font-extrabold leading-none tnum">
+      <div className="mt-2.5 text-[26px] font-bold leading-none tnum">
         {value}
       </div>
 

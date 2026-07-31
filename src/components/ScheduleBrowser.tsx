@@ -60,20 +60,7 @@ export default function ScheduleBrowser({ games }: { games: ScheduleGame[] }) {
               <button
                 key={k}
                 onClick={() => setKey(k)}
-                className="shrink-0 rounded-[10px] border px-3 py-1.5 text-xs font-semibold transition-colors"
-                style={
-                  key === k
-                    ? {
-                        background: "rgb(var(--primary))",
-                        borderColor: "rgb(var(--primary))",
-                        color: "rgb(var(--primary-fg))",
-                      }
-                    : {
-                        background: "rgb(var(--surface))",
-                        borderColor: "rgb(var(--border))",
-                        color: "rgb(var(--text-muted))",
-                      }
-                }
+                className={`pill ${key === k ? "pill-active" : ""}`}
               >
                 {weekLabel(sample)}
               </button>

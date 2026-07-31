@@ -28,7 +28,7 @@ export default async function SchedulePage() {
   }));
 
   return (
-    <AppShell breadcrumb={[{ label: "Browse" }, { label: "Schedule" }]}>
+    <AppShell generated={data.generated}>
       <PageHeader
         title="Schedule"
         subtitle="Every game on file, by week. Results appear as soon as both scores are entered."

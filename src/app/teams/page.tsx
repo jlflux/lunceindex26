@@ -10,7 +10,7 @@ export default async function TeamsPage() {
   const data = await loadRatings();
 
   return (
-    <AppShell breadcrumb={[{ label: "Browse" }, { label: "All Teams" }]}>
+    <AppShell generated={data.generated}>
       <PageHeader
         title="All Teams"
         subtitle="Every AHSAA football program, grouped by classification and region."

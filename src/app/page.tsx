@@ -24,17 +24,7 @@ export default async function HomePage({
   const played = data.games.filter(isPlayed);
 
   return (
-    <AppShell
-      breadcrumb={[{ label: "Rankings" }, { label: "Power Index" }]}
-      meta={
-        data.ratings.length
-          ? `Updated ${new Date(data.generated).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            })}`
-          : undefined
-      }
-    >
+    <AppShell generated={data.ratings.length ? data.generated : undefined}>
       <PageHeader
         title="AHSAA Power Ratings"
         subtitle="A composite rating blending a Massey-style solve with strength of schedule, scoring efficiency and win quality. Select any team for its full breakdown, schedule and projections."

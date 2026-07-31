@@ -8,7 +8,7 @@ export default async function AboutPage() {
   const { config } = await loadRatings();
 
   return (
-    <AppShell breadcrumb={[{ label: "How ratings work" }]}>
+    <AppShell>
       <PageHeader
         title="How the ratings work"
         subtitle="What goes into a team's number, and why it is built the way it is."

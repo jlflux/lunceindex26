@@ -3,114 +3,115 @@
 @tailwind utilities;
 
 /*
- * Light-first design system: soft grey canvas, white cards, generous spacing.
- * Dark mode is a full peer, not an afterthought — the toggle stamps
- * `data-theme` on <html> and must win over the system preference both ways.
+ * Light-first, no chrome for its own sake: a neutral canvas, one content
+ * column, and type doing most of the work. Dark mode is a full peer — the
+ * toggle stamps `data-theme` on <html> and must win over the system
+ * preference in both directions.
  */
 :root {
-  --canvas: 240 241 243;
+  --canvas: 247 247 248;
   --surface: 255 255 255;
-  --surface-2: 247 248 250;
-  --surface-3: 241 243 245;
-  --border: 229 231 235;
-  --border-strong: 214 217 223;
+  --surface-2: 249 250 251;
+  --surface-3: 243 244 246;
+  --border: 232 233 237;
+  --border-strong: 214 216 222;
 
-  --text: 20 22 28;
-  --text-muted: 98 104 118;
-  --text-faint: 145 151 164;
+  --text: 17 18 22;
+  --text-muted: 106 112 124;
+  --text-faint: 152 157 168;
 
-  --brand: 208 43 43;
-  --brand-soft: 254 238 238;
-  --primary: 24 26 32;
+  --brand: 206 40 40;
+  --brand-soft: 253 238 238;
+  --primary: 17 18 22;
   --primary-fg: 255 255 255;
 
-  --good: 22 133 72;
-  --good-soft: 232 247 238;
-  --bad: 199 42 42;
-  --bad-soft: 253 236 236;
-  --warn: 176 111 8;
-  --warn-soft: 253 245 227;
+  --good: 21 128 61;
+  --good-soft: 236 250 241;
+  --bad: 194 45 45;
+  --bad-soft: 253 238 238;
+  --warn: 168 108 8;
+  --warn-soft: 253 246 230;
 
-  --shadow-sm: 0 1px 2px rgb(20 22 28 / 0.04);
-  --shadow: 0 1px 2px rgb(20 22 28 / 0.04), 0 6px 16px -6px rgb(20 22 28 / 0.08);
+  --shadow-sm: 0 1px 2px rgb(17 18 22 / 0.05);
+  --shadow: 0 1px 3px rgb(17 18 22 / 0.06), 0 8px 24px -10px rgb(17 18 22 / 0.1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: 12 13 16;
-    --surface: 23 25 30;
-    --surface-2: 30 33 39;
-    --surface-3: 37 40 47;
-    --border: 44 48 56;
-    --border-strong: 58 63 73;
+    --canvas: 11 12 14;
+    --surface: 22 24 28;
+    --surface-2: 28 30 35;
+    --surface-3: 35 38 44;
+    --border: 42 45 52;
+    --border-strong: 58 62 71;
 
-    --text: 236 238 243;
-    --text-muted: 154 161 175;
-    --text-faint: 112 119 134;
+    --text: 240 241 244;
+    --text-muted: 158 164 176;
+    --text-faint: 116 122 134;
 
     --brand: 248 113 113;
-    --brand-soft: 46 24 25;
-    --primary: 236 238 243;
-    --primary-fg: 20 22 28;
+    --brand-soft: 45 23 24;
+    --primary: 240 241 244;
+    --primary-fg: 17 18 22;
 
     --good: 74 222 128;
-    --good-soft: 20 42 30;
+    --good-soft: 18 40 28;
     --bad: 248 113 113;
-    --bad-soft: 46 24 25;
+    --bad-soft: 45 23 24;
     --warn: 250 204 21;
-    --warn-soft: 45 37 15;
+    --warn-soft: 42 35 14;
 
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -8px rgb(0 0 0 / 0.5);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+    --shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 10px 30px -12px rgb(0 0 0 / 0.6);
   }
 }
 
 :root[data-theme="light"] {
-  --canvas: 240 241 243;
+  --canvas: 247 247 248;
   --surface: 255 255 255;
-  --surface-2: 247 248 250;
-  --surface-3: 241 243 245;
-  --border: 229 231 235;
-  --border-strong: 214 217 223;
-  --text: 20 22 28;
-  --text-muted: 98 104 118;
-  --text-faint: 145 151 164;
-  --brand: 208 43 43;
-  --brand-soft: 254 238 238;
-  --primary: 24 26 32;
+  --surface-2: 249 250 251;
+  --surface-3: 243 244 246;
+  --border: 232 233 237;
+  --border-strong: 214 216 222;
+  --text: 17 18 22;
+  --text-muted: 106 112 124;
+  --text-faint: 152 157 168;
+  --brand: 206 40 40;
+  --brand-soft: 253 238 238;
+  --primary: 17 18 22;
   --primary-fg: 255 255 255;
-  --good: 22 133 72;
-  --good-soft: 232 247 238;
-  --bad: 199 42 42;
-  --bad-soft: 253 236 236;
-  --warn: 176 111 8;
-  --warn-soft: 253 245 227;
-  --shadow-sm: 0 1px 2px rgb(20 22 28 / 0.04);
-  --shadow: 0 1px 2px rgb(20 22 28 / 0.04), 0 6px 16px -6px rgb(20 22 28 / 0.08);
+  --good: 21 128 61;
+  --good-soft: 236 250 241;
+  --bad: 194 45 45;
+  --bad-soft: 253 238 238;
+  --warn: 168 108 8;
+  --warn-soft: 253 246 230;
+  --shadow-sm: 0 1px 2px rgb(17 18 22 / 0.05);
+  --shadow: 0 1px 3px rgb(17 18 22 / 0.06), 0 8px 24px -10px rgb(17 18 22 / 0.1);
 }
 
 :root[data-theme="dark"] {
-  --canvas: 12 13 16;
-  --surface: 23 25 30;
-  --surface-2: 30 33 39;
-  --surface-3: 37 40 47;
-  --border: 44 48 56;
-  --border-strong: 58 63 73;
-  --text: 236 238 243;
-  --text-muted: 154 161 175;
-  --text-faint: 112 119 134;
+  --canvas: 11 12 14;
+  --surface: 22 24 28;
+  --surface-2: 28 30 35;
+  --surface-3: 35 38 44;
+  --border: 42 45 52;
+  --border-strong: 58 62 71;
+  --text: 240 241 244;
+  --text-muted: 158 164 176;
+  --text-faint: 116 122 134;
   --brand: 248 113 113;
-  --brand-soft: 46 24 25;
-  --primary: 236 238 243;
-  --primary-fg: 20 22 28;
+  --brand-soft: 45 23 24;
+  --primary: 240 241 244;
+  --primary-fg: 17 18 22;
   --good: 74 222 128;
-  --good-soft: 20 42 30;
+  --good-soft: 18 40 28;
   --bad: 248 113 113;
-  --bad-soft: 46 24 25;
+  --bad-soft: 45 23 24;
   --warn: 250 204 21;
-  --warn-soft: 45 37 15;
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -8px rgb(0 0 0 / 0.5);
+  --warn-soft: 42 35 14;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 10px 30px -12px rgb(0 0 0 / 0.6);
 }
 
 @layer base {
@@ -121,16 +122,32 @@
   body {
     background: rgb(var(--canvas));
     color: rgb(var(--text));
-    font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system,
-      "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    /* The fallback chain matters: if the variable ever goes missing again,
+       this still resolves to a sans face rather than the browser's serif. */
+    font-family:
+      var(--font-sans, ui-sans-serif),
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial,
+      sans-serif;
     -webkit-font-smoothing: antialiased;
-    letter-spacing: -0.006em;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.011em;
   }
 
   /* Figures line up in columns without a monospace face. */
   table,
   .tnum {
     font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  h1, h2, h3 {
+    letter-spacing: -0.021em;
   }
 
   :focus-visible {
@@ -140,10 +157,9 @@
   }
 
   ::selection {
-    background: rgb(var(--brand) / 0.2);
+    background: rgb(var(--brand) / 0.18);
   }
 
-  /* Unobtrusive scrollbars inside scroll containers. */
   .scroll-thin {
     scrollbar-width: thin;
     scrollbar-color: rgb(var(--border-strong)) transparent;
@@ -165,8 +181,7 @@
   .card {
     background: rgb(var(--surface));
     border: 1px solid rgb(var(--border));
-    border-radius: 16px;
-    box-shadow: var(--shadow-sm);
+    border-radius: 14px;
   }
 
   .card-lift {
@@ -184,11 +199,11 @@
     align-items: center;
     justify-content: center;
     gap: 0.25rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: 7px;
+    padding: 0.175rem 0.45rem;
+    border-radius: 6px;
     font-size: 0.6875rem;
-    font-weight: 650;
-    line-height: 1.25;
+    font-weight: 600;
+    line-height: 1.3;
     white-space: nowrap;
   }
 
@@ -197,17 +212,17 @@
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
-    padding: 0.5rem 0.85rem;
-    border-radius: 10px;
+    padding: 0.5rem 0.8rem;
+    border-radius: 9px;
     border: 1px solid rgb(var(--border));
     background: rgb(var(--surface));
     color: rgb(var(--text));
     font-size: 0.8125rem;
-    font-weight: 600;
+    font-weight: 550;
     white-space: nowrap;
     transition:
-      background 0.14s ease,
-      border-color 0.14s ease;
+      background 0.13s ease,
+      border-color 0.13s ease;
   }
 
   .btn:hover:not(:disabled) {
@@ -227,19 +242,19 @@
   }
 
   .btn-primary:hover:not(:disabled) {
-    background: rgb(var(--primary) / 0.88);
-    border-color: rgb(var(--primary) / 0.88);
+    background: rgb(var(--primary) / 0.86);
+    border-color: rgb(var(--primary) / 0.86);
   }
 
   .input {
     width: 100%;
     padding: 0.5rem 0.75rem;
-    border-radius: 10px;
+    border-radius: 9px;
     border: 1px solid rgb(var(--border));
     background: rgb(var(--surface));
     color: rgb(var(--text));
     font-size: 0.8125rem;
-    transition: border-color 0.14s ease;
+    transition: border-color 0.13s ease;
   }
 
   .input:hover {
@@ -252,88 +267,121 @@
 
   .label {
     display: block;
-    margin-bottom: 0.375rem;
-    font-size: 0.6875rem;
-    font-weight: 650;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: rgb(var(--text-faint));
-  }
-
-  /* Sidebar section heading */
-  .nav-section {
-    padding: 0 0.75rem;
-    margin-bottom: 0.4rem;
-    font-size: 0.6875rem;
-    font-weight: 650;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: rgb(var(--text-faint));
-  }
-
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 0.625rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 10px;
-    font-size: 0.8125rem;
+    margin-bottom: 0.35rem;
+    font-size: 0.75rem;
     font-weight: 550;
     color: rgb(var(--text-muted));
-    transition:
-      background 0.14s ease,
-      color 0.14s ease;
   }
 
-  .nav-item:hover {
-    background: rgb(var(--surface-2));
+  /* Top-bar navigation tab */
+  .tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: rgb(var(--text-muted));
+    white-space: nowrap;
+    transition: color 0.13s ease;
+  }
+
+  .tab:hover {
     color: rgb(var(--text));
   }
 
-  .nav-item-active {
-    background: rgb(var(--surface-3));
+  .tab-active {
     color: rgb(var(--text));
-    font-weight: 650;
+    font-weight: 600;
+  }
+
+  .tab-active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: rgb(var(--brand));
   }
 
   /* Table primitives */
   .th {
-    padding: 0.625rem 0.75rem;
+    padding: 0.7rem 0.75rem;
     text-align: left;
     font-size: 0.6875rem;
-    font-weight: 650;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.045em;
+    letter-spacing: 0.055em;
     color: rgb(var(--text-faint));
     white-space: nowrap;
   }
 
   .td {
-    padding: 0.6875rem 0.75rem;
+    padding: 0.7rem 0.75rem;
     font-size: 0.8125rem;
     white-space: nowrap;
   }
 
+  .row-hover {
+    transition: background 0.1s ease;
+  }
   .row-hover:hover {
     background: rgb(var(--surface-2));
+  }
+
+  /* Filter pill */
+  .pill {
+    flex-shrink: 0;
+    border-radius: 8px;
+    border: 1px solid rgb(var(--border));
+    background: rgb(var(--surface));
+    color: rgb(var(--text-muted));
+    padding: 0.35rem 0.7rem;
+    font-size: 0.75rem;
+    font-weight: 550;
+    transition:
+      background 0.13s ease,
+      color 0.13s ease,
+      border-color 0.13s ease;
+  }
+
+  .pill:hover {
+    border-color: rgb(var(--border-strong));
+    color: rgb(var(--text));
+  }
+
+  .pill-active {
+    background: rgb(var(--primary));
+    border-color: rgb(var(--primary));
+    color: rgb(var(--primary-fg));
+  }
+
+  .pill-active:hover {
+    color: rgb(var(--primary-fg));
   }
 }
 
 /* Classification accents, 6A (deepest) down to A. */
-.cls-6A { background: rgb(124 58 237 / 0.12); color: rgb(139 92 246); }
-.cls-5A { background: rgb(37 99 235 / 0.12); color: rgb(59 130 246); }
-.cls-4A { background: rgb(8 145 178 / 0.12); color: rgb(14 165 233); }
-.cls-3A { background: rgb(13 148 136 / 0.12); color: rgb(20 184 166); }
-.cls-2A { background: rgb(22 163 74 / 0.12); color: rgb(34 197 94); }
-.cls-1A { background: rgb(202 138 4 / 0.14); color: rgb(180 120 5); }
-.cls-AA { background: rgb(234 88 12 / 0.12); color: rgb(234 105 30); }
-.cls-A  { background: rgb(219 39 119 / 0.12); color: rgb(219 60 130); }
+.cls-6A { background: rgb(124 58 237 / 0.11); color: rgb(126 58 224); }
+.cls-5A { background: rgb(37 99 235 / 0.11); color: rgb(37 99 235); }
+.cls-4A { background: rgb(8 145 178 / 0.12); color: rgb(7 130 160); }
+.cls-3A { background: rgb(13 148 136 / 0.12); color: rgb(12 134 123); }
+.cls-2A { background: rgb(22 163 74 / 0.12); color: rgb(20 140 65); }
+.cls-1A { background: rgb(202 138 4 / 0.14); color: rgb(168 114 5); }
+.cls-AA { background: rgb(234 88 12 / 0.12); color: rgb(207 78 11); }
+.cls-A  { background: rgb(219 39 119 / 0.11); color: rgb(202 36 110); }
 
-:root[data-theme="dark"] .cls-1A,
-:root[data-theme="dark"] .cls-AA,
-:root[data-theme="dark"] .cls-A { color: rgb(250 204 21); }
+:root[data-theme="dark"] .cls-6A { color: rgb(167 139 250); }
+:root[data-theme="dark"] .cls-5A { color: rgb(96 165 250); }
+:root[data-theme="dark"] .cls-4A { color: rgb(56 189 248); }
+:root[data-theme="dark"] .cls-3A { color: rgb(45 212 191); }
+:root[data-theme="dark"] .cls-2A { color: rgb(74 222 128); }
+:root[data-theme="dark"] .cls-1A { color: rgb(250 204 21); }
 :root[data-theme="dark"] .cls-AA { color: rgb(251 146 60); }
-:root[data-theme="dark"] .cls-A { color: rgb(244 114 182); }
+:root[data-theme="dark"] .cls-A  { color: rgb(244 114 182); }
 
 @media (prefers-reduced-motion: reduce) {
   *,

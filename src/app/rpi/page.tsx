@@ -10,7 +10,7 @@ export default async function RpiPage() {
   const data = await loadRatings();
 
   return (
-    <AppShell breadcrumb={[{ label: "Rankings" }, { label: "RPI" }]}>
+    <AppShell generated={data.rpi.length ? data.generated : undefined}>
       <PageHeader
         title="RPI Rankings"
         subtitle="25% win percentage + 50% opponents' win percentage + 25% opponents' opponents' win percentage. Out-of-state opponents count toward a team's record but are excluded from opponent-strength terms."

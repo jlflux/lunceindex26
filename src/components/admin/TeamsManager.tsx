@@ -34,7 +34,7 @@ export default function TeamsManager({ initial }: { initial: Team[] }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-[22px] font-extrabold tracking-tight">Teams</h1>
+        <h1 className="text-[24px] font-bold leading-tight">Teams</h1>
         <button
           className="btn !py-1.5 !text-xs"
           onClick={() => setShowPriors((v) => !v)}
@@ -104,20 +104,7 @@ export default function TeamsManager({ initial }: { initial: Team[] }) {
               <button
                 key={c}
                 onClick={() => setCls(c as Classification | "all")}
-                className="shrink-0 rounded-[10px] border px-3 py-1.5 text-xs font-semibold transition-colors"
-                style={
-                  cls === c
-                    ? {
-                        background: "rgb(var(--primary))",
-                        borderColor: "rgb(var(--primary))",
-                        color: "rgb(var(--primary-fg))",
-                      }
-                    : {
-                        background: "rgb(var(--surface))",
-                        borderColor: "rgb(var(--border))",
-                        color: "rgb(var(--text-muted))",
-                      }
-                }
+                className={`pill ${cls === c ? "pill-active" : ""}`}
               >
                 {c === "all" ? "All" : c}
               </button>

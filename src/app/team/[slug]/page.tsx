@@ -43,13 +43,7 @@ export default async function TeamPage({
   const hasPlayed = t.wins + t.losses > 0;
 
   return (
-    <AppShell
-      breadcrumb={[
-        { label: "Rankings" },
-        { label: "Power Index" },
-        { label: t.name },
-      ]}
-    >
+    <AppShell generated={data.generated}>
       <Link
         href="/"
         className="mb-4 inline-flex items-center gap-1.5 text-[13px] font-medium hover:underline"

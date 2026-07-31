@@ -2,43 +2,23 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
-import Icon, { type IconName } from "@/components/Icon";
+import Icon from "@/components/Icon";
 import ThemeToggle from "@/components/ThemeToggle";
 
-const LINKS: { href: string; label: string; icon: IconName }[] = [
-  { href: "/admin", label: "Dashboard", icon: "grid" },
-  { href: "/admin/games", label: "Games", icon: "list" },
-  { href: "/admin/import", label: "Import", icon: "upload" },
-  { href: "/admin/formula", label: "Formula", icon: "sliders" },
-  { href: "/admin/teams", label: "Teams", icon: "users" },
-];
+const LINKS = [
+  { href: "/admin", label: "Dashboard" },
+  { href: "/admin/games", label: "Games" },
+  { href: "/admin/import", label: "Import" },
+  { href: "/admin/formula", label: "Formula" },
+  { href: "/admin/teams", label: "Teams" },
+] as const;
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+export default function AdminNav() {
   const pathname = usePathname();
-  return (
-    <div className="space-y-0.5">
-      {LINKS.map((l) => {
-        const active =
-          l.href === "/admin" ? pathname === l.href : pathname.startsWith(l.href);
-        return (
-          <Link
-            key={l.href}
-            href={l.href}
-            onClick={onNavigate}
-            className={`nav-item ${active ? "nav-item-active" : ""}`}
-          >
-            <Icon name={l.icon} size={16} />
-            {l.label}
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
-function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
+
+  const isActive = (href: string) =>
+    href === "/admin" ? pathname === href : pathname.startsWith(href);
 
   async function signOut() {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -47,129 +27,56 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="px-4 pb-3 pt-4">
-        <Link href="/admin" onClick={onNavigate} className="flex items-center gap-2.5">
-          <span
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px]"
-            style={{
-              background: "rgb(var(--primary))",
-              color: "rgb(var(--primary-fg))",
-            }}
-          >
-            <Icon name="shield" size={16} />
-          </span>
-          <span className="text-[15px] font-extrabold tracking-tight">
-            ALPreps
-            <span style={{ color: "rgb(var(--text-faint))" }}> Admin</span>
-          </span>
-        </Link>
-      </div>
+    <header
+      className="sticky top-0 z-30 border-b"
+      style={{
+        background: "rgb(var(--surface))",
+        borderColor: "rgb(var(--border))",
+      }}
+    >
+      <div className="mx-auto max-w-[1160px] px-5 sm:px-7">
+        <div className="flex h-[58px] items-center gap-6">
+          <Link href="/admin" className="flex shrink-0 items-baseline gap-[7px]">
+            <span className="text-[17px] font-bold tracking-tight">ALPreps</span>
+            <span
+              className="text-[17px] font-bold tracking-tight"
+              style={{ color: "rgb(var(--text-faint))" }}
+            >
+              Admin
+            </span>
+          </Link>
 
-      <nav className="flex-1 px-2">
-        <p className="nav-section">Manage</p>
-        <NavLinks onNavigate={onNavigate} />
-      </nav>
-
-      <div
-        className="space-y-0.5 border-t px-2 py-3"
-        style={{ borderColor: "rgb(var(--border))" }}
-      >
-        <Link href="/" target="_blank" className="nav-item">
-          <Icon name="external" size={16} />
-          View public site
-        </Link>
-        <button onClick={signOut} className="nav-item w-full">
-          <Icon name="logout" size={16} />
-          Sign out
-        </button>
-      </div>
-    </div>
-  );
-}
-
-const TITLES: Record<string, string> = {
-  "/admin": "Dashboard",
-  "/admin/games": "Games",
-  "/admin/import": "Import",
-  "/admin/formula": "Formula",
-  "/admin/teams": "Teams",
-};
-
-export default function AdminNav() {
-  const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  const breadcrumb = TITLES[pathname];
-
-  return (
-    <>
-      <aside
-        className="fixed inset-y-0 left-0 z-30 hidden w-[228px] border-r lg:block"
-        style={{
-          background: "rgb(var(--surface))",
-          borderColor: "rgb(var(--border))",
-        }}
-      >
-        <SidebarBody />
-      </aside>
-
-      <div
-        className="sticky top-0 z-20 border-b backdrop-blur-md lg:pl-[228px]"
-        style={{
-          background: "rgb(var(--canvas) / 0.8)",
-          borderColor: "rgb(var(--border))",
-        }}
-      >
-        <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
-          <button
-            onClick={() => setOpen(true)}
-            className="btn !h-9 !w-9 !p-0 lg:hidden"
-            aria-label="Open navigation"
-          >
-            <Icon name="menu" size={18} />
-          </button>
-
-          <nav
-            className="flex items-center gap-1.5 text-[13px]"
-            aria-label="Breadcrumb"
-          >
-            <span style={{ color: "rgb(var(--text-muted))" }}>Admin</span>
-            {breadcrumb && (
-              <>
-                <Icon
-                  name="chevron-right"
-                  size={13}
-                  className="opacity-35"
-                />
-                <span className="font-semibold">{breadcrumb}</span>
-              </>
-            )}
+          <nav className="table-scroll scroll-thin -mb-px min-w-0 flex-1">
+            <div className="flex h-[57px] items-center gap-6">
+              {LINKS.map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className={`tab ${isActive(l.href) ? "tab-active" : ""}`}
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </div>
           </nav>
 
-          <div className="ml-auto">
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href="/"
+              target="_blank"
+              className="hidden items-center gap-1.5 text-xs hover:underline sm:inline-flex"
+              style={{ color: "rgb(var(--text-muted))" }}
+            >
+              View site
+              <Icon name="external" size={12} />
+            </Link>
             <ThemeToggle />
+            <button onClick={signOut} className="btn !py-1.5 !text-xs">
+              Sign out
+            </button>
           </div>
         </div>
       </div>
-
-      {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setOpen(false)}
-            aria-label="Close navigation"
-          />
-          <div
-            className="absolute inset-y-0 left-0 w-[252px] border-r"
-            style={{
-              background: "rgb(var(--surface))",
-              borderColor: "rgb(var(--border))",
-            }}
-          >
-            <SidebarBody onNavigate={() => setOpen(false)} />
-          </div>
-        </div>
-      )}
-    </>
+    </header>
   );
 }

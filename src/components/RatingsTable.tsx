@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import Icon from "./Icon";
-import { fmt, fmtPct, fmtSigned, record } from "@/lib/format";
+import { fmt, fmtPct, fmtSigned, ordinal, record } from "@/lib/format";
 import {
   CLS_FILTER_ORDER,
   type Classification,
@@ -162,7 +162,7 @@ export default function RatingsTable({
       </div>
 
       <div className="card table-scroll scroll-thin overflow-hidden">
-        <table className="w-full min-w-[720px]">
+        <table className={`w-full ${hasResults || mode === "rpi" ? "min-w-[780px]" : "min-w-[560px]"}`}>
           <thead>
             <tr
               className="border-b"
@@ -176,16 +176,25 @@ export default function RatingsTable({
               {mode === "index" ? (
                 <>
                   <th className="th !text-right">Rating</th>
+                  <th className="th !text-center">In class</th>
                   <th className="th !text-center">Rec</th>
-                  <th className="th !text-right">SOS</th>
-                  <th className="th !text-right">Off</th>
-                  <th className="th !text-right">Def</th>
-                  <th className="th hidden !text-right lg:table-cell">PF/G</th>
-                  <th className="th hidden !text-right lg:table-cell">PA/G</th>
+                  {/* Every one of these reads "—" before a game is played.
+                      Hiding them keeps the preseason board legible; they
+                      return the moment there are results. */}
+                  {hasResults && (
+                    <>
+                      <th className="th !text-right">SOS</th>
+                      <th className="th !text-right">Off</th>
+                      <th className="th !text-right">Def</th>
+                      <th className="th hidden !text-right lg:table-cell">PF/G</th>
+                      <th className="th hidden !text-right lg:table-cell">PA/G</th>
+                    </>
+                  )}
                 </>
               ) : (
                 <>
                   <th className="th !text-right">RPI</th>
+                  <th className="th !text-center">In class</th>
                   <th className="th !text-center">Rec</th>
                   <th className="th !text-right">Win%</th>
                   <th className="th !text-right">OWP</th>
@@ -211,10 +220,10 @@ export default function RatingsTable({
                     <RankBadge n={scoped ? r.class_rank : r.rank} />
                   </td>
 
-                  <td className="td !whitespace-normal">
+                  <td className="td !whitespace-nowrap">
                     <Link
                       href={`/team/${r.slug}`}
-                      className="font-semibold hover:underline"
+                      className="text-[13.5px] font-semibold hover:underline"
                     >
                       {r.name}
                     </Link>
@@ -234,48 +243,60 @@ export default function RatingsTable({
                   {ir && ranks && idx !== undefined ? (
                     <>
                       <td className="td !text-right">
-                        <span className="text-[15px] font-extrabold">
+                        <span className="text-[15px] font-bold">
                           {fmt(ir.rating)}
                         </span>
                       </td>
+                      <ClassRankCell
+                        rank={ir.class_rank}
+                        cls={ir.classification}
+                      />
                       <td
                         className="td !text-center"
                         style={{ color: "rgb(var(--text-muted))" }}
                       >
                         {record(ir.wins, ir.losses)}
                       </td>
-                      <Cell
-                        value={hasGames ? fmt(ir.sos) : "—"}
-                        rank={hasGames ? ranks.sos[idx] : undefined}
-                      />
-                      <Cell
-                        value={hasGames ? fmtSigned(ir.o_eff) : "—"}
-                        rank={hasGames ? ranks.oEff[idx] : undefined}
-                        tone={hasGames ? ir.o_eff : undefined}
-                      />
-                      <Cell
-                        value={hasGames ? fmtSigned(ir.d_eff) : "—"}
-                        rank={hasGames ? ranks.dEff[idx] : undefined}
-                        tone={hasGames ? ir.d_eff : undefined}
-                      />
-                      <Cell
-                        className="hidden lg:table-cell"
-                        value={hasGames ? fmt(ir.ppg, 1) : "—"}
-                        rank={hasGames ? ranks.ppg[idx] : undefined}
-                      />
-                      <Cell
-                        className="hidden lg:table-cell"
-                        value={hasGames ? fmt(ir.papg, 1) : "—"}
-                        rank={hasGames ? ranks.papg[idx] : undefined}
-                      />
+                      {hasResults && (
+                        <>
+                          <Cell
+                            value={hasGames ? fmt(ir.sos) : "—"}
+                            rank={hasGames ? ranks.sos[idx] : undefined}
+                          />
+                          <Cell
+                            value={hasGames ? fmtSigned(ir.o_eff) : "—"}
+                            rank={hasGames ? ranks.oEff[idx] : undefined}
+                            tone={hasGames ? ir.o_eff : undefined}
+                          />
+                          <Cell
+                            value={hasGames ? fmtSigned(ir.d_eff) : "—"}
+                            rank={hasGames ? ranks.dEff[idx] : undefined}
+                            tone={hasGames ? ir.d_eff : undefined}
+                          />
+                          <Cell
+                            className="hidden lg:table-cell"
+                            value={hasGames ? fmt(ir.ppg, 1) : "—"}
+                            rank={hasGames ? ranks.ppg[idx] : undefined}
+                          />
+                          <Cell
+                            className="hidden lg:table-cell"
+                            value={hasGames ? fmt(ir.papg, 1) : "—"}
+                            rank={hasGames ? ranks.papg[idx] : undefined}
+                          />
+                        </>
+                      )}
                     </>
                   ) : rr ? (
                     <>
                       <td className="td !text-right">
-                        <span className="text-[15px] font-extrabold">
+                        <span className="text-[15px] font-bold">
                           {rr.rpi.toFixed(4)}
                         </span>
                       </td>
+                      <ClassRankCell
+                        rank={rr.class_rank}
+                        cls={rr.classification}
+                      />
                       <td
                         className="td !text-center"
                         style={{ color: "rgb(var(--text-muted))" }}
@@ -297,7 +318,7 @@ export default function RatingsTable({
             {!rows.length && (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={10}
                   className="px-4 py-16 text-center text-sm"
                   style={{ color: "rgb(var(--text-faint))" }}
                 >
@@ -312,14 +333,35 @@ export default function RatingsTable({
   );
 }
 
+/** A team's standing inside its own classification, e.g. "2nd in 5A". */
+function ClassRankCell({
+  rank,
+  cls,
+}: {
+  rank: number;
+  cls: Classification;
+}) {
+  return (
+    <td className="td !text-center">
+      <span className="text-[12.5px] font-semibold tnum">{ordinal(rank)}</span>
+      <span
+        className="ml-1 text-[11px]"
+        style={{ color: "rgb(var(--text-faint))" }}
+      >
+        {cls}
+      </span>
+    </td>
+  );
+}
+
 function RankBadge({ n }: { n: number }) {
   const top = n <= 3;
   return (
     <span
-      className="inline-grid h-7 min-w-[28px] place-items-center rounded-lg px-1.5 text-[13px] font-bold tnum"
+      className="inline-grid h-[26px] min-w-[26px] place-items-center rounded-md px-1.5 text-[12.5px] font-semibold tnum"
       style={
         top
-          ? { background: "rgb(var(--brand-soft))", color: "rgb(var(--brand))" }
+          ? { color: "rgb(var(--brand))", fontWeight: 700 }
           : { color: "rgb(var(--text-faint))" }
       }
     >
@@ -378,20 +420,7 @@ function Chip({
   return (
     <button
       onClick={onClick}
-      className="shrink-0 rounded-[10px] border px-3 py-1.5 text-xs font-semibold transition-colors"
-      style={
-        active
-          ? {
-              background: "rgb(var(--primary))",
-              borderColor: "rgb(var(--primary))",
-              color: "rgb(var(--primary-fg))",
-            }
-          : {
-              background: "rgb(var(--surface))",
-              borderColor: "rgb(var(--border))",
-              color: "rgb(var(--text-muted))",
-            }
-      }
+      className={`pill ${active ? "pill-active" : ""}`}
     >
       {label}
     </button>

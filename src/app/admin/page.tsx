@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AdminError from "@/components/admin/AdminError";
 import { AdminHeader } from "@/components/admin/AdminShell";
 import PublishButton from "@/components/admin/PublishButton";
 import Icon from "@/components/Icon";
@@ -9,11 +10,16 @@ import { isPlayed } from "@/lib/engine";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  const [teams, games, config] = await Promise.all([
-    loadTeams(true),
-    loadGames(true),
-    loadConfig(true),
-  ]);
+  let teams, games, config;
+  try {
+    [teams, games, config] = await Promise.all([
+      loadTeams(true),
+      loadGames(true),
+      loadConfig(true),
+    ]);
+  } catch (e) {
+    return <AdminError error={e instanceof Error ? e.message : String(e)} />;
+  }
 
   const played = games.filter(isPlayed);
   const maxWeek = played.reduce((m, g) => Math.max(m, g.week ?? 0), 0);

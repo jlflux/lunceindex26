@@ -58,18 +58,31 @@ async function pbkdf2(
   return new Uint8Array(bits);
 }
 
-/** Produces the `pbkdf2$iterations$salt$hash` string for ADMIN_PASSWORD_HASH. */
+/**
+ * Produces the `pbkdf2.iterations.salt.hash` string for ADMIN_PASSWORD_HASH.
+ *
+ * Dot-separated, NOT dollar-separated. The conventional `$`-delimited form is
+ * hostile to `.env` files: dotenv-expand — which Next.js applies — reads
+ * `$210000` as a variable reference and substitutes an empty string, silently
+ * corrupting the hash so every login fails with "incorrect password". Base64
+ * never contains a dot, so it is an unambiguous separator.
+ */
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
   const hash = await pbkdf2(password, salt, PBKDF2_ITERATIONS);
-  return `pbkdf2$${PBKDF2_ITERATIONS}$${toBase64(salt)}$${toBase64(hash)}`;
+  return `pbkdf2.${PBKDF2_ITERATIONS}.${toBase64(salt)}.${toBase64(hash)}`;
 }
 
 export async function verifyPassword(
   password: string,
   stored: string,
 ): Promise<boolean> {
-  const parts = stored.split("$");
+  const trimmed = stored.trim().replace(/^['"]|['"]$/g, "");
+  // Accepts the older `$`-separated form too, so an already-deployed hash
+  // keeps working.
+  const parts = trimmed.includes("$")
+    ? trimmed.split("$")
+    : trimmed.split(".");
   if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
   const iterations = Number(parts[1]);
   if (!Number.isFinite(iterations) || iterations < 1000) return false;

@@ -11,7 +11,9 @@ function required(name: string): string {
   const v = process.env[name];
   if (!v) {
     throw new Error(
-      `Missing ${name}. Copy .env.example to .env.local and fill it in.`,
+      `${name} is not set. On Vercel: Settings → Environment Variables, ` +
+        `then redeploy (new variables only apply to a fresh deployment). ` +
+        `Locally: add it to .env.local — see .env.example.`,
     );
   }
   return v;

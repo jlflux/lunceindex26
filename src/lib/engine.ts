@@ -275,11 +275,16 @@ export function computeRatings(
     const winRate = a.games ? a.wins / a.games : 0.5; // neutral when unplayed
 
     // Dampens efficiency credit on a weak schedule — you don't get full marks
-    // for outscoring bad opponents.
+    // for outscoring bad opponents. A negative SOS scales to zero, so those
+    // teams get no efficiency credit at all.
     const scale = medianSos > 0 ? clamp(sos / medianSos, 0, 1) : 0;
 
     let composite = m;
-    if (sos > 0) composite += (sos - medianSos) * cfg.sos_w;
+    // Gated on having played, NOT on sos > 0. SOS is a mean opponent rating
+    // and is legitimately negative for a team on a genuinely weak schedule —
+    // those teams must still take the adjustment. Gating on sos > 0 silently
+    // exempted 61 of 387 teams in 2025 and broke the composite.
+    if (a.games > 0) composite += (sos - medianSos) * cfg.sos_w;
     composite += (oEff + dEff) * cfg.eff_w * scale;
     composite += (winRate - 0.5) * cfg.wr_w;
 

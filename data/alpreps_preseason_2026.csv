@@ -1,0 +1,394 @@
+Overall Rank,Team,Classification,Region,Rating,Class Rank,Region Rank
+1,Thompson,6A,Region 3,36.97,1,1
+2,Clay-Chalkville,5A,Region 6,33.9,1,1
+3,Central-Phenix City,6A,Region 2,32.51,2,1
+4,Auburn,6A,Region 2,31.22,3,2
+5,Vestavia Hills,6A,Region 3,31.08,4,2
+6,Saraland,5A,Region 1,30.83,2,1
+7,Spain Park,6A,Region 3,29.23,5,3
+8,Hewitt-Trussville,6A,Region 3,29.2,6,4
+9,Opelika,6A,Region 2,29.17,7,3
+10,Muscle Shoals,5A,Region 7,28.1,3,1
+11,Hoover,6A,Region 3,27.58,8,5
+12,Baker,6A,Region 1,27.4,9,1
+13,Mary Montgomery,6A,Region 1,26.66,10,2
+14,Jackson,3A,Region 1,26.51,1,1
+15,Benjamin Russell,5A,Region 2,26.26,4,1
+16,Carver-Montgomery,6A,Region 2,25.87,11,4
+17,Prattville,6A,Region 3,25.86,12,6
+18,Daphne,6A,Region 1,25.66,13,3
+19,Fairhope,6A,Region 1,25.51,14,4
+20,Homewood,5A,Region 4,24.68,5,1
+21,Moody,4A,Region 6,24.34,1,1
+22,Mountain Brook,5A,Region 4,24.03,6,2
+23,Enterprise,6A,Region 2,24.03,15,5
+24,St. Michael,AA,Region 1,23.95,1,1
+25,Parker,5A,Region 5,23.85,7,1
+26,Hartselle,5A,Region 7,23.36,8,2
+27,Dothan,6A,Region 2,23.15,16,6
+28,Pike Road,5A,Region 2,22.95,9,2
+29,Williamson,4A,Region 1,22.89,2,1
+30,James Clemens,6A,Region 4,22.58,17,1
+31,Mars Hill,A,Region 4,21.6,1,1
+32,Central-Clay County,4A,Region 6,21.32,3,2
+33,Anniston,4A,Region 6,21.25,4,3
+34,Hueytown,5A,Region 3,21.15,10,1
+35,McAdory,5A,Region 3,21.13,11,2
+36,Vigor,4A,Region 1,20.82,5,2
+37,Oak Mountain,6A,Region 3,20.77,18,7
+38,Scottsboro,4A,Region 8,20.64,6,1
+39,Hillcrest-Tuscaloosa,5A,Region 3,20.57,12,3
+40,Theodore,5A,Region 1,20.54,13,2
+41,Gadsden City,6A,Region 4,20.21,19,2
+42,Ramsay,5A,Region 4,19.41,14,3
+43,Russell County,5A,Region 2,18.97,15,3
+44,Fort Payne,5A,Region 8,18.92,16,1
+45,Pinson Valley,5A,Region 6,18.52,17,2
+46,Central-Tuscaloosa,5A,Region 3,18.42,18,4
+47,Jasper,5A,Region 5,18.24,19,2
+48,Oxford,5A,Region 6,18.23,20,3
+49,Bessemer City,5A,Region 3,18.07,21,5
+50,Austin,5A,Region 7,18.05,22,3
+51,Fairview,4A,Region 8,17.64,7,2
+52,Pell City,5A,Region 6,17.63,23,4
+53,Alexandria,4A,Region 6,17.58,8,4
+54,Huntsville,6A,Region 4,17.49,20,3
+55,Sparkman,6A,Region 4,17.42,21,4
+56,Russellville,5A,Region 7,17.36,24,4
+57,Spanish Fort,5A,Region 1,17.25,25,3
+58,Briarwood,AA,Region 2,16.96,2,1
+59,St. Clair County,5A,Region 6,16.92,26,5
+60,Northridge,5A,Region 3,16.91,27,6
+61,Gulf Shores,5A,Region 1,16.8,28,4
+62,Athens,5A,Region 7,16.67,29,5
+63,Northside,4A,Region 3,16.65,9,1
+64,Good Hope,4A,Region 8,16.49,10,3
+65,Florence,5A,Region 7,16.37,30,6
+66,West Morgan,4A,Region 7,16.22,11,1
+67,McGill-Toolen,AA,Region 1,16.03,3,2
+68,Plainview,3A,Region 8,16.03,2,1
+69,Deshler,4A,Region 7,16,12,2
+70,Boaz,5A,Region 8,15.97,31,2
+71,Glenwood,AA,Region 1,15.79,4,3
+72,Handley,3A,Region 4,15.7,3,1
+73,Cherokee County,4A,Region 8,15.42,13,4
+74,UMS-Wright,AA,Region 1,15.4,5,4
+75,Bob Jones,6A,Region 4,15.21,22,5
+76,Pelham,5A,Region 4,14.99,32,4
+77,Hamilton,4A,Region 7,14.96,14,3
+78,Wetumpka,5A,Region 2,14.87,33,4
+79,Priceville,4A,Region 7,14.83,15,4
+80,Buckhorn,6A,Region 4,14.64,23,6
+81,Montgomery Catholic,AA,Region 1,14.63,6,5
+82,Jacksonville,4A,Region 6,14.62,16,5
+83,Guntersville,4A,Region 8,14.59,17,5
+84,Helena,5A,Region 4,14.47,34,5
+85,Madison Academy,AA,Region 2,14.45,7,2
+86,Andalusia,4A,Region 2,14.01,18,1
+87,Stanhope Elmore,5A,Region 2,13.98,35,5
+88,Davidson,6A,Region 1,13.94,24,5
+89,Lee-Scott,AA,Region 2,13.92,8,3
+90,WS Neal,3A,Region 1,13.87,4,2
+91,Coosa Christian,A,Region 4,13.77,2,2
+92,Valley,4A,Region 4,13.64,19,1
+93,Piedmont,2A,Region 6,13.28,1,1
+94,Smiths Station,6A,Region 2,13.26,25,7
+95,Maplesville,1A,Region 4,13.24,1,1
+96,Foley,6A,Region 1,13.1,26,6
+97,Chelsea,5A,Region 4,12.87,36,6
+98,Cullman,5A,Region 5,12.84,37,3
+99,Alma Bryant,6A,Region 1,12.68,27,7
+100,Carver-Birmingham,4A,Region 5,12.45,20,1
+101,Leeds,4A,Region 6,12.45,21,6
+102,Eufaula,4A,Region 2,12.35,22,2
+103,Ashford,4A,Region 2,11.87,23,3
+104,JAG,6A,Region 2,11.72,28,8
+105,Dale County,4A,Region 2,11.66,24,4
+106,Tuscaloosa County,6A,Region 3,11.58,29,8
+107,Arab,5A,Region 8,11.52,38,3
+108,Elmore County,4A,Region 4,11.48,25,2
+109,Mortimer Jordan,5A,Region 5,11.45,39,4
+110,Montgomery Academy,A,Region 2,11.4,3,1
+111,Lanett,2A,Region 4,11.25,2,1
+112,St. Paul's,AA,Region 1,11.15,9,6
+113,Robertsdale,6A,Region 1,11.09,30,8
+114,Brooks,4A,Region 7,11,26,5
+115,Corner,3A,Region 3,10.99,5,1
+116,Geraldine,3A,Region 8,10.95,6,2
+117,Douglas,5A,Region 8,10.92,40,4
+118,Winfield,3A,Region 5,10.77,7,1
+119,American Christian,AA,Region 2,10.62,10,4
+120,Mae Jemison,5A,Region 8,10.45,41,5
+121,Grissom,6A,Region 4,9.81,31,7
+122,Hazel Green,6A,Region 4,9.75,32,8
+123,Demopolis,4A,Region 3,9.73,27,2
+124,Jackson-Olin,5A,Region 5,9.68,42,5
+125,Opp,3A,Region 1,9.61,8,3
+126,Wadley,1A,Region 6,9.51,2,1
+127,Calera,5A,Region 4,9.42,43,7
+128,Tallassee,4A,Region 4,9.35,28,3
+129,Blount,5A,Region 1,9.28,44,5
+130,Hatton,3A,Region 5,9.24,9,2
+131,Bibb County,3A,Region 3,9.22,10,2
+132,Crossville,4A,Region 8,9.1,29,6
+133,Fyffe,2A,Region 8,9.03,3,1
+134,Minor,5A,Region 5,8.99,45,6
+135,Wenonah,4A,Region 5,8.97,30,2
+136,Beauregard,4A,Region 4,8.88,31,4
+137,Reeltown,2A,Region 4,8.8,4,2
+138,Bullock County,3A,Region 2,8.56,11,1
+139,Mobile Christian,A,Region 1,8.51,4,1
+140,Straughn,4A,Region 2,8.49,32,5
+141,Charles Henderson,4A,Region 4,8.24,33,5
+142,Shelby County,4A,Region 3,8.13,34,3
+143,Westbrook Christian,A,Region 4,8.12,5,3
+144,Oak Grove,4A,Region 5,8.02,35,3
+145,Baldwin County,5A,Region 1,7.83,46,6
+146,Fayette County,3A,Region 5,7.79,12,3
+147,Randolph,AA,Region 2,7.69,11,5
+148,Percy Julian,5A,Region 2,7.65,47,6
+149,Hubbertville,1A,Region 5,7.47,3,1
+150,Pisgah,2A,Region 8,7.37,5,2
+151,Gordo,2A,Region 5,7.33,6,1
+152,Gardendale,5A,Region 5,7.26,48,7
+153,Shades Valley,4A,Region 5,7.2,36,4
+154,Ardmore,4A,Region 6,7.15,37,7
+155,Sardis,4A,Region 8,6.96,38,7
+156,North Jackson,3A,Region 8,6.95,13,3
+157,Citronelle,4A,Region 1,6.84,39,3
+158,Brookwood,5A,Region 3,6.78,49,7
+159,Woodlawn,4A,Region 5,6.7,40,5
+160,Colbert County,2A,Region 7,6.62,7,1
+161,Holtville,4A,Region 4,6.51,41,6
+162,Rehobeth,5A,Region 2,6.39,50,7
+163,Orange Beach,4A,Region 1,6.37,42,4
+164,Decatur,5A,Region 7,6.27,51,7
+165,Brewer,4A,Region 8,6.12,43,8
+166,Headland,4A,Region 2,6,44,6
+167,TR Miller,3A,Region 1,5.96,14,4
+168,Albertville,5A,Region 8,5.96,52,6
+169,Sylacauga,4A,Region 6,5.82,45,8
+170,BC Rain,4A,Region 1,5.76,46,5
+171,Sipsey Valley,4A,Region 3,5.72,47,4
+172,West Point,4A,Region 7,5.68,48,6
+173,John Carroll,AA,Region 2,5.66,12,6
+174,Luverne,2A,Region 1,5.66,8,1
+175,Tuscaloosa Academy,A,Region 3,5.59,6,1
+176,Hokes Bluff,3A,Region 6,5.54,15,1
+177,Oneonta,3A,Region 6,5.54,16,2
+178,Southeastern,2A,Region 5,5.5,9,2
+179,Lauderdale County,3A,Region 7,5.46,17,1
+180,Houston Academy,AA,Region 1,4.96,13,7
+181,BT Washington,3A,Region 2,4.87,18,2
+182,Springville,5A,Region 6,4.73,53,6
+183,Pike County,3A,Region 2,4.69,19,3
+184,Leroy,1A,Region 1,4.63,4,1
+185,Lincoln,4A,Region 6,4.57,49,9
+186,Cottage Hill Christian,A,Region 1,4.31,7,2
+187,New Brockton,4A,Region 2,4.26,50,7
+188,Southside-Gadsden,5A,Region 6,3.98,54,7
+189,Glencoe,3A,Region 6,3.94,20,3
+190,Ashville,3A,Region 4,3.89,21,2
+191,Escambia County,3A,Region 1,3.85,22,5
+192,Marbury,4A,Region 4,3.78,51,7
+193,Vincent,2A,Region 6,3.7,10,2
+194,Addison,1A,Region 7,3.48,5,1
+195,Westminster Christian,AA,Region 2,3.43,14,7
+196,Wicksburg,3A,Region 2,3.24,23,4
+197,Pleasant Grove,3A,Region 3,3.15,24,3
+198,Chilton County,5A,Region 4,3.08,55,8
+199,Phil Campbell,2A,Region 7,2.96,11,2
+200,Faith Academy,AA,Region 1,2.77,15,8
+201,Ariton,2A,Region 2,2.77,12,1
+202,Flomaton,3A,Region 1,2.65,25,6
+203,Center Point,4A,Region 5,2.6,52,6
+204,Randolph County,2A,Region 4,2.59,13,3
+205,Huffman,5A,Region 5,2.58,56,8
+206,Pleasant Valley,2A,Region 6,2.54,14,3
+207,Oakman,3A,Region 5,2.54,26,4
+208,Loachapoka,1A,Region 6,2.29,6,2
+209,Cold Springs,2A,Region 5,2.29,15,3
+210,Providence Christian,A,Region 1,2.28,8,3
+211,Trinity,A,Region 2,2.24,9,2
+212,LeFlore,4A,Region 1,2.15,53,6
+213,Vinemont,3A,Region 6,1.99,27,4
+214,Isabella,2A,Region 3,1.93,16,1
+215,Thorsby,2A,Region 3,1.9,17,2
+216,East Limestone,5A,Region 7,1.85,57,8
+217,Falkville,2A,Region 7,1.63,18,3
+218,Lawrence County,4A,Region 7,1.62,54,7
+219,Rogers,3A,Region 7,1.41,28,2
+220,Susan Moore,3A,Region 6,1.37,29,5
+221,Carroll,4A,Region 2,1.32,55,8
+222,Dadeville,2A,Region 4,1.24,19,4
+223,Paul Bryant,5A,Region 3,1.17,58,8
+224,West Blocton,3A,Region 3,1.12,30,4
+225,Colbert Heights,3A,Region 7,1.07,31,3
+226,St. John Paul II,AA,Region 2,0.93,16,8
+227,Hale County,3A,Region 3,0.92,32,5
+228,Madison County,3A,Region 8,0.91,33,4
+229,Murphy,5A,Region 1,0.87,59,7
+230,St. James,A,Region 2,0.8,10,3
+231,Columbia,5A,Region 8,0.75,60,7
+232,Cleburne County,3A,Region 4,0.7,34,3
+233,Marion County,1A,Region 5,0.65,7,2
+234,Central-Florence,3A,Region 7,0.55,35,4
+235,Alabama Christian,A,Region 2,0.51,11,4
+236,Red Bay,1A,Region 7,0.51,8,2
+237,McKenzie,1A,Region 4,0.47,9,2
+238,Satsuma,4A,Region 1,0.46,56,7
+239,North Sand Mountain,2A,Region 8,0.01,20,3
+240,Winterboro,1A,Region 6,-0.15,10,3
+241,Cottonwood,2A,Region 2,-0.21,21,2
+242,Park Crossing,5A,Region 2,-0.24,61,8
+243,Dora,4A,Region 5,-0.29,57,7
+244,Sylvania,3A,Region 8,-0.3,36,5
+245,University Charter,1A,Region 3,-0.54,11,1
+246,Thomasville,2A,Region 1,-0.57,22,2
+247,Fairfield,4A,Region 5,-0.6,58,8
+248,JB Pennington,2A,Region 7,-0.61,23,4
+249,Sulligent,1A,Region 5,-0.71,12,3
+250,Hackleburg,1A,Region 7,-0.77,13,3
+251,Lexington,2A,Region 7,-0.83,24,5
+252,Cordova,3A,Region 3,-0.88,37,6
+253,Etowah,3A,Region 6,-1.02,38,6
+254,Jemison,4A,Region 3,-1.19,59,5
+255,Greenville,4A,Region 4,-1.23,60,8
+256,Beulah,3A,Region 2,-1.3,39,5
+257,White Plains,3A,Region 4,-1.36,40,4
+258,Southern Choctaw,1A,Region 1,-1.46,14,2
+259,Collinsville,2A,Region 8,-1.49,25,4
+260,Clarke County,2A,Region 1,-1.52,26,3
+261,Winston County,2A,Region 7,-1.52,27,6
+262,Holt,4A,Region 3,-1.59,61,6
+263,GW Long,2A,Region 2,-1.73,28,3
+264,Fultondale,3A,Region 3,-2.06,41,7
+265,Appalachian,1A,Region 8,-2.07,15,1
+266,Elberta,5A,Region 1,-2.22,62,8
+267,Autauga Academy,A,Region 3,-2.33,12,2
+268,Whitesburg Christian,A,Region 4,-2.46,13,4
+269,Selma,4A,Region 3,-2.58,62,7
+270,Excel,3A,Region 1,-2.61,42,7
+271,Bayside Academy,A,Region 1,-2.71,14,4
+272,St. Luke's,A,Region 1,-2.71,15,5
+273,Fort Dale,A,Region 2,-2.71,16,5
+274,Linsay Lane,A,Region 4,-2.71,17,5
+275,Sheffield,2A,Region 7,-2.75,29,7
+276,Hayden,4A,Region 8,-2.93,63,9
+277,Fayetteville,1A,Region 6,-2.95,16,4
+278,Wilson,3A,Region 7,-2.99,43,5
+279,Walter Wellborn,2A,Region 6,-3,30,4
+280,Berry,1A,Region 5,-3.1,17,4
+281,Holly Pond,3A,Region 6,-3.11,44,7
+282,Lee-Huntsville,5A,Region 8,-3.21,63,8
+283,Southside-Selma,2A,Region 3,-3.23,31,3
+284,Goshen,2A,Region 2,-3.28,32,4
+285,Meek,1A,Region 7,-3.69,18,4
+286,Clements,3A,Region 7,-3.83,45,6
+287,Hillcrest-Evergreen,2A,Region 1,-4.11,33,4
+288,JU Blacksher,2A,Region 1,-4.14,34,5
+289,New Hope,3A,Region 8,-4.19,46,6
+290,Daleville,3A,Region 2,-4.26,47,6
+291,East Lawrence,3A,Region 5,-4.32,48,5
+292,Lynn,1A,Region 5,-4.47,19,5
+293,Munford,3A,Region 4,-4.63,49,5
+294,Midfield,2A,Region 5,-4.84,35,4
+295,Lamar County,2A,Region 5,-4.9,36,5
+296,McIntosh,1A,Region 1,-5.07,20,3
+297,Billingsley,1A,Region 4,-5.08,21,3
+298,Central-Coosa,2A,Region 4,-5.25,37,5
+299,Notasulga,1A,Region 6,-5.45,22,5
+300,Ranburne,2A,Region 4,-5.54,38,6
+301,BB Comer,2A,Region 4,-5.61,39,7
+302,Aliceville,2A,Region 3,-5.63,40,4
+303,Cleveland,2A,Region 5,-5.74,41,6
+304,Prattville Christian,A,Region 2,-5.85,18,6
+305,Curry,3A,Region 5,-5.99,50,6
+306,Danville,3A,Region 5,-6.08,51,7
+307,Zion Chapel,2A,Region 2,-6.28,42,5
+308,South Lamar,1A,Region 5,-6.45,23,6
+309,Victory Christian,A,Region 3,-6.49,19,3
+310,Sweet Water,1A,Region 3,-6.58,24,2
+311,Locust Fork,2A,Region 5,-6.81,43,7
+312,Talladega,3A,Region 4,-6.92,52,6
+313,Spring Garden,1A,Region 8,-6.93,25,2
+314,Highland Home,2A,Region 2,-6.93,44,6
+315,Elkmont,3A,Region 7,-6.97,53,7
+316,Greene County,2A,Region 3,-6.98,45,5
+317,Montevallo,4A,Region 3,-7.08,64,8
+318,Slocomb,3A,Region 2,-7.09,54,7
+319,West Limestone,3A,Region 7,-7.51,55,8
+320,Washington County,1A,Region 1,-7.52,26,4
+321,Linden,1A,Region 3,-7.54,27,3
+322,West End,2A,Region 6,-7.61,46,5
+323,Weaver,3A,Region 4,-7.62,56,7
+324,Breakthrough Charter,1A,Region 3,-7.76,28,4
+325,Alabama Aerospace and Aviation,1A,Region 6,-7.76,29,6
+326,Belgreen,1A,Region 7,-7.76,30,5
+327,Phillips,1A,Region 7,-7.76,31,6
+328,Monroe County,2A,Region 1,-7.76,47,6
+329,Geneva,3A,Region 2,-7.91,57,8
+330,Pickens County,1A,Region 5,-7.94,32,7
+331,Ohatchee,2A,Region 6,-8.15,48,6
+332,Woodland,1A,Region 6,-8.35,33,7
+333,Childersburg,3A,Region 4,-8.36,58,8
+334,Woodville,1A,Region 8,-8.54,34,3
+335,DAR,3A,Region 8,-8.76,59,7
+336,Ragland,1A,Region 8,-8.87,35,4
+337,Millry,1A,Region 1,-8.88,36,5
+338,Sand Rock,2A,Region 8,-9.11,49,5
+339,Brantley,1A,Region 2,-9.32,37,1
+340,Geneva County,2A,Region 2,-9.38,50,7
+341,Verbena,1A,Region 4,-9.75,38,4
+342,Tanner,2A,Region 7,-9.8,51,8
+343,Elba,1A,Region 2,-10.31,39,2
+344,Tarrant,3A,Region 3,-10.44,60,8
+345,Haleyville,3A,Region 5,-10.56,61,8
+346,Shoals Christian,A,Region 4,-10.63,20,6
+347,Section,2A,Region 8,-10.63,52,6
+348,Holy Spirit,A,Region 3,-10.77,21,4
+349,Choctaw County,1A,Region 1,-10.78,40,6
+350,Brindlee Mountain,2A,Region 8,-10.96,53,7
+351,Georgiana,1A,Region 4,-11.21,41,5
+352,Waterloo,1A,Region 7,-11.31,42,7
+353,Samson,1A,Region 2,-11.43,43,3
+354,Greensboro,2A,Region 3,-11.54,54,6
+355,Keith,1A,Region 3,-11.67,44,5
+356,LaFayette,1A,Region 6,-11.93,45,8
+357,Hanceville,3A,Region 6,-11.93,62,8
+358,Carbon Hill,2A,Region 5,-11.95,55,8
+359,Abbeville,1A,Region 2,-11.96,46,4
+360,Chickasaw,2A,Region 1,-12.06,56,7
+361,Horseshoe Bend,2A,Region 4,-12.68,57,8
+362,Northside Methodist,A,Region 1,-12.92,22,6
+363,Saks,2A,Region 6,-12.96,58,7
+364,Marengo,1A,Region 1,-12.98,47,7
+365,Brilliant,1A,Region 5,-13.32,48,8
+366,Decatur Heritage,A,Region 4,-13.36,23,7
+367,Cedar Bluff,1A,Region 8,-13.38,49,5
+368,Houston County,2A,Region 2,-13.51,59,8
+369,Kinston,1A,Region 2,-13.64,50,5
+370,Dallas County,2A,Region 3,-13.87,60,7
+371,Pike Liberal Arts,A,Region 2,-13.91,24,7
+372,Donoho,A,Region 3,-14.04,25,5
+373,Valley Head,1A,Region 8,-14.1,51,6
+374,Florala,1A,Region 2,-14.75,52,6
+375,Calhoun,1A,Region 4,-14.76,53,6
+376,Gaston,2A,Region 6,-15.13,61,8
+377,Gaylesville,1A,Region 8,-15.14,54,7
+378,Ider,2A,Region 8,-15.3,62,8
+379,RC Hatch,1A,Region 3,-15.36,55,6
+380,Cherokee,1A,Region 7,-15.65,56,8
+381,Sumter Central,2A,Region 3,-16.22,63,8
+382,Pickens Academy,A,Region 3,-16.43,26,6
+383,Red Level,1A,Region 4,-16.47,57,7
+384,Asbury,3A,Region 8,-16.66,63,8
+385,Ellwood Christian,A,Region 3,-16.71,27,7
+386,Pleasant Home,1A,Region 2,-17.73,58,7
+387,Wilcox Central,3A,Region 1,-17.78,64,8
+388,Bayshore Christian,A,Region 1,-18.13,28,7
+389,Fruitdale,1A,Region 1,-18.48,59,8
+390,JF Shields,1A,Region 3,-18.85,60,7
+391,Francis Marion,1A,Region 3,-19.56,61,8
+392,Barbour County,1A,Region 2,-19.73,62,8
+393,Central-Hayneville,1A,Region 4,-23.68,63,8

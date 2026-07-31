@@ -96,13 +96,20 @@ export interface EngineConfig {
   perf_dominant_band: number;
 }
 
+/**
+ * Defaults recovered from the 2025 season output, not from PROJECT.md — its
+ * config block lists sos_w 0.75 and wr_w 3.0, which do not reproduce the
+ * ratings that shipped. Fitting the composite against all 387 teams in the
+ * 2025 export gives sos_w 0.90 and wr_w 6.0 to within rounding error.
+ * See scripts/validate-2025.ts.
+ */
 export const DEFAULT_CONFIG: EngineConfig = {
   prior_min: 0,
   prior_max: 14,
   prior_w: 0.22,
-  sos_w: 0.75,
+  sos_w: 0.9,
   eff_w: 0.07,
-  wr_w: 3.0,
+  wr_w: 6.0,
   cap: 28,
   iters: 300,
   oos_mult: 1.3,

@@ -45,6 +45,20 @@ export function isOutOfStateToken(cl: string): boolean {
   return OOS_ASSOCIATIONS.has(cl.trim().toUpperCase());
 }
 
+/**
+ * Alabama schools that play a schedule but are not ranked: they appear in the
+ * PDFs with an AHSAA classification yet are not championship-eligible, so they
+ * have no roster entry. Treated exactly like out-of-state opponents — their
+ * games count toward the opponent's record and are valued off the field mean,
+ * but they never receive a rating or a ranking of their own.
+ */
+export const NON_MEMBER_SCHOOLS = new Set(["vina"]);
+
+export function isNonMember(raw: string): boolean {
+  const forms = variants(raw);
+  return forms.some((f) => NON_MEMBER_SCHOOLS.has(f));
+}
+
 /** Maps the PDF's classification token to a roster classification. */
 export function normalizeClassToken(cl: string): Classification | null {
   // Tolerates the `4a`` style typos the PDFs contain.
@@ -212,24 +226,31 @@ export function normalize(raw: string): string {
     .trim();
 }
 
-/** All progressively-shortened forms of a name, longest first. */
+/**
+ * Every shortened form reachable by stripping suffixes, longest first.
+ *
+ * This explores all applicable patterns rather than greedily taking the first
+ * that matches. "Hope Christian Academy" must yield "hope christian" (the
+ * roster spelling) as well as "hope" — a greedy stripper removes the whole
+ * "christian academy" tail and never produces the form we actually need.
+ */
 function variants(raw: string): string[] {
-  const out = [normalize(raw)];
-  let cur = normalize(raw);
-  let changed = true;
-  while (changed) {
-    changed = false;
+  const start = normalize(raw);
+  const seen = new Set<string>([start]);
+  const queue = [start];
+
+  while (queue.length) {
+    const cur = queue.shift() as string;
     for (const p of SUFFIX_PATTERNS) {
       const next = cur.replace(p, "").trim();
-      if (next && next !== cur) {
-        cur = next;
-        out.push(cur);
-        changed = true;
-        break;
+      if (next && next !== cur && !seen.has(next)) {
+        seen.add(next);
+        queue.push(next);
       }
     }
   }
-  return out;
+  // Longest first, so the most specific form is tried before the vaguest.
+  return [...seen].sort((a, b) => b.length - a.length);
 }
 
 // ---- similarity -----------------------------------------------------------
@@ -324,9 +345,13 @@ export function matchTeam(
     return { ...base, name: null, method: "unmatched", confidence: 0 };
   }
 
-  // Out-of-state: recorded against the opponent's record but never given a
-  // rating of its own. The engine values them off the field mean.
-  if (input.classToken && isOutOfStateToken(input.classToken)) {
+  // Out-of-state and non-championship schools: recorded against the
+  // opponent's record but never given a rating of their own. The engine
+  // values them off the field mean.
+  if (
+    (input.classToken && isOutOfStateToken(input.classToken)) ||
+    isNonMember(raw)
+  ) {
     return {
       ...base,
       name: cleanOosName(raw),

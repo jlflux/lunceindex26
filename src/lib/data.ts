@@ -1,0 +1,137 @@
+/**
+ * Loading domain data and publishing rating snapshots.
+ *
+ * The public site reads a cached snapshot rather than recomputing on every
+ * request — a 300-iteration solve over a full season is not something to run
+ * per page view. Any admin write that changes the inputs republishes.
+ */
+import "server-only";
+
+import { computeRatings } from "./engine";
+import { publicClient, serviceClient } from "./db";
+import {
+  DEFAULT_CONFIG,
+  type EngineConfig,
+  type Game,
+  type RatingsPayload,
+  type Team,
+} from "./types";
+
+/** Supabase caps a single select at 1000 rows; page through it. */
+async function selectAll<T>(
+  client: ReturnType<typeof publicClient>,
+  table: string,
+  order: string,
+): Promise<T[]> {
+  const page = 1000;
+  const out: T[] = [];
+  for (let from = 0; ; from += page) {
+    const { data, error } = await client
+      .from(table)
+      .select("*")
+      .order(order)
+      .range(from, from + page - 1);
+    if (error) throw new Error(`${table}: ${error.message}`);
+    out.push(...((data ?? []) as T[]));
+    if (!data || data.length < page) break;
+  }
+  return out;
+}
+
+export async function loadTeams(admin = false): Promise<Team[]> {
+  const c = admin ? serviceClient() : publicClient();
+  return selectAll<Team>(c, "teams", "name");
+}
+
+export async function loadGames(admin = false): Promise<Game[]> {
+  const c = admin ? serviceClient() : publicClient();
+  return selectAll<Game>(c, "games", "id");
+}
+
+export async function loadConfig(admin = false): Promise<EngineConfig> {
+  const c = admin ? serviceClient() : publicClient();
+  const { data } = await c.from("config").select("data").eq("id", 1).maybeSingle();
+  // Merging over defaults means a config saved before a new knob existed
+  // still loads, rather than yielding undefined mid-solve.
+  return { ...DEFAULT_CONFIG, ...((data?.data as Partial<EngineConfig>) ?? {}) };
+}
+
+export async function saveConfig(config: EngineConfig): Promise<void> {
+  const { error } = await serviceClient()
+    .from("config")
+    .upsert({ id: 1, data: config, updated_at: new Date().toISOString() });
+  if (error) throw new Error(`Saving config: ${error.message}`);
+}
+
+/** Recomputes ratings from current data and caches the result. */
+export async function publishRatings(): Promise<RatingsPayload> {
+  const [teams, games, config] = await Promise.all([
+    loadTeams(true),
+    loadGames(true),
+    loadConfig(true),
+  ]);
+
+  const result = computeRatings(teams, games, config);
+  const payload: RatingsPayload = {
+    generated: new Date().toISOString(),
+    config,
+    ratings: result.ratings,
+    rpi: result.rpi,
+    // The full games array rides along so team pages can render schedules
+    // without a second round trip.
+    games,
+    max_week_played: result.maxWeekPlayed,
+    prior_blend: result.priorBlend,
+  };
+
+  const { error } = await serviceClient()
+    .from("ratings_snapshot")
+    .upsert({ id: 1, payload, generated: payload.generated });
+  if (error) throw new Error(`Publishing ratings: ${error.message}`);
+
+  return payload;
+}
+
+/**
+ * The public read path. Falls back to computing on the fly if no snapshot
+ * exists yet, so a fresh deploy is never a blank page.
+ */
+export async function loadRatings(): Promise<RatingsPayload> {
+  const { data } = await publicClient()
+    .from("ratings_snapshot")
+    .select("payload")
+    .eq("id", 1)
+    .maybeSingle();
+
+  if (data?.payload) return data.payload as RatingsPayload;
+
+  const [teams, games, config] = await Promise.all([
+    loadTeams(),
+    loadGames(),
+    loadConfig(),
+  ]);
+  const result = computeRatings(teams, games, config);
+  return {
+    generated: new Date().toISOString(),
+    config,
+    ratings: result.ratings,
+    rpi: result.rpi,
+    games,
+    max_week_played: result.maxWeekPlayed,
+    prior_blend: result.priorBlend,
+  };
+}
+
+/** Admin-resolved PDF name aliases, keyed by the raw PDF spelling. */
+export async function loadAliases(): Promise<Record<string, string>> {
+  const { data, error } = await serviceClient()
+    .from("team_aliases")
+    .select("alias, teams(name)");
+  if (error) throw new Error(`Loading aliases: ${error.message}`);
+
+  const out: Record<string, string> = {};
+  for (const row of (data ?? []) as { alias: string; teams: { name: string } | null }[]) {
+    if (row.teams?.name) out[row.alias] = row.teams.name;
+  }
+  return out;
+}

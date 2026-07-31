@@ -9,14 +9,18 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test:engine": "tsx scripts/test-engine.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "hash-password": "tsx scripts/hash-password.ts",
+    "parse-schedule": "tsx scripts/test-parse.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^17.4.2",
     "next": "^15.0.3",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

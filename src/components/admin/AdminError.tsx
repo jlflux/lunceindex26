@@ -1,4 +1,5 @@
 import Icon from "@/components/Icon";
+import { supabaseHost } from "@/lib/db";
 
 /**
  * Shown when an admin page cannot load its data.
@@ -21,6 +22,7 @@ export default function AdminError({ error }: { error: string }) {
     { name: "ADMIN_SESSION_SECRET", set: Boolean(process.env.ADMIN_SESSION_SECRET) },
   ];
   const missing = env.filter((e) => !e.set);
+  const host = supabaseHost();
 
   return (
     <div className="space-y-5">
@@ -90,6 +92,22 @@ export default function AdminError({ error }: { error: string }) {
         >
           Presence only — values are never displayed.
         </p>
+
+        {host && (
+          <div className="card mt-3 px-4 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <span
+                className="text-xs"
+                style={{ color: "rgb(var(--text-muted))" }}
+              >
+                Connecting to
+              </span>
+              {/* Host only — it is public anyway, and seeing it makes a
+                  mistyped project URL obvious. */}
+              <code className="text-xs font-bold">{host}</code>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card p-4">
@@ -127,6 +145,14 @@ export default function AdminError({ error }: { error: string }) {
                 <strong>&ldquo;fetch failed&rdquo;</strong> — check{" "}
                 <code>NEXT_PUBLIC_SUPABASE_URL</code> is the full{" "}
                 <code>https://…supabase.co</code> project URL.
+              </li>
+              <li>
+                <strong>
+                  &ldquo;Invalid path specified in request URL&rdquo;
+                </strong>{" "}
+                — the project URL has extra path on it. It must be just{" "}
+                <code>https://your-project.supabase.co</code>, with no{" "}
+                <code>/rest/v1</code> and no trailing slash.
               </li>
             </>
           )}

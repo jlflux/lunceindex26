@@ -39,7 +39,7 @@ function LoginForm() {
     <form onSubmit={submit} className="card w-full max-w-sm space-y-4 p-6">
       <div>
         <h1 className="text-xl font-extrabold tracking-tight">
-          ALPreps<span style={{ color: "rgb(var(--accent))" }}> Admin</span>
+          ALPreps<span style={{ color: "rgb(var(--brand))" }}> Admin</span>
         </h1>
         <p className="mt-1 text-sm" style={{ color: "rgb(var(--text-muted))" }}>
           Sign in to manage ratings and results.

@@ -104,12 +104,17 @@ export default function TeamsManager({ initial }: { initial: Team[] }) {
               <button
                 key={c}
                 onClick={() => setCls(c as Classification | "all")}
-                className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold"
+                className="shrink-0 rounded-[10px] border px-3 py-1.5 text-xs font-semibold transition-colors"
                 style={
                   cls === c
-                    ? { background: "rgb(var(--accent))", color: "#fff" }
+                    ? {
+                        background: "rgb(var(--primary))",
+                        borderColor: "rgb(var(--primary))",
+                        color: "rgb(var(--primary-fg))",
+                      }
                     : {
-                        background: "rgb(var(--surface-2))",
+                        background: "rgb(var(--surface))",
+                        borderColor: "rgb(var(--border))",
                         color: "rgb(var(--text-muted))",
                       }
                 }

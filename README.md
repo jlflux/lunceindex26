@@ -31,25 +31,30 @@ npm run hash-password -- "a long password you'll remember"
 Paste the two lines it prints into `.env.local`. The password itself is never
 stored — only a PBKDF2 hash.
 
-### 3. Seed
+### 3. Load the data
 
 ```bash
 npm install
-npm run seed
+npm run setup -- --dry-run   # report everything, write nothing
+npm run setup                # write it
 ```
 
-That loads all 393 teams from `data/AHSAA_Class_List_2026.csv`, plus the alias
-table used to match schedule-PDF spellings to roster names.
+One command does the lot, from the files already in `data/`:
 
-To seed carry-over ratings at the same time:
+- all 393 teams from `AHSAA_Class_List_2026.csv`
+- preseason carry-over ratings from `alpreps_preseason_2026.csv`
+- the alias table mapping schedule-PDF spellings to roster names
+- every `*Week_N*.pdf` schedule in `data/`, week taken from the filename
+- the default formula config
+- the first published ratings snapshot
 
-```bash
-npm run seed -- --priors data/preseason_priors.csv
-```
+It is idempotent. Teams upsert by name, games upsert on their natural key, and
+**a game that already has scores is never overwritten**, so re-running
+mid-season will not wipe results. An existing formula config is left untouched.
 
-The priors CSV needs a team-name column and a rating column; the exact headers
-are flexible. Any team without a prior seeds from its classification baseline
-alone. You can also import priors later from **Admin → Teams**.
+Run the dry run first: it prints classification counts, which teams matched a
+preseason rating, the parse report for each schedule PDF, and the resulting top
+10 — without touching the database.
 
 ### 4. Run
 

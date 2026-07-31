@@ -310,7 +310,7 @@ function Slider({
       </div>
       <input
         type="range"
-        className="mt-1.5 w-full accent-[rgb(var(--accent))]"
+        className="mt-1.5 w-full accent-[rgb(var(--brand))]"
         min={knob.min}
         max={knob.max}
         step={knob.step}

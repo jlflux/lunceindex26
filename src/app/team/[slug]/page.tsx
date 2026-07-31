@@ -127,7 +127,8 @@ export default async function TeamPage({
               className="card px-4 py-14 text-center text-sm"
               style={{ color: "rgb(var(--text-faint))" }}
             >
-              No games on file yet.
+              No games on file yet — {t.name} is not on any schedule that has
+              been imported.
             </div>
           ) : (
             <div className="space-y-2">
@@ -137,18 +138,20 @@ export default async function TeamPage({
             </div>
           )}
 
-          <p
-            className="mt-3 text-xs leading-relaxed"
-            style={{ color: "rgb(var(--text-faint))" }}
-          >
-            Projected margins come from the rating gap plus home-field
-            advantage. A result is <strong>dominant</strong> when it beats the
-            projection by {data.config.perf_dominant_band}+ points,{" "}
-            <strong>exceeded</strong> when it beats it by more than{" "}
-            {data.config.perf_expected_band}, and{" "}
-            <strong>below expectation</strong> when it falls short by more than{" "}
-            {data.config.perf_expected_band}.
-          </p>
+          {schedule.length > 0 && (
+            <p
+              className="mt-3 text-xs leading-relaxed"
+              style={{ color: "rgb(var(--text-faint))" }}
+            >
+              Projected margins come from the rating gap plus home-field
+              advantage. A result is <strong>dominant</strong> when it beats the
+              projection by {data.config.perf_dominant_band}+ points,{" "}
+              <strong>exceeded</strong> when it beats it by more than{" "}
+              {data.config.perf_expected_band}, and{" "}
+              <strong>below expectation</strong> when it falls short by more
+              than {data.config.perf_expected_band}.
+            </p>
+          )}
         </section>
 
         {/* Breakdown */}

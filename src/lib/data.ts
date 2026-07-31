@@ -92,34 +92,58 @@ export async function publishRatings(): Promise<RatingsPayload> {
   return payload;
 }
 
+function emptyPayload(): RatingsPayload {
+  return {
+    generated: new Date().toISOString(),
+    config: DEFAULT_CONFIG,
+    ratings: [],
+    rpi: [],
+    games: [],
+    max_week_played: 0,
+    prior_blend: 1,
+  };
+}
+
 /**
  * The public read path. Falls back to computing on the fly if no snapshot
  * exists yet, so a fresh deploy is never a blank page.
+ *
+ * Never throws. The homepage is prerendered at build time, and a database
+ * that is unreachable or not yet provisioned would otherwise fail the whole
+ * build rather than showing an empty board.
  */
 export async function loadRatings(): Promise<RatingsPayload> {
-  const { data } = await publicClient()
-    .from("ratings_snapshot")
-    .select("payload")
-    .eq("id", 1)
-    .maybeSingle();
+  try {
+    const { data } = await publicClient()
+      .from("ratings_snapshot")
+      .select("payload")
+      .eq("id", 1)
+      .maybeSingle();
 
-  if (data?.payload) return data.payload as RatingsPayload;
+    if (data?.payload) return data.payload as RatingsPayload;
+  } catch {
+    return emptyPayload();
+  }
 
-  const [teams, games, config] = await Promise.all([
-    loadTeams(),
-    loadGames(),
-    loadConfig(),
-  ]);
-  const result = computeRatings(teams, games, config);
-  return {
-    generated: new Date().toISOString(),
-    config,
-    ratings: result.ratings,
-    rpi: result.rpi,
-    games,
-    max_week_played: result.maxWeekPlayed,
-    prior_blend: result.priorBlend,
-  };
+  try {
+    const [teams, games, config] = await Promise.all([
+      loadTeams(),
+      loadGames(),
+      loadConfig(),
+    ]);
+    const result = computeRatings(teams, games, config);
+    return {
+      generated: new Date().toISOString(),
+      config,
+      ratings: result.ratings,
+      rpi: result.rpi,
+      games,
+      max_week_played: result.maxWeekPlayed,
+      prior_blend: result.priorBlend,
+    };
+  } catch {
+    return emptyPayload();
+  }
 }
 
 /** Admin-resolved PDF name aliases, keyed by the raw PDF spelling. */
@@ -129,9 +153,15 @@ export async function loadAliases(): Promise<Record<string, string>> {
     .select("alias, teams(name)");
   if (error) throw new Error(`Loading aliases: ${error.message}`);
 
+  // The embedded relation comes back as an array or an object depending on
+  // how PostgREST resolves the foreign key; normalise both.
   const out: Record<string, string> = {};
-  for (const row of (data ?? []) as { alias: string; teams: { name: string } | null }[]) {
-    if (row.teams?.name) out[row.alias] = row.teams.name;
+  for (const row of (data ?? []) as unknown as {
+    alias: string;
+    teams: { name: string } | { name: string }[] | null;
+  }[]) {
+    const team = Array.isArray(row.teams) ? row.teams[0] : row.teams;
+    if (team?.name) out[row.alias] = team.name;
   }
   return out;
 }

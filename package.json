@@ -11,7 +11,8 @@
     "test:engine": "tsx scripts/test-engine.ts",
     "seed": "tsx scripts/seed.ts",
     "hash-password": "tsx scripts/hash-password.ts",
-    "parse-schedule": "tsx scripts/test-parse.ts"
+    "parse-schedule": "tsx scripts/test-parse.ts",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

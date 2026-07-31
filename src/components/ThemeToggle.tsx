@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Icon from "./Icon";
 
 const STORAGE_KEY = "alpreps-theme";
 
@@ -24,10 +25,12 @@ type Theme = "light" | "dark" | "system";
 
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>("system");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") setTheme(stored);
+    setMounted(true);
   }, []);
 
   function apply(next: Theme) {
@@ -41,27 +44,22 @@ export default function ThemeToggle() {
     }
   }
 
-  // Cycles system → light → dark. The icon shows what you'd switch to.
+  // Cycles system → light → dark.
   const next: Theme =
     theme === "system" ? "light" : theme === "light" ? "dark" : "system";
-
-  const label =
-    theme === "system"
-      ? "Theme: system"
-      : theme === "light"
-        ? "Theme: light"
-        : "Theme: dark";
+  const icon = theme === "system" ? "monitor" : theme === "light" ? "sun" : "moon";
+  const label = `Theme: ${theme}. Switch to ${next}.`;
 
   return (
     <button
       onClick={() => apply(next)}
-      className="btn !px-2.5"
-      title={`${label} — click for ${next}`}
-      aria-label={`${label}. Switch to ${next}.`}
+      className="btn !h-9 !w-9 !p-0"
+      title={label}
+      aria-label={label}
+      // Server renders the system icon; suppress the mismatch until hydrated.
+      suppressHydrationWarning
     >
-      <span aria-hidden className="text-base leading-none">
-        {theme === "system" ? "◐" : theme === "light" ? "☀" : "☾"}
-      </span>
+      <Icon name={mounted ? icon : "monitor"} size={16} />
     </button>
   );
 }

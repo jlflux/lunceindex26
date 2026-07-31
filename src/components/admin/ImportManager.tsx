@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AdminHeader } from "./AdminShell";
 import { Banner } from "./PublishButton";
 import type { ScoreRow } from "@/lib/score-csv";
 import { PLAYOFF_ROUND_LABELS, type PlayoffRound } from "@/lib/types";
@@ -14,7 +15,10 @@ export default function ImportManager() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-extrabold tracking-tight">Import</h1>
+      <AdminHeader
+        title="Import"
+        subtitle="Bulk-load a week of scores, or pull a schedule straight from the AHSAA PDF."
+      />
 
       <div
         className="flex gap-1 rounded-xl p-1"

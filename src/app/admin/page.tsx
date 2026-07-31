@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { AdminHeader } from "@/components/admin/AdminShell";
 import PublishButton from "@/components/admin/PublishButton";
+import Icon from "@/components/Icon";
+import StatCard from "@/components/StatCard";
 import { loadConfig, loadGames, loadTeams } from "@/lib/data";
 import { isPlayed } from "@/lib/engine";
 
@@ -18,63 +21,81 @@ export default async function AdminDashboard() {
   const withPriors = teams.filter((t) => t.preseason_prior !== null).length;
 
   return (
-    <div className="space-y-8">
-      <section>
-        <h1 className="text-xl font-extrabold tracking-tight">Dashboard</h1>
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-          <Stat label="Teams" value={teams.length.toLocaleString()} />
-          <Stat label="Games on file" value={games.length.toLocaleString()} />
-          <Stat label="Games played" value={played.length.toLocaleString()} />
-          <Stat
-            label="Latest week played"
-            value={played.length ? `Week ${maxWeek}` : "—"}
-          />
-          <Stat
-            label="Preseason carry-over"
-            value={`${Math.round(priorBlend * 100)}%`}
-          />
-        </div>
-      </section>
+    <div className="space-y-7">
+      <AdminHeader
+        title="Dashboard"
+        subtitle="Edits save immediately but stay off the public site until you publish."
+      />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <StatCard icon="users" label="Teams" value={teams.length.toLocaleString()} />
+        <StatCard
+          icon="calendar"
+          label="Games on file"
+          value={games.length.toLocaleString()}
+        />
+        <StatCard
+          icon="check"
+          label="Games played"
+          value={played.length.toLocaleString()}
+        />
+        <StatCard
+          icon="clock"
+          label="Latest week"
+          value={played.length ? `Week ${maxWeek}` : "—"}
+        />
+        <StatCard
+          icon="database"
+          label="Carry-over"
+          value={`${Math.round(priorBlend * 100)}%`}
+        />
+      </div>
 
       {withPriors < teams.length && (
-        <section
+        <div
           className="card p-4"
-          style={{ borderColor: "rgb(202 138 4 / 0.5)" }}
+          style={{ borderColor: "rgb(var(--warn) / 0.45)" }}
         >
-          <h2 className="text-sm font-bold">
-            {teams.length - withPriors} of {teams.length} teams have no
-            preseason rating
+          <h2 className="flex items-center gap-2 text-sm font-bold">
+            <span style={{ color: "rgb(var(--warn))" }}>
+              <Icon name="info" size={15} />
+            </span>
+            {teams.length - withPriors} of {teams.length} teams have no preseason
+            rating
           </h2>
           <p
-            className="mt-1 text-sm leading-relaxed"
+            className="mt-1.5 text-sm leading-relaxed"
             style={{ color: "rgb(var(--text-muted))" }}
           >
             Those teams seed from their classification baseline alone. Import
             carry-over ratings on the{" "}
-            <Link href="/admin/teams" className="underline">
+            <Link href="/admin/teams" className="font-semibold underline">
               Teams
             </Link>{" "}
             page to start the season where last season finished.
           </p>
-        </section>
+        </div>
       )}
 
       <section className="space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-wider">Publish</h2>
-        <p className="text-sm" style={{ color: "rgb(var(--text-muted))" }}>
-          Edits are saved immediately but do not reach the public site until
-          you publish. Ratings never move on their own — only played games
-          change them.
-        </p>
+        <h2 className="text-[13px] font-bold uppercase tracking-wider">
+          Publish
+        </h2>
         <PublishButton />
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-bold uppercase tracking-wider">
-          Current formula
-        </h2>
-        <div className="card table-scroll">
-          <table className="w-full text-sm">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-[13px] font-bold uppercase tracking-wider">
+            Current formula
+          </h2>
+          <Link href="/admin/formula" className="btn !py-1.5 !text-xs">
+            <Icon name="sliders" size={14} />
+            Adjust
+          </Link>
+        </div>
+        <div className="card table-scroll scroll-thin overflow-hidden">
+          <table className="w-full">
             <tbody>
               {Object.entries(config).map(([k, v]) => (
                 <tr
@@ -83,37 +104,18 @@ export default async function AdminDashboard() {
                   style={{ borderColor: "rgb(var(--border))" }}
                 >
                   <td
-                    className="px-3 py-1.5 font-medium"
+                    className="td font-medium"
                     style={{ color: "rgb(var(--text-muted))" }}
                   >
                     {k}
                   </td>
-                  <td className="px-3 py-1.5 text-right font-bold tabular-nums">
-                    {v}
-                  </td>
+                  <td className="td !text-right font-bold tnum">{String(v)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <Link href="/admin/formula" className="btn">
-          Adjust formula
-        </Link>
       </section>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="card px-3 py-2.5">
-      <div
-        className="text-[10px] font-semibold uppercase tracking-wider"
-        style={{ color: "rgb(var(--text-faint))" }}
-      >
-        {label}
-      </div>
-      <div className="mt-0.5 text-xl font-bold tabular-nums">{value}</div>
     </div>
   );
 }

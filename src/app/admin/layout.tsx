@@ -1,4 +1,4 @@
-import AdminNav from "@/components/admin/AdminNav";
+import AdminShell from "@/components/admin/AdminShell";
 
 export const metadata = {
   title: { default: "Admin", template: "%s · ALPreps Admin" },
@@ -10,10 +10,5 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="min-h-screen">
-      <AdminNav />
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">{children}</main>
-    </div>
-  );
+  return <AdminShell>{children}</AdminShell>;
 }

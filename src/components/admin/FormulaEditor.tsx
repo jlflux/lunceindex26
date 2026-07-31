@@ -142,7 +142,7 @@ export default function FormulaEditor({ initial }: { initial: EngineConfig }) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-extrabold tracking-tight">Formula</h1>
+        <h1 className="text-[22px] font-extrabold tracking-tight">Formula</h1>
         <button
           className="btn !py-1.5 !text-xs"
           onClick={() => {

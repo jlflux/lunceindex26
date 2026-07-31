@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AdminHeader } from "./AdminShell";
 import { Banner } from "./PublishButton";
 import { weekLabel } from "@/lib/format";
 import { PLAYOFF_ROUND_LABELS, type Game, type PlayoffRound } from "@/lib/types";
@@ -130,7 +131,10 @@ export default function GamesManager({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-extrabold tracking-tight">Games</h1>
+      <AdminHeader
+        title="Games"
+        subtitle="Add results one at a time, or edit anything already on file."
+      />
 
       <form onSubmit={save} className="card space-y-4 p-4">
         <h2 className="text-sm font-bold uppercase tracking-wider">

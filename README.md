@@ -100,10 +100,22 @@ Renaming a team also rewrites its games, since games reference teams by name.
 
 ```bash
 npm run test:engine       # 24 invariant checks on the rating engine
+npm run validate          # reproduce the 2025 ratings from the 2025 export
 npm run smoke             # roster → PDF → engine, end to end, no database
 npm run parse-schedule    # parse report for a schedule PDF
 npm run typecheck
 ```
+
+### Previewing without a database
+
+```bash
+npm run preview -- --played   # builds scripts/out/preview.json from the CSVs
+npm run preview:serve         # serves the real UI against it
+```
+
+Useful for design work — renders all 393 teams and the Week 0 schedule with no
+Supabase connection. `--played` invents deterministic results so records,
+efficiency columns and result labels are populated.
 
 ---
 
@@ -147,6 +159,21 @@ than an error. `PROJECT.md` covers the reasoning.
 - **Classification comes from the roster, never the PDF.** The published PDFs
   contain classification errors.
 
-The engine has not yet been validated against the 2025 season — that check
-needs the 2025 game data. `npm run test:engine` covers the invariants above but
-is not a substitute for a team-by-team diff against the original PHP output.
+## Validation status
+
+`npm run validate` reproduces all 387 final 2025 ratings from the 2025 export
+to a mean absolute error of 0.0046 — within the rounding of that file. That
+confirms the composite step (step 5) and the SOS median.
+
+It does **not** confirm the Massey solve itself (steps 1–3), which needs the
+2025 game results to reproduce. `npm run test:engine` covers the invariants
+above but is not a substitute for that diff.
+
+Two things came out of the validation and are worth knowing:
+
+- **PROJECT.md's config block is stale.** It lists `sos_w` 0.75 and `wr_w` 3.0.
+  The ratings that actually shipped used 0.90 and 6.0. The defaults in
+  `src/lib/types.ts` follow the data, not the document.
+- **SOS is legitimately negative** for teams on weak schedules — it is a mean
+  opponent rating, not a count. The adjustment must apply to every team that
+  has played, while the *median* is still taken over teams with `sos > 0`.

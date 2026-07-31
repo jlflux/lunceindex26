@@ -113,6 +113,14 @@ function emptyPayload(): RatingsPayload {
  * build rather than showing an empty board.
  */
 export async function loadRatings(): Promise<RatingsPayload> {
+  // Local preview: renders the real UI against a generated payload without a
+  // database. Set by `npm run preview`; never used in production.
+  const previewPath = process.env.ALPREPS_PREVIEW_DATA;
+  if (previewPath) {
+    const { readFileSync } = await import("node:fs");
+    return JSON.parse(readFileSync(previewPath, "utf8")) as RatingsPayload;
+  }
+
   try {
     const { data } = await publicClient()
       .from("ratings_snapshot")

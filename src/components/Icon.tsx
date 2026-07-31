@@ -28,7 +28,8 @@ export type IconName =
   | "menu"
   | "close"
   | "trend-up"
-  | "trend-down";
+  | "trend-down"
+  | "copy";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   grid: (
@@ -152,6 +153,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="m3 7 6 6 4-4 8 8" />
       <path d="M14 17h7v-7" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
     </>
   ),
 };

@@ -60,7 +60,7 @@ Regenerate the SQL after changing anything in `data/`:
 npm run seed:sql
 ```
 
-### 4. Run
+### 4. Run locally (optional)
 
 ```bash
 npm run dev
@@ -68,10 +68,33 @@ npm run dev
 
 Public site at `/`, admin at `/admin`.
 
-### 5. Deploy
+### 5. Deploy to Vercel
 
-Push to GitHub, import the repo in Vercel, and add the same four environment
-variables. No build configuration is needed.
+1. **Import the repo.** vercel.com → Add New → Project → pick this repo.
+   Framework detection and build settings need no changes.
+
+2. **Add four environment variables** (Settings → Environment Variables), for
+   Production, Preview and Development:
+
+   | Variable | Where to find it |
+   |---|---|
+   | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | same page, `anon` `public` key |
+   | `SUPABASE_SERVICE_ROLE_KEY` | same page, `service_role` key — **server-side only, never expose it** |
+   | `ADMIN_PASSWORD_HASH` | see step 3 below |
+   | `ADMIN_SESSION_SECRET` | see step 3 below |
+
+3. **Generate the admin credentials.** Deploy once with just the Supabase
+   variables, then visit **`/admin/setup`** on the deployed site. Enter a
+   password and it prints both admin variables to paste into Vercel. The
+   hashing happens in the page — the password itself is never transmitted.
+
+   With a terminal, `npm run hash-password -- "your password"` does the same.
+
+4. **Redeploy** so the new variables take effect, then sign in at `/admin`.
+
+`/admin/setup` and `/admin/login` are the only unauthenticated admin routes.
+Setup reads no data and grants no access; it is a calculator.
 
 ---
 

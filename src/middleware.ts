@@ -8,7 +8,12 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth";
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (pathname === "/admin/login") return NextResponse.next();
+  // The setup page has to be reachable before ADMIN_PASSWORD_HASH exists —
+  // it generates that value. It runs entirely client-side, reads no data and
+  // grants no access.
+  if (pathname === "/admin/login" || pathname === "/admin/setup") {
+    return NextResponse.next();
+  }
 
   const secret = process.env.ADMIN_SESSION_SECRET;
   if (!secret) {

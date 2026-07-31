@@ -66,15 +66,23 @@ function LoginForm() {
       </div>
 
       {error && (
-        <p
+        <div
           className="rounded-lg px-3 py-2 text-sm"
           style={{
-            background: "rgb(var(--bad) / 0.1)",
+            background: "rgb(var(--bad-soft))",
             color: "rgb(var(--bad))",
           }}
         >
           {error}
-        </p>
+          {params.get("error") === "setup" && (
+            <>
+              {" "}
+              <a href="/admin/setup" className="font-semibold underline">
+                Generate them here.
+              </a>
+            </>
+          )}
+        </div>
       )}
 
       <button

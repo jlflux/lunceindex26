@@ -14,7 +14,10 @@ export default function AdminShell({
 }) {
   const pathname = usePathname();
 
-  if (pathname === "/admin/login") return <>{children}</>;
+  // Both live under /admin but render bare — no nav, no sidebar offset.
+  if (pathname === "/admin/login" || pathname === "/admin/setup") {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen">

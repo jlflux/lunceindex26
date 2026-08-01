@@ -16,7 +16,8 @@
     "validate": "tsx scripts/validate-2025.ts",
     "preview:serve": "ALPREPS_PREVIEW_DATA=$PWD/scripts/out/preview.json next dev",
     "setup": "tsx scripts/setup.ts",
-    "seed:sql": "tsx scripts/make-seed-sql.ts"
+    "seed:sql": "tsx scripts/make-seed-sql.ts",
+    "parse-ahsfhs": "tsx scripts/test-ahsfhs.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

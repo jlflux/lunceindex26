@@ -8,7 +8,7 @@ import { PLAYOFF_ROUND_LABELS, type PlayoffRound } from "@/lib/types";
 
 const ROUNDS = Object.keys(PLAYOFF_ROUND_LABELS) as PlayoffRound[];
 
-type Mode = "scores" | "schedule";
+type Mode = "scores" | "schedule" | "ahsfhs";
 
 export default function ImportManager() {
   const [mode, setMode] = useState<Mode>("scores");
@@ -28,6 +28,7 @@ export default function ImportManager() {
           [
             ["scores", "Weekly scores (CSV)"],
             ["schedule", "Schedule (AHSAA PDF)"],
+            ["ahsfhs", "Full schedules (ahsfhs.org)"],
           ] as [Mode, string][]
         ).map(([id, label]) => (
           <button
@@ -48,7 +49,13 @@ export default function ImportManager() {
         ))}
       </div>
 
-      {mode === "scores" ? <ScoreImport /> : <ScheduleImport />}
+      {mode === "scores" ? (
+        <ScoreImport />
+      ) : mode === "schedule" ? (
+        <ScheduleImport />
+      ) : (
+        <AhsfhsImport />
+      )}
     </div>
   );
 }
@@ -597,6 +604,234 @@ function ScheduleImport() {
             {busy
               ? "Importing…"
               : `Import ${report.games.length} games into week ${week}`}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+
+// -------------------------------------------------------------- ahsfhs.org
+
+interface AhsfhsRow {
+  home: string;
+  away: string;
+  week: number;
+  date: string | null;
+  source: string;
+  note: string | null;
+}
+
+/**
+ * The AHSAA's weekly PDFs omit games. ahsfhs.org carries a full schedule per
+ * team, so this pulls from there — either by fetching directly (only works
+ * where the deployment can reach the site) or from saved pages.
+ */
+function AhsfhsImport() {
+  const [rows, setRows] = useState<AhsfhsRow[] | null>(null);
+  const [problems, setProblems] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{
+    tone: "good" | "bad" | "warn";
+    text: string;
+  } | null>(null);
+
+  async function upload(files: FileList) {
+    setBusy(true);
+    setMessage(null);
+    setRows(null);
+    try {
+      const form = new FormData();
+      for (const f of Array.from(files)) form.append("files", f);
+      const res = await fetch("/api/admin/import/ahsfhs", {
+        method: "POST",
+        body: form,
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Could not read those pages.");
+      setRows(body.games);
+      setProblems(body.problems ?? []);
+      setMessage({
+        tone: body.problems?.length ? "warn" : "good",
+        text: `${body.files} page(s) → ${body.games.length} games, ${body.duplicates} duplicate listings collapsed.`,
+      });
+    } catch (e) {
+      setMessage({
+        tone: "bad",
+        text: e instanceof Error ? e.message : "Upload failed.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function fetchAll() {
+    setBusy(true);
+    setMessage(null);
+    setRows(null);
+    try {
+      const res = await fetch("/api/admin/import/ahsfhs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ onlyMissing: false }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Fetch failed.");
+      setRows(body.games);
+      setProblems(body.problems ?? []);
+      setMessage({
+        tone: body.problems?.length ? "warn" : "good",
+        text: `Fetched ${body.fetched} of ${body.attempted} team pages → ${body.games.length} games.`,
+      });
+    } catch (e) {
+      setMessage({
+        tone: "bad",
+        text: e instanceof Error ? e.message : "Fetch failed.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function commit() {
+    if (!rows) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/import/ahsfhs", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ games: rows }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? "Import failed.");
+      setMessage({
+        tone: "good",
+        text: `Imported ${body.imported} games${
+          body.skippedAlreadyPlayed
+            ? `, left ${body.skippedAlreadyPlayed} alone because they already have scores`
+            : ""
+        }. Publish from the dashboard to update the site.`,
+      });
+      setRows(null);
+    } catch (e) {
+      setMessage({
+        tone: "bad",
+        text: e instanceof Error ? e.message : "Import failed.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="card space-y-3 p-4">
+        <p className="text-sm" style={{ color: "rgb(var(--text-muted))" }}>
+          Pulls whole-season schedules from ahsfhs.org, which carries games the
+          AHSAA weekly PDFs leave out. Every fixture appears on both teams&rsquo;
+          pages; home and away come from the &ldquo;@&rdquo; / &ldquo;vs.&rdquo;
+          marker, so the duplicate collapses to one game. Scores already entered
+          are never touched.
+        </p>
+        <p className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
+          That site also lists AISA and defunct programs. Anything that does not
+          match your roster is reported rather than imported.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button className="btn btn-primary" onClick={fetchAll} disabled={busy}>
+            {busy ? "Working…" : "Fetch all teams"}
+          </button>
+          <span className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
+            or upload saved pages:
+          </span>
+          <input
+            type="file"
+            accept=".html,.htm,text/html"
+            multiple
+            className="text-sm"
+            disabled={busy}
+            onChange={(e) => e.target.files?.length && upload(e.target.files)}
+          />
+        </div>
+      </div>
+
+      {message && <Banner tone={message.tone}>{message.text}</Banner>}
+
+      {problems.length > 0 && (
+        <details className="card p-4">
+          <summary className="cursor-pointer text-sm font-bold">
+            {problems.length} thing(s) to check
+          </summary>
+          <ul
+            className="mt-2 space-y-1 text-xs"
+            style={{ color: "rgb(var(--text-muted))" }}
+          >
+            {problems.slice(0, 200).map((p, i) => (
+              <li key={i}>• {p}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {rows && (
+        <>
+          <div className="card table-scroll">
+            <table className="w-full">
+              <thead>
+                <tr
+                  className="border-b text-[11px] uppercase tracking-wider"
+                  style={{
+                    borderColor: "rgb(var(--border))",
+                    color: "rgb(var(--text-faint))",
+                  }}
+                >
+                  <th className="px-3 py-2 text-left">Wk</th>
+                  <th className="px-3 py-2 text-left">Matchup</th>
+                  <th className="px-3 py-2 text-left">Date</th>
+                  <th className="px-3 py-2 text-left">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.slice(0, 400).map((r, i) => (
+                  <tr
+                    key={i}
+                    className="border-b last:border-0"
+                    style={{ borderColor: "rgb(var(--border))" }}
+                  >
+                    <td className="px-3 py-2 text-xs tnum">{r.week}</td>
+                    <td className="px-3 py-2 text-sm">
+                      <span className="font-semibold">{r.home}</span>
+                      <span style={{ color: "rgb(var(--text-faint))" }}>
+                        {" vs "}
+                      </span>
+                      <span className="font-semibold">{r.away}</span>
+                    </td>
+                    <td
+                      className="px-3 py-2 text-xs"
+                      style={{ color: "rgb(var(--text-muted))" }}
+                    >
+                      {r.date ?? "—"}
+                    </td>
+                    <td
+                      className="px-3 py-2 text-xs"
+                      style={{ color: "rgb(var(--text-faint))" }}
+                    >
+                      {r.note ?? ""}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {rows.length > 400 && (
+            <p className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
+              Showing the first 400 of {rows.length}. All of them import.
+            </p>
+          )}
+          <button className="btn btn-primary" onClick={commit} disabled={busy}>
+            {busy ? "Importing…" : `Import ${rows.length} games`}
           </button>
         </>
       )}

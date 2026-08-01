@@ -59,6 +59,23 @@ export function isNonMember(raw: string): boolean {
   return forms.some((f) => NON_MEMBER_SCHOOLS.has(f));
 }
 
+/** Every US state except Alabama — a trailing one marks an outside opponent. */
+const OTHER_STATE_CODES = new Set(
+  ("AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO " +
+    "MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC")
+    .split(" "),
+);
+
+/**
+ * ahsfhs.org writes out-of-state opponents as "Pace FL" — the name followed by
+ * a state code. Checked against a real state list so Roman numerals and
+ * initialisms ("St. John Paul II") are not mistaken for one.
+ */
+export function hasOutOfStateSuffix(raw: string): boolean {
+  const m = raw.trim().match(/\b([A-Za-z]{2})\.?$/);
+  return m ? OTHER_STATE_CODES.has(m[1].toUpperCase()) : false;
+}
+
 /** Maps the PDF's classification token to a roster classification. */
 export function normalizeClassToken(cl: string): Classification | null {
   // Tolerates the `4a`` style typos the PDFs contain.
@@ -350,7 +367,8 @@ export function matchTeam(
   // values them off the field mean.
   if (
     (input.classToken && isOutOfStateToken(input.classToken)) ||
-    isNonMember(raw)
+    isNonMember(raw) ||
+    hasOutOfStateSuffix(raw)
   ) {
     return {
       ...base,

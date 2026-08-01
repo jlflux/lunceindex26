@@ -25,13 +25,15 @@ export default async function SchedulePage() {
     t2Slug: rated.get(g.t2)?.slug ?? null,
     t1Class: rated.get(g.t1)?.classification ?? null,
     t2Class: rated.get(g.t2)?.classification ?? null,
+    t1Rank: rated.get(g.t1)?.rank ?? null,
+    t2Rank: rated.get(g.t2)?.rank ?? null,
   }));
 
   return (
     <AppShell generated={data.generated}>
       <PageHeader
         title="Schedule"
-        subtitle="Every game on file, by week. Results appear as soon as both scores are entered."
+        subtitle="Every game on file, ordered by the home team’s classification. Results appear as soon as both scores are entered."
       />
       {games.length === 0 ? (
         <EmptyState

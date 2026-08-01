@@ -3,7 +3,13 @@
  * margins and how each result compared with its projection.
  */
 import { classifyPerformance, expectedMargin, isPlayed } from "./engine";
-import type { Game, RatingRow, RatingsPayload, RpiRow } from "./types";
+import type {
+  Classification,
+  Game,
+  RatingRow,
+  RatingsPayload,
+  RpiRow,
+} from "./types";
 import type { Performance as Perf } from "./engine";
 
 export interface ScheduleEntry {
@@ -13,6 +19,8 @@ export interface ScheduleEntry {
   opponentSlug: string | null;
   opponentRating: number | null;
   opponentRank: number | null;
+  /** Null for out-of-state schools, which carry no AHSAA classification. */
+  opponentClass: Classification | null;
   isHome: boolean;
   played: boolean;
   teamScore: number | null;
@@ -78,6 +86,7 @@ export function buildTeamView(
         opponentSlug: opp?.slug ?? null,
         opponentRating: opp?.rating ?? null,
         opponentRank: opp?.rank ?? null,
+        opponentClass: opp?.classification ?? null,
         isHome,
         played,
         teamScore,

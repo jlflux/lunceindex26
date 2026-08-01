@@ -4,8 +4,17 @@ export const fmt = (n: number, digits = 2) =>
   Number.isFinite(n) ? n.toFixed(digits) : "—";
 
 /** Signed, for differentials where the direction is the point. */
-export const fmtSigned = (n: number, digits = 1) =>
-  `${n > 0 ? "+" : n < 0 ? "−" : ""}${Math.abs(n).toFixed(digits)}`;
+/**
+ * Signed, with the sign taken from the *rounded* value.
+ *
+ * Reading the sign off the raw number prints "−0" for anything that rounds
+ * away to zero, e.g. a margin of −0.4 at zero decimals.
+ */
+export const fmtSigned = (n: number, digits = 1) => {
+  const body = Math.abs(n).toFixed(digits);
+  const zero = Number(body) === 0;
+  return `${zero ? "" : n > 0 ? "+" : "−"}${body}`;
+};
 
 export const fmtPct = (n: number) => `${(n * 100).toFixed(1)}%`;
 

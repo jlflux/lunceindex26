@@ -104,13 +104,6 @@ export default function RatingsTable({
   // it should read against every team rather than the current filter.
   const scale = useMemo(() => meterScale(ratings), [ratings]);
 
-  // Where the highlighted block ends, so a divider can be dropped in. Only
-  // meaningful when the board is in rank order and actually reaches the cutoff.
-  const breakAt = useMemo(() => {
-    const i = rows.findIndex((r) => (scoped ? r.class_rank : r.rank) > cutoff);
-    return i > 0 ? i : -1;
-  }, [rows, scoped, cutoff]);
-
   return (
     <>
       {/* Toolbar */}
@@ -202,7 +195,10 @@ export default function RatingsTable({
         className="table-scroll scroll-thin overflow-hidden rounded-xl border"
         style={{ borderColor: "rgb(var(--border))" }}
       >
-        <table className="w-full min-w-[880px]">
+        {/* The wide layout only kicks in once there is room for it. Forcing a
+            880px minimum on a phone produced a board that could not be scrolled
+            sideways at all, leaving the rating off-screen and unreachable. */}
+        <table className="w-full md:min-w-[880px]">
           <thead>
             <tr
               className="border-b"
@@ -211,24 +207,26 @@ export default function RatingsTable({
                 background: "rgb(var(--surface-2))",
               }}
             >
-              <th className="th w-14 !text-center">#</th>
-              <th className="th">Team</th>
-              <th className="th !text-center">Record</th>
+              <th className="th w-11 !px-2 !text-center sm:w-14 sm:!px-3">#</th>
+              <th className="th !px-2 sm:!px-3">Team</th>
+              <th className="th hidden !text-center sm:table-cell">Record</th>
               {mode === "index" ? (
                 <>
-                  <th className="th !text-right">SOS</th>
-                  <th className="th !text-right">O-Eff</th>
-                  <th className="th !text-right">D-Eff</th>
+                  <th className="th hidden !text-right md:table-cell">SOS</th>
+                  <th className="th hidden !text-right md:table-cell">O-Eff</th>
+                  <th className="th hidden !text-right md:table-cell">D-Eff</th>
                   <th className="th hidden !text-right xl:table-cell">PF/G</th>
                   <th className="th hidden !text-right xl:table-cell">PA/G</th>
-                  <th className="th w-32 !pr-4 !text-right">Index Rating</th>
+                  <th className="th !px-2 !text-right sm:w-32 sm:!pr-4">
+                    Rating
+                  </th>
                 </>
               ) : (
                 <>
-                  <th className="th !text-right">Win%</th>
-                  <th className="th !text-right">OWP</th>
+                  <th className="th hidden !text-right md:table-cell">Win%</th>
+                  <th className="th hidden !text-right md:table-cell">OWP</th>
                   <th className="th hidden !text-right lg:table-cell">OOWP</th>
-                  <th className="th !pr-4 !text-right">RPI</th>
+                  <th className="th !px-2 !text-right sm:!pr-4">RPI</th>
                 </>
               )}
             </tr>
@@ -242,7 +240,7 @@ export default function RatingsTable({
                 }
               />
             )}
-            {rows.map((r, i) => {
+            {rows.map((r) => {
               const shown = scoped ? r.class_rank : r.rank;
               const top = shown <= cutoff;
               const ir = mode === "index" ? (r as RatingRow) : null;
@@ -250,15 +248,8 @@ export default function RatingsTable({
               const games = r.wins + r.losses > 0;
 
               return (
-                <Fragment key={r.slug}>
-                  {i === breakAt && (
-                    <GroupRow
-                      rest
-                      colSpan={mode === "index" ? 9 : 7}
-                      label={`The rest of the field`}
-                    />
-                  )}
                 <tr
+                  key={r.slug}
                   onClick={() => setOpenSlug(r.slug)}
                   className="row-hover cursor-pointer border-b last:border-0"
                   style={{
@@ -270,7 +261,9 @@ export default function RatingsTable({
                       : undefined,
                   }}
                 >
-                  <td className={`td !text-center stripe-${r.classification}`}>
+                  <td
+                    className={`td !px-2 !text-center sm:!px-3 stripe-${r.classification}`}
+                  >
                     <span
                       className="text-[14px] font-extrabold tnum"
                       style={{
@@ -283,8 +276,8 @@ export default function RatingsTable({
                     </span>
                   </td>
 
-                  <td className="td">
-                    <span className="block text-[16.5px] font-bold leading-[1.15] tracking-[-0.02em]">
+                  <td className="td !whitespace-normal !px-2 sm:!px-3">
+                    <span className="block text-[15px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[16.5px]">
                       {r.name}
                     </span>
                     <span
@@ -295,11 +288,15 @@ export default function RatingsTable({
                         {r.classification}
                       </span>
                       <span>· Region {r.region}</span>
+                      {/* Record rides along here once its own column is gone. */}
+                      <span className="tnum sm:hidden">
+                        · {record(r.wins, r.losses)}
+                      </span>
                     </span>
                   </td>
 
                   <td
-                    className="td !text-center text-[13px] font-semibold tnum"
+                    className="td hidden !text-center text-[13px] font-semibold tnum sm:table-cell"
                     style={{ color: "rgb(var(--text-muted))" }}
                   >
                     {record(r.wins, r.losses)}
@@ -308,15 +305,18 @@ export default function RatingsTable({
                   {ir ? (
                     <>
                       <Cell
+                        className="hidden md:table-cell"
                         value={games ? fmt(ir.sos, 1) : "—"}
                         rank={games ? ranks.sos.get(r.slug) : undefined}
                       />
                       <Cell
+                        className="hidden md:table-cell"
                         value={games ? fmtSigned(ir.o_eff) : "—"}
                         rank={games ? ranks.oEff.get(r.slug) : undefined}
                         tone={games ? ir.o_eff : undefined}
                       />
                       <Cell
+                        className="hidden md:table-cell"
                         value={games ? fmtSigned(ir.d_eff) : "—"}
                         rank={games ? ranks.dEff.get(r.slug) : undefined}
                         tone={games ? ir.d_eff : undefined}
@@ -331,7 +331,7 @@ export default function RatingsTable({
                         value={games ? fmt(ir.papg, 1) : "—"}
                         rank={games ? ranks.papg.get(r.slug) : undefined}
                       />
-                      <td className="td !pr-4 !text-right">
+                      <td className="td !px-2 !text-right sm:!pr-4">
                         <span
                           className="block text-[19px] font-extrabold leading-none tracking-[-0.03em] tnum"
                           style={{ color: "rgb(var(--rating))" }}
@@ -345,13 +345,19 @@ export default function RatingsTable({
                     </>
                   ) : rr ? (
                     <>
-                      <Cell value={games ? fmtPct(rr.win_pct) : "—"} />
-                      <Cell value={games ? fmtPct(rr.opp_win_pct) : "—"} />
+                      <Cell
+                        className="hidden md:table-cell"
+                        value={games ? fmtPct(rr.win_pct) : "—"}
+                      />
+                      <Cell
+                        className="hidden md:table-cell"
+                        value={games ? fmtPct(rr.opp_win_pct) : "—"}
+                      />
                       <Cell
                         className="hidden lg:table-cell"
                         value={games ? fmtPct(rr.opp_opp_win_pct) : "—"}
                       />
-                      <td className="td !pr-4 !text-right">
+                      <td className="td !px-2 !text-right sm:!pr-4">
                         <span
                           className="text-[19px] font-extrabold tracking-[-0.03em] tnum"
                           style={{ color: "rgb(var(--rating))" }}
@@ -362,7 +368,6 @@ export default function RatingsTable({
                     </>
                   ) : null}
                 </tr>
-                </Fragment>
               );
             })}
 
@@ -401,21 +406,18 @@ export default function RatingsTable({
   );
 }
 
-/** Divider inside the board, marking where the highlighted block ends. */
-function GroupRow({
-  label,
-  colSpan,
-  rest = false,
-}: {
-  label: string;
-  colSpan: number;
-  rest?: boolean;
-}) {
+/**
+ * Header for the highlighted block at the top of the board.
+ *
+ * There is deliberately no matching marker where the block ends — the tint
+ * simply stopping is enough, and a second divider was just noise.
+ */
+function GroupRow({ label, colSpan }: { label: string; colSpan: number }) {
   return (
     <tr>
       <td
         colSpan={colSpan}
-        className={`group-row ${rest ? "group-rest" : ""} border-b`}
+        className="group-row border-b"
         style={{ borderColor: "rgb(var(--border))" }}
       >
         {label}

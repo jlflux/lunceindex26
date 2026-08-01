@@ -382,11 +382,6 @@
     color: rgb(var(--brand));
   }
 
-  .group-row.group-rest {
-    background: rgb(var(--surface-2));
-    color: rgb(var(--text-faint));
-  }
-
   /* Rating strength bar. Scaled across the field so the gaps are readable. */
   .meter {
     /* Block, because this is a <span> inside a table cell — an inline box

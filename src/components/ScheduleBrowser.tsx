@@ -274,40 +274,43 @@ function Side({
         </span>
       )}
 
-      {slug ? (
-        <Link
-          href={`/team/${slug}`}
-          className="min-w-0 flex-1 truncate text-[13.5px] font-semibold hover:underline"
-          style={{ opacity: dim ? 0.55 : 1 }}
-        >
-          {name}
-        </Link>
-      ) : (
-        <span
-          className="min-w-0 flex-1 truncate text-[13.5px] font-semibold"
-          style={{ opacity: dim ? 0.55 : 1 }}
-        >
-          {name}
-        </span>
-      )}
+      <span
+        className="flex min-w-0 flex-1 items-center gap-1.5"
+        style={{ opacity: dim ? 0.55 : 1 }}
+      >
+        {slug ? (
+          <Link
+            href={`/team/${slug}`}
+            className="truncate text-[13.5px] font-semibold hover:underline"
+          >
+            {name}
+          </Link>
+        ) : (
+          <span className="truncate text-[13.5px] font-semibold">{name}</span>
+        )}
+        {/* Marks the host beside the name it belongs to. Sitting in its own
+            column it read as a third figure alongside the two ranks. */}
+        {home && (
+          <span
+            className="shrink-0 rounded px-1 text-[9.5px] font-bold leading-[1.5]"
+            style={{
+              background: "rgb(var(--brand) / 0.14)",
+              color: "rgb(var(--brand))",
+            }}
+            title="Home team"
+          >
+            H
+          </span>
+        )}
+      </span>
 
-      {rank && (
-        <span
-          className="shrink-0 text-[10.5px] tnum"
-          style={{ color: "rgb(var(--text-faint))" }}
-        >
-          #{rank}
-        </span>
-      )}
-
-      {home && (
-        <span
-          className="shrink-0 text-[9.5px] font-semibold uppercase tracking-wide"
-          style={{ color: "rgb(var(--text-faint))" }}
-        >
-          home
-        </span>
-      )}
+      {/* Fixed width so the two ranks line up as a column of their own. */}
+      <span
+        className="w-9 shrink-0 text-right text-[10.5px] tnum"
+        style={{ color: "rgb(var(--text-faint))" }}
+      >
+        {rank ? `#${rank}` : ""}
+      </span>
 
       {played && (
         <span

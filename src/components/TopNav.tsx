@@ -60,7 +60,7 @@ export default function TopNav({
 
         {/* Three links always fit, so no scroll container — one was adding a
             stray horizontal scrollbar under the nav. */}
-        <nav className="flex items-center gap-6">
+        <nav className="order-3 flex w-full items-center gap-6 sm:order-none sm:w-auto">
           {LINKS.map((l) => (
             <Link
               key={l.href}
@@ -82,7 +82,8 @@ export default function TopNav({
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2.5 py-2">
+        {/* Sits beside the wordmark on a phone; the nav wraps beneath both. */}
+        <div className="order-2 ml-auto flex items-center gap-2.5 py-2 sm:order-none">
           {generated && (
             <span
               className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-semibold"
@@ -92,7 +93,9 @@ export default function TopNav({
               }}
             >
               <Icon name="clock" size={12} />
-              Updated{" "}
+              {/* The word costs ~55px, which is the difference between this
+                  sitting beside the wordmark on a phone and wrapping below. */}
+              <span className="hidden sm:inline">Updated</span>
               {new Date(generated).toLocaleString("en-US", {
                 month: "short",
                 day: "numeric",

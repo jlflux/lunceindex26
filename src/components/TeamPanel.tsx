@@ -74,25 +74,33 @@ export default function TeamPanel({
         role="dialog"
         aria-label={`${t.name} profile`}
       >
-        {/* Header */}
+        {/* Header. The class colour runs the full width as a top rule so the
+            panel is identifiable at a glance before anything is read. */}
         <div
-          className="sticky top-0 z-10 border-b px-5 py-4"
+          className={`sticky top-0 z-10 border-b px-5 py-4 cls-${t.classification}`}
           style={{
             background: "rgb(var(--surface))",
             borderColor: "rgb(var(--border))",
+            borderTop: "3px solid rgb(var(--c))",
           }}
         >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h2 className="truncate text-[24px] font-bold leading-tight">
+              <h2 className="truncate text-[27px] font-extrabold leading-tight tracking-[-0.03em]">
                 {t.name}
               </h2>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span className={`chip cls-${t.classification}`}>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span
+                  className="chip !px-2 !py-1 !text-[12px] !font-extrabold"
+                  style={{
+                    background: "rgb(var(--c) / 0.16)",
+                    color: "rgb(var(--c))",
+                  }}
+                >
                   {t.classification}
                 </span>
                 <span
-                  className="text-[12px]"
+                  className="text-[13px] font-medium"
                   style={{ color: "rgb(var(--text-muted))" }}
                 >
                   Region {t.region}
@@ -103,22 +111,23 @@ export default function TeamPanel({
             <div className="flex shrink-0 items-start gap-3">
               <div className="text-right">
                 <div
-                  className="text-[28px] font-extrabold leading-none tnum"
+                  className="text-[38px] font-extrabold leading-none tracking-[-0.04em] tnum"
                   style={{ color: "rgb(var(--rating))" }}
                 >
-                  {fmt(t.rating)}
+                  {fmt(t.rating, 1)}
                 </div>
                 <div
-                  className="mt-1 text-[10px] font-semibold uppercase tracking-wider"
+                  className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.09em]"
                   style={{ color: "rgb(var(--text-faint))" }}
                 >
                   Index Rating
                 </div>
-                <div
-                  className="mt-1 text-[11px]"
-                  style={{ color: "rgb(var(--text-muted))" }}
-                >
-                  #{t.rank} overall · #{t.class_rank} in {t.classification}
+                <div className="mt-2 flex justify-end gap-1.5">
+                  <RankBadge label={`#${t.rank} overall`} tone="brand" />
+                  <RankBadge
+                    label={`#${t.class_rank} in ${t.classification}`}
+                    tone="class"
+                  />
                 </div>
               </div>
               <button
@@ -135,14 +144,16 @@ export default function TeamPanel({
         {/* Stat strip */}
         <div
           className="grid grid-cols-3 border-b sm:grid-cols-5"
-          style={{ borderColor: "rgb(var(--border))" }}
+          style={{
+            borderColor: "rgb(var(--border))",
+            background: "rgb(var(--surface-2))",
+          }}
         >
           <StatCell label="Record" value={record(t.wins, t.losses)} />
           <StatCell
             label="SOS"
             value={played ? fmt(t.sos, 1) : "—"}
             rank={played ? columnRanks.sos.get(t.slug) : undefined}
-            classRank={t.classification}
           />
           <StatCell
             label="O-Eff"
@@ -163,9 +174,9 @@ export default function TeamPanel({
         </div>
 
         {/* Schedule */}
-        <div className="px-5 py-4">
+        <div className="px-4 py-4 sm:px-5">
           <h3
-            className="mb-3 text-[11px] font-bold uppercase tracking-wider"
+            className="mb-3 text-[11px] font-bold uppercase tracking-[0.09em]"
             style={{ color: "rgb(var(--text-faint))" }}
           >
             {payload.config ? "2026" : ""} Schedule
@@ -179,7 +190,7 @@ export default function TeamPanel({
               No games on file — {t.name} is not on any imported schedule yet.
             </p>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {schedule.map((e, i) => (
                 <ScheduleRow key={i} e={e} />
               ))}
@@ -206,18 +217,35 @@ export default function TeamPanel({
   );
 }
 
+/** Small pill carrying a rank, in the brand red or the team's class colour. */
+function RankBadge({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: "brand" | "class";
+}) {
+  const c = tone === "brand" ? "var(--brand)" : "var(--c)";
+  return (
+    <span
+      className="rounded px-1.5 py-[3px] text-[10px] font-bold leading-none"
+      style={{ background: `rgb(${c} / 0.15)`, color: `rgb(${c})` }}
+    >
+      {label}
+    </span>
+  );
+}
+
 function StatCell({
   label,
   value,
   rank,
   tone,
-  classRank,
 }: {
   label: string;
   value: string;
   rank?: number;
   tone?: number;
-  classRank?: string;
 }) {
   const color =
     tone === undefined
@@ -229,25 +257,30 @@ function StatCell({
           : "rgb(var(--text))";
   return (
     <div
-      className="border-r px-3 py-3 text-center last:border-r-0"
+      className="border-r px-2 py-3 text-center last:border-r-0"
       style={{ borderColor: "rgb(var(--border))" }}
     >
-      <div className="text-[15px] font-bold tnum" style={{ color }}>
+      <div
+        className="text-[19px] font-extrabold leading-none tracking-[-0.03em] tnum"
+        style={{ color }}
+      >
         {value}
       </div>
       {rank !== undefined && (
-        <div
-          className="mt-0.5 text-[10px] font-semibold"
-          style={{ color: "rgb(var(--brand))" }}
-        >
-          #{rank}
-          {classRank && (
-            <span style={{ color: "rgb(var(--text-faint))" }}> overall</span>
-          )}
+        <div className="mt-1.5">
+          <span
+            className="rounded px-1 py-[2px] text-[9.5px] font-bold leading-none"
+            style={{
+              background: "rgb(var(--brand) / 0.14)",
+              color: "rgb(var(--brand))",
+            }}
+          >
+            #{rank}
+          </span>
         </div>
       )}
       <div
-        className="mt-1 text-[10px] font-semibold uppercase tracking-wider"
+        className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.07em]"
         style={{ color: "rgb(var(--text-faint))" }}
       >
         {label}
@@ -260,99 +293,130 @@ function ScheduleRow({ e }: { e: ScheduleEntry }) {
   const diff =
     e.actual !== null && e.expected !== null ? e.actual - e.expected : null;
 
+  const playoff = e.game.type === "playoff";
+
   return (
     <div
-      className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-[12.5px]"
+      className={`rounded-lg px-2.5 py-2 ${e.opponentClass ? `cls-${e.opponentClass}` : ""}`}
       style={{ background: "rgb(var(--surface-2))" }}
     >
-      <span
-        className="w-[34px] shrink-0 text-[10.5px] font-semibold uppercase"
-        style={{ color: "rgb(var(--text-faint))" }}
-      >
-        {weekLabel(e.game).replace("Week ", "Wk ").replace("Playoffs ", "")}
-      </span>
-
-      {e.played ? (
+      <div className="flex items-center gap-2">
+        {/* Playoff rows leave this blank: the round is named on its own chip
+            below, and "Quarterfinals" does not fit a week-sized slot. */}
         <span
-          className="w-4 shrink-0 text-center font-bold"
-          style={{
-            color: e.won ? "rgb(var(--good))" : "rgb(var(--bad))",
-          }}
+          className="w-[30px] shrink-0 text-[10.5px] font-bold uppercase"
+          style={{ color: "rgb(var(--text-faint))" }}
         >
-          {e.actual === 0 ? "T" : e.won ? "W" : "L"}
+          {playoff ? "" : weekLabel(e.game).replace("Week ", "Wk ")}
         </span>
-      ) : (
-        <span className="w-4 shrink-0" />
-      )}
 
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
+        {e.played ? (
           <span
-            className="shrink-0 text-[11px]"
-            style={{ color: "rgb(var(--text-faint))" }}
+            className="w-4 shrink-0 text-center text-[14px] font-extrabold"
+            style={{ color: e.won ? "rgb(var(--good))" : "rgb(var(--bad))" }}
           >
-            {e.isHome || e.game.neutral_site ? "vs" : "at"}
+            {e.actual === 0 ? "T" : e.won ? "W" : "L"}
           </span>
-          <span className="truncate font-semibold">{e.opponent}</span>
-          {e.opponentRank ? (
-            <span
-              className="shrink-0 text-[10.5px]"
-              style={{ color: "rgb(var(--text-faint))" }}
-            >
-              #{e.opponentRank}
+        ) : (
+          <span className="w-4 shrink-0" />
+        )}
+
+        <span
+          className="shrink-0 text-[11px]"
+          style={{ color: "rgb(var(--text-faint))" }}
+        >
+          {e.isHome || e.game.neutral_site ? "vs" : "at"}
+        </span>
+
+        <span className="truncate text-[14.5px] font-bold">{e.opponent}</span>
+
+        {e.opponentClass ? (
+          <span
+            className="shrink-0 rounded px-1 py-[2px] text-[9.5px] font-extrabold leading-none"
+            style={{
+              background: "rgb(var(--c) / 0.16)",
+              color: "rgb(var(--c))",
+            }}
+          >
+            {e.opponentClass}
+          </span>
+        ) : (
+          <span
+            className="shrink-0 rounded px-1 py-[2px] text-[9.5px] font-bold leading-none"
+            style={{
+              background: "rgb(var(--surface-3))",
+              color: "rgb(var(--text-faint))",
+            }}
+          >
+            OOS
+          </span>
+        )}
+
+        {playoff && (
+          <span
+            className="shrink-0 rounded px-1 py-[2px] text-[9.5px] font-extrabold leading-none"
+            style={{
+              background: "rgb(var(--brand) / 0.16)",
+              color: "rgb(var(--brand))",
+            }}
+          >
+            {weekLabel(e.game).replace("Playoffs ", "").toUpperCase()}
+          </span>
+        )}
+
+        <span className="ml-auto shrink-0 text-right">
+          {e.played ? (
+            <span className="text-[15px] font-extrabold tnum">
+              <span style={{ color: e.won ? "rgb(var(--good))" : undefined }}>
+                {e.teamScore}
+              </span>
+              <span style={{ color: "rgb(var(--text-faint))" }}>–</span>
+              <span style={{ color: e.won ? undefined : "rgb(var(--bad))" }}>
+                {e.oppScore}
+              </span>
             </span>
           ) : (
             <span
-              className="chip shrink-0 !px-1 !text-[9.5px]"
-              style={{
-                background: "rgb(var(--surface-3))",
-                color: "rgb(var(--text-faint))",
-              }}
+              className="text-[10.5px] font-bold uppercase tracking-wide"
+              style={{ color: "rgb(var(--text-faint))" }}
             >
-              OOS
+              Upcoming
             </span>
           )}
-        </div>
-        {(e.expected !== null || diff !== null) && (
-          <div
-            className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10.5px]"
-            style={{ color: "rgb(var(--text-faint))" }}
-          >
-            {e.expected !== null && <span>Exp {fmtSigned(e.expected, 0)}</span>}
-            {e.actual !== null && <span>Act {fmtSigned(e.actual, 0)}</span>}
-          </div>
-        )}
+        </span>
       </div>
 
-      {e.performance && diff !== null && (
-        <PerformanceChip p={e.performance} diff={diff} />
-      )}
-
-      {e.played ? (
-        <span className="w-[52px] shrink-0 text-right font-bold tnum">
-          {e.teamScore}–{e.oppScore}
-        </span>
-      ) : (
-        <span
-          className="w-[52px] shrink-0 text-right text-[10.5px] uppercase"
-          style={{ color: "rgb(var(--text-faint))" }}
-        >
-          Upcoming
-        </span>
-      )}
+      <div
+        className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-[52px] text-[11px]"
+        style={{ color: "rgb(var(--text-faint))" }}
+      >
+        {e.opponentRank && <span className="tnum">#{e.opponentRank} overall</span>}
+        {!e.opponentRank && <span>Out-of-state</span>}
+        {e.expected !== null && (
+          <span className="tnum">Exp {fmtSigned(e.expected, 0)}</span>
+        )}
+        {e.actual !== null && (
+          <span className="tnum">Act {fmtSigned(e.actual, 0)}</span>
+        )}
+        {e.performance && diff !== null && (
+          <PerformanceChip p={e.performance} diff={diff} />
+        )}
+      </div>
     </div>
   );
 }
 
 function PerformanceChip({ p, diff }: { p: Performance; diff: number }) {
+  // Solid enough to read as a verdict rather than as more small print — this
+  // is the one thing on the row that is a judgement rather than a figure.
   const style: Record<Performance, { bg: string; fg: string }> = {
-    dominant: { bg: "rgb(var(--good-soft))", fg: "rgb(var(--good))" },
-    exceeded: { bg: "rgb(var(--good) / 0.1)", fg: "rgb(var(--good))" },
+    dominant: { bg: "rgb(var(--good) / 0.2)", fg: "rgb(var(--good))" },
+    exceeded: { bg: "rgb(var(--good) / 0.12)", fg: "rgb(var(--good))" },
     "as-expected": {
-      bg: "rgb(var(--surface-3))",
+      bg: "rgb(var(--text-muted) / 0.15)",
       fg: "rgb(var(--text-muted))",
     },
-    below: { bg: "rgb(var(--bad-soft))", fg: "rgb(var(--bad))" },
+    below: { bg: "rgb(var(--bad) / 0.18)", fg: "rgb(var(--bad))" },
   };
   const s = style[p];
   const short: Record<Performance, string> = {
@@ -363,7 +427,7 @@ function PerformanceChip({ p, diff }: { p: Performance; diff: number }) {
   };
   return (
     <span
-      className="chip hidden shrink-0 sm:inline-flex"
+      className="shrink-0 rounded px-1.5 py-[3px] text-[10px] font-extrabold leading-none"
       style={{ background: s.bg, color: s.fg }}
       title={PERFORMANCE_LABELS[p]}
     >

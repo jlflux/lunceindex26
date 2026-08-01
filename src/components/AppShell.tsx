@@ -15,7 +15,7 @@ export default function AppShell({
   return (
     <div className="flex min-h-screen flex-col">
       <TopNav generated={generated} />
-      <main className="mx-auto w-full max-w-[1400px] flex-1 px-5 py-6 sm:px-8">
+      <main className="mx-auto w-full max-w-[1280px] flex-1 px-5 py-6 sm:px-8">
         {children}
       </main>
       <Footer />
@@ -29,7 +29,7 @@ function Footer() {
       className="mt-10 border-t"
       style={{ borderColor: "rgb(var(--border))" }}
     >
-      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-5 py-6 sm:px-8">
+      <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-3 px-5 py-6 sm:px-8">
         <p className="text-[12px]" style={{ color: "rgb(var(--text-faint))" }}>
           ALPreps Index · AHSAA Football · 2026
         </p>

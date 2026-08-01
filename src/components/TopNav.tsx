@@ -38,61 +38,37 @@ export default function TopNav({
           "linear-gradient(105deg, rgb(var(--hero-from)) 0%, rgb(var(--hero-to)) 62%)",
       }}
     >
-      <div className="mx-auto max-w-[1400px] px-5 pt-5 sm:px-8">
-        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-          <div>
-            <Link href="/" className="flex items-baseline gap-2">
-              <span className="text-[30px] font-extrabold leading-none tracking-tight text-white sm:text-[34px]">
-                ALPREPS
-              </span>
-              <span
-                className="text-[30px] font-extrabold leading-none tracking-tight sm:text-[34px]"
-                style={{ color: "rgb(var(--brand))" }}
-              >
-                INDEX
-              </span>
-            </Link>
-            <p
-              className="mt-1.5 text-[12.5px] font-medium"
-              style={{ color: "rgb(255 255 255 / 0.55)" }}
-            >
-              AHSAA Football Power Ratings · {season} Season
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {generated && (
-              <span
-                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-medium"
-                style={{
-                  background: "rgb(255 255 255 / 0.07)",
-                  color: "rgb(255 255 255 / 0.8)",
-                }}
-              >
-                <Icon name="clock" size={13} />
-                Updated{" "}
-                {new Date(generated).toLocaleString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              </span>
-            )}
-            <ThemeToggle />
-          </div>
-        </div>
+      {/* One row on desktop: wordmark, tabs, then the timestamp. The tall
+          stacked masthead spent a third of the screen before a single team
+          appeared, which is the wrong trade on a 393-row board. */}
+      <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-x-6 gap-y-1 px-5 sm:px-8">
+        <Link
+          href="/"
+          className="flex shrink-0 items-baseline gap-1.5 py-3.5"
+          title={`AHSAA Football Power Ratings · ${season} Season`}
+        >
+          <span className="text-[17px] font-extrabold leading-none tracking-[-0.03em] text-white">
+            ALPREPS
+          </span>
+          <span
+            className="text-[17px] font-extrabold leading-none tracking-[-0.03em]"
+            style={{ color: "rgb(var(--brand))" }}
+          >
+            INDEX
+          </span>
+        </Link>
 
         {/* Three links always fit, so no scroll container — one was adding a
             stray horizontal scrollbar under the nav. */}
-        <nav className="mt-4 flex items-center gap-7">
+        <nav className="flex items-center gap-6">
           {LINKS.map((l) => (
             <Link
               key={l.href}
               href={l.href}
-              className="relative whitespace-nowrap pb-2.5 text-[13.5px] font-semibold transition-colors"
+              className="relative whitespace-nowrap py-[18px] text-[13.5px] transition-colors"
               style={{
                 color: isActive(l.href) ? "#fff" : "rgb(255 255 255 / 0.5)",
+                fontWeight: isActive(l.href) ? 650 : 500,
               }}
             >
               {l.label}
@@ -105,6 +81,28 @@ export default function TopNav({
             </Link>
           ))}
         </nav>
+
+        <div className="ml-auto flex items-center gap-2.5 py-2">
+          {generated && (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11.5px] font-semibold"
+              style={{
+                background: "rgb(255 255 255 / 0.07)",
+                color: "rgb(255 255 255 / 0.78)",
+              }}
+            >
+              <Icon name="clock" size={12} />
+              Updated{" "}
+              {new Date(generated).toLocaleString("en-US", {
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );

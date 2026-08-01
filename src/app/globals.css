@@ -39,6 +39,20 @@
   --hero-from: 13 23 42;
   --hero-to: 8 13 23;
 
+  --c-6A: 167 139 250;
+  --c-5A: 96 165 250;
+  --c-4A: 56 189 248;
+  --c-3A: 45 212 191;
+  --c-2A: 74 222 128;
+  --c-1A: 250 204 21;
+  --c-AA: 251 146 60;
+  --c-A: 244 114 182;
+
+  /* Two wide, low-opacity washes so the page is not a flat field of navy. */
+  --canvas-wash:
+    radial-gradient(1200px 600px at 15% -10%, rgb(37 45 90 / 0.3), transparent 60%),
+    radial-gradient(900px 500px at 92% 0%, rgb(90 26 40 / 0.22), transparent 55%);
+
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow: 0 2px 6px rgb(0 0 0 / 0.45), 0 16px 40px -16px rgb(0 0 0 / 0.7);
 }
@@ -70,6 +84,20 @@
   --rating: 21 128 61;
   --hero-from: 23 37 64;
   --hero-to: 15 23 42;
+
+  /* Darkened so they carry on white; the dark values wash out entirely. */
+  --c-6A: 109 40 217;
+  --c-5A: 29 78 216;
+  --c-4A: 2 132 199;
+  --c-3A: 13 148 136;
+  --c-2A: 21 128 61;
+  --c-1A: 161 98 7;
+  --c-AA: 194 65 12;
+  --c-A: 190 24 93;
+
+  --canvas-wash:
+    radial-gradient(1100px 560px at 12% -12%, rgb(99 102 241 / 0.09), transparent 62%),
+    radial-gradient(900px 480px at 94% -4%, rgb(220 38 38 / 0.06), transparent 58%);
 
   --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05);
   --shadow: 0 2px 6px rgb(15 23 42 / 0.06), 0 16px 40px -18px rgb(15 23 42 / 0.2);
@@ -103,6 +131,19 @@
   --hero-from: 13 23 42;
   --hero-to: 8 13 23;
 
+  --c-6A: 167 139 250;
+  --c-5A: 96 165 250;
+  --c-4A: 56 189 248;
+  --c-3A: 45 212 191;
+  --c-2A: 74 222 128;
+  --c-1A: 250 204 21;
+  --c-AA: 251 146 60;
+  --c-A: 244 114 182;
+
+  --canvas-wash:
+    radial-gradient(1200px 600px at 15% -10%, rgb(37 45 90 / 0.3), transparent 60%),
+    radial-gradient(900px 500px at 92% 0%, rgb(90 26 40 / 0.22), transparent 55%);
+
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow: 0 2px 6px rgb(0 0 0 / 0.45), 0 16px 40px -16px rgb(0 0 0 / 0.7);
 }
@@ -113,7 +154,8 @@
   }
 
   body {
-    background: rgb(var(--canvas));
+    background: var(--canvas-wash), rgb(var(--canvas));
+    background-attachment: fixed;
     color: rgb(var(--text));
     /* The fallback chain matters: if the variable ever goes missing again,
        this still resolves to a sans face rather than the browser's serif. */
@@ -313,7 +355,7 @@
   }
 
   .td {
-    padding: 0.7rem 0.75rem;
+    padding: 0.55rem 0.75rem;
     font-size: 0.8125rem;
     white-space: nowrap;
   }
@@ -323,6 +365,49 @@
   }
   .row-hover:hover {
     background: rgb(var(--surface-2));
+  }
+
+  /* Section marker inside the board, e.g. "Top 25". */
+  .group-row {
+    padding: 0.55rem 0.75rem 0.55rem 1rem;
+    background: linear-gradient(
+      90deg,
+      rgb(var(--brand) / 0.12),
+      transparent 70%
+    );
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: rgb(var(--brand));
+  }
+
+  .group-row.group-rest {
+    background: rgb(var(--surface-2));
+    color: rgb(var(--text-faint));
+  }
+
+  /* Rating strength bar. Scaled across the field so the gaps are readable. */
+  .meter {
+    /* Block, because this is a <span> inside a table cell — an inline box
+       ignores height and the bar renders as nothing at all. */
+    display: block;
+    height: 3px;
+    margin-top: 5px;
+    border-radius: 99px;
+    background: rgb(var(--surface-3));
+    overflow: hidden;
+  }
+
+  .meter > span {
+    display: block;
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(
+      90deg,
+      rgb(var(--rating) / 0.45),
+      rgb(var(--rating))
+    );
   }
 
   /* Filter pill */
@@ -357,24 +442,43 @@
   }
 }
 
-/* Classification accents, 6A (deepest) down to A. */
-.cls-6A { background: rgb(124 58 237 / 0.11); color: rgb(126 58 224); }
-.cls-5A { background: rgb(37 99 235 / 0.11); color: rgb(37 99 235); }
-.cls-4A { background: rgb(8 145 178 / 0.12); color: rgb(7 130 160); }
-.cls-3A { background: rgb(13 148 136 / 0.12); color: rgb(12 134 123); }
-.cls-2A { background: rgb(22 163 74 / 0.12); color: rgb(20 140 65); }
-.cls-1A { background: rgb(202 138 4 / 0.14); color: rgb(168 114 5); }
-.cls-AA { background: rgb(234 88 12 / 0.12); color: rgb(207 78 11); }
-.cls-A  { background: rgb(219 39 119 / 0.11); color: rgb(202 36 110); }
+/*
+ * Classification accents, 6A (deepest) down to A.
+ *
+ * Held as variables rather than baked into the chip rule, because the same
+ * colour is also the row's edge stripe on the rankings board and the marker
+ * on schedule rows — one definition, three uses.
+ */
+.cls-6A, .stripe-6A { --c: var(--c-6A); }
+.cls-5A, .stripe-5A { --c: var(--c-5A); }
+.cls-4A, .stripe-4A { --c: var(--c-4A); }
+.cls-3A, .stripe-3A { --c: var(--c-3A); }
+.cls-2A, .stripe-2A { --c: var(--c-2A); }
+.cls-1A, .stripe-1A { --c: var(--c-1A); }
+.cls-AA, .stripe-AA { --c: var(--c-AA); }
+.cls-A,  .stripe-A  { --c: var(--c-A); }
 
-:root[data-theme="dark"] .cls-6A { color: rgb(167 139 250); }
-:root[data-theme="dark"] .cls-5A { color: rgb(96 165 250); }
-:root[data-theme="dark"] .cls-4A { color: rgb(56 189 248); }
-:root[data-theme="dark"] .cls-3A { color: rgb(45 212 191); }
-:root[data-theme="dark"] .cls-2A { color: rgb(74 222 128); }
-:root[data-theme="dark"] .cls-1A { color: rgb(250 204 21); }
-:root[data-theme="dark"] .cls-AA { color: rgb(251 146 60); }
-:root[data-theme="dark"] .cls-A  { color: rgb(244 114 182); }
+.chip[class*="cls-"] {
+  background: rgb(var(--c) / 0.13);
+  color: rgb(var(--c));
+}
+
+/* Class colour as text, for the line under a team name. */
+.cls-text {
+  color: rgb(var(--c));
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/*
+ * The row's class stripe. An inset shadow rather than a border so it does not
+ * take part in layout, and rather than an absolutely positioned pseudo-element
+ * so it works on a table cell, where `position: relative` on the row is not
+ * reliable across browsers.
+ */
+[class*="stripe-"] {
+  box-shadow: inset 3px 0 0 rgb(var(--c) / 0.9);
+}
 
 @media (prefers-reduced-motion: reduce) {
   *,

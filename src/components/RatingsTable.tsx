@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Icon from "./Icon";
 import TeamPanel from "./TeamPanel";
 import { fmt, fmtPct, fmtSigned, record } from "@/lib/format";
@@ -34,6 +34,21 @@ function columnRank<T extends { slug: string }>(
 /** How much of the board gets the highlight treatment. */
 const HIGHLIGHT_OVERALL = 25;
 const HIGHLIGHT_IN_CLASS = 10;
+
+/**
+ * Where a rating sits across the whole field, 0–1.
+ *
+ * Scaled from the field minimum rather than from zero: ratings at the top of
+ * the board cluster within a few points of each other, so measuring against
+ * zero gives every leader a near-full bar and shows nothing.
+ */
+function meterScale(all: { rating: number }[]) {
+  const vals = all.map((r) => r.rating);
+  const lo = Math.min(...vals);
+  const hi = Math.max(...vals);
+  const span = hi - lo;
+  return (v: number) => (span > 0 ? Math.max(0, (v - lo) / span) : 0);
+}
 
 export default function RatingsTable({
   mode,
@@ -85,6 +100,16 @@ export default function RatingsTable({
 
   const scoped = cls !== "all";
   const cutoff = scoped ? HIGHLIGHT_IN_CLASS : HIGHLIGHT_OVERALL;
+  // Always off the full Index field: the meter only appears in index mode, and
+  // it should read against every team rather than the current filter.
+  const scale = useMemo(() => meterScale(ratings), [ratings]);
+
+  // Where the highlighted block ends, so a divider can be dropped in. Only
+  // meaningful when the board is in rank order and actually reaches the cutoff.
+  const breakAt = useMemo(() => {
+    const i = rows.findIndex((r) => (scoped ? r.class_rank : r.rank) > cutoff);
+    return i > 0 ? i : -1;
+  }, [rows, scoped, cutoff]);
 
   return (
     <>
@@ -186,9 +211,8 @@ export default function RatingsTable({
                 background: "rgb(var(--surface-2))",
               }}
             >
-              <th className="th w-12 !text-center">#</th>
+              <th className="th w-14 !text-center">#</th>
               <th className="th">Team</th>
-              <th className="th !text-center">Class</th>
               <th className="th !text-center">Record</th>
               {mode === "index" ? (
                 <>
@@ -197,7 +221,7 @@ export default function RatingsTable({
                   <th className="th !text-right">D-Eff</th>
                   <th className="th hidden !text-right xl:table-cell">PF/G</th>
                   <th className="th hidden !text-right xl:table-cell">PA/G</th>
-                  <th className="th !pr-4 !text-right">Rating</th>
+                  <th className="th w-32 !pr-4 !text-right">Index Rating</th>
                 </>
               ) : (
                 <>
@@ -210,7 +234,15 @@ export default function RatingsTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
+            {rows.length > 0 && (
+              <GroupRow
+                colSpan={mode === "index" ? 9 : 7}
+                label={
+                  scoped ? `Top ${HIGHLIGHT_IN_CLASS}` : `Top ${HIGHLIGHT_OVERALL}`
+                }
+              />
+            )}
+            {rows.map((r, i) => {
               const shown = scoped ? r.class_rank : r.rank;
               const top = shown <= cutoff;
               const ir = mode === "index" ? (r as RatingRow) : null;
@@ -218,20 +250,29 @@ export default function RatingsTable({
               const games = r.wins + r.losses > 0;
 
               return (
+                <Fragment key={r.slug}>
+                  {i === breakAt && (
+                    <GroupRow
+                      rest
+                      colSpan={mode === "index" ? 9 : 7}
+                      label={`The rest of the field`}
+                    />
+                  )}
                 <tr
-                  key={r.slug}
                   onClick={() => setOpenSlug(r.slug)}
                   className="row-hover cursor-pointer border-b last:border-0"
                   style={{
-                    borderColor: "rgb(var(--border))",
+                    borderColor: "rgb(var(--border) / 0.7)",
                     // The top of the board reads as one block rather than a
                     // few decorated rows.
-                    background: top ? "rgb(var(--brand) / 0.05)" : undefined,
+                    background: top
+                      ? "linear-gradient(90deg, rgb(var(--brand) / 0.05), transparent 55%)"
+                      : undefined,
                   }}
                 >
-                  <td className="td !text-center">
+                  <td className={`td !text-center stripe-${r.classification}`}>
                     <span
-                      className="text-[13px] font-bold tnum"
+                      className="text-[14px] font-extrabold tnum"
                       style={{
                         color: top
                           ? "rgb(var(--brand))"
@@ -243,25 +284,22 @@ export default function RatingsTable({
                   </td>
 
                   <td className="td">
-                    <span className="block text-[15.5px] font-bold leading-tight">
+                    <span className="block text-[16.5px] font-bold leading-[1.15] tracking-[-0.02em]">
                       {r.name}
                     </span>
                     <span
-                      className="mt-0.5 block text-[11px]"
+                      className="mt-[3px] flex items-center gap-1.5 text-[11px]"
                       style={{ color: "rgb(var(--text-faint))" }}
                     >
-                      Region {r.region}
-                    </span>
-                  </td>
-
-                  <td className="td !text-center">
-                    <span className={`chip cls-${r.classification}`}>
-                      {r.classification}
+                      <span className={`cls-text cls-${r.classification}`}>
+                        {r.classification}
+                      </span>
+                      <span>· Region {r.region}</span>
                     </span>
                   </td>
 
                   <td
-                    className="td !text-center font-semibold"
+                    className="td !text-center text-[13px] font-semibold tnum"
                     style={{ color: "rgb(var(--text-muted))" }}
                   >
                     {record(r.wins, r.losses)}
@@ -295,10 +333,13 @@ export default function RatingsTable({
                       />
                       <td className="td !pr-4 !text-right">
                         <span
-                          className="text-[17px] font-extrabold tnum"
+                          className="block text-[19px] font-extrabold leading-none tracking-[-0.03em] tnum"
                           style={{ color: "rgb(var(--rating))" }}
                         >
                           {fmt(ir.rating, 1)}
+                        </span>
+                        <span className="meter">
+                          <span style={{ width: `${scale(ir.rating) * 100}%` }} />
                         </span>
                       </td>
                     </>
@@ -312,7 +353,7 @@ export default function RatingsTable({
                       />
                       <td className="td !pr-4 !text-right">
                         <span
-                          className="text-[17px] font-extrabold tnum"
+                          className="text-[19px] font-extrabold tracking-[-0.03em] tnum"
                           style={{ color: "rgb(var(--rating))" }}
                         >
                           {rr.rpi.toFixed(4)}
@@ -321,6 +362,7 @@ export default function RatingsTable({
                     </>
                   ) : null}
                 </tr>
+                </Fragment>
               );
             })}
 
@@ -356,6 +398,29 @@ export default function RatingsTable({
         columnRanks={ranks}
       />
     </>
+  );
+}
+
+/** Divider inside the board, marking where the highlighted block ends. */
+function GroupRow({
+  label,
+  colSpan,
+  rest = false,
+}: {
+  label: string;
+  colSpan: number;
+  rest?: boolean;
+}) {
+  return (
+    <tr>
+      <td
+        colSpan={colSpan}
+        className={`group-row ${rest ? "group-rest" : ""} border-b`}
+        style={{ borderColor: "rgb(var(--border))" }}
+      >
+        {label}
+      </td>
+    </tr>
   );
 }
 

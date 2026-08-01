@@ -16,6 +16,7 @@
  * match is reported with its confidence for a human to check.
  */
 
+import { AHSFHS_NAMES } from "./ahsfhs";
 import type { Classification, Team } from "./types";
 
 export function slugify(name: string): string {
@@ -94,8 +95,11 @@ export function parseRegionToken(reg: string): number | null {
 }
 
 /**
- * Explicit aliases: PDF spelling → roster name. Everything here is a case the
- * generic rules cannot get right on their own.
+ * Explicit aliases: source spelling → roster name. Everything here is a case
+ * the generic rules cannot get right on their own.
+ *
+ * The ahsfhs.org spellings are folded in from AHSFHS_NAMES at the bottom of
+ * this file, so that mapping is written once.
  */
 export const ALIASES: Record<string, string> = {
   // Initials dropped by the roster
@@ -142,7 +146,7 @@ export const ALIASES: Record<string, string> = {
   "North Sand Mtn. High School": "North Sand Mountain",
   "Saint James School": "St. James",
   "St. James School": "St. James",
-  "Lindsay Lane Christian Academy": "Linsay Lane",
+  "Lindsay Lane Christian Academy": "Lindsay Lane",
   "Trinity Presbyterian School": "Trinity",
   "Vincent Middle High School": "Vincent",
   "Ramsay IB High School": "Ramsay",
@@ -194,6 +198,12 @@ export const ALIASES: Record<string, string> = {
   "Monroe County High School": "Monroe County",
   "Escambia County High School": "Escambia County",
 };
+
+// ahsfhs.org files several schools under a different name. Deriving the
+// reverse here means the mapping lives in exactly one place.
+for (const [roster, source] of Object.entries(AHSFHS_NAMES)) {
+  ALIASES[source] = roster;
+}
 
 /**
  * Names that appear in more than one form and must be disambiguated by

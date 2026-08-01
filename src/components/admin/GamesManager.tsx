@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AdminHeader } from "./AdminShell";
+import DuplicateFinder from "./DuplicateFinder";
 import { Banner } from "./PublishButton";
 import { weekLabel } from "@/lib/format";
 import { PLAYOFF_ROUND_LABELS, type Game, type PlayoffRound } from "@/lib/types";
@@ -135,6 +136,8 @@ export default function GamesManager({
         title="Games"
         subtitle="Add results one at a time, or edit anything already on file."
       />
+
+      <DuplicateFinder />
 
       <form onSubmit={save} className="card space-y-4 p-4">
         <h2 className="text-sm font-bold uppercase tracking-wider">

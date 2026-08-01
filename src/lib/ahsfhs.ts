@@ -205,7 +205,28 @@ export function parseAhsfhsTeamPage(
   return { team, season: anchor.year, games, skipped };
 }
 
-/** The page URL for a given source-side team name. */
-export function ahsfhsUrl(team: string): string {
-  return `https://www.ahsfhs.org/teams2/teampage.asp?year=&Team=${encodeURIComponent(team)}`;
+/**
+ * Roster name → the name ahsfhs.org files the team under.
+ *
+ * Only entries where the two disagree. A wrong name here is an HTTP 500 on
+ * the fetch, which is how these were found. `names.ts` derives the reverse
+ * direction from this same map so the school is also recognised when it turns
+ * up as somebody else's opponent.
+ *
+ * Dothan is the instructive one: ahsfhs moved the program to a "Dothan High"
+ * page after a merger, so the bare name no longer resolves.
+ */
+export const AHSFHS_NAMES: Record<string, string> = {
+  Dothan: "Dothan High",
+  Phillips: "Phillips Bear Creek",
+  "Lindsay Lane": "Lindsay Lane Christian",
+  "West End": "West End Walnut Grove",
+  "Montgomery Catholic": "Catholic Montgomery",
+  Berry: "Berry Fayette",
+};
+
+/** The page URL for a roster team. */
+export function ahsfhsUrl(rosterName: string): string {
+  const source = AHSFHS_NAMES[rosterName] ?? rosterName;
+  return `https://www.ahsfhs.org/teams2/teampage.asp?year=&Team=${encodeURIComponent(source)}`;
 }

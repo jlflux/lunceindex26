@@ -17,7 +17,8 @@
     "preview:serve": "ALPREPS_PREVIEW_DATA=$PWD/scripts/out/preview.json next dev",
     "setup": "tsx scripts/setup.ts",
     "seed:sql": "tsx scripts/make-seed-sql.ts",
-    "parse-ahsfhs": "tsx scripts/test-ahsfhs.ts"
+    "parse-ahsfhs": "tsx scripts/test-ahsfhs.ts",
+    "test:duplicates": "tsx scripts/test-duplicates.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

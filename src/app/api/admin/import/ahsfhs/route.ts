@@ -220,12 +220,17 @@ export const PATCH = withAdmin(async (req: Request) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     try {
-      const res = await fetch(ahsfhsUrl(t.prior_source ?? t.name), {
+      const res = await fetch(ahsfhsUrl(t.name), {
         headers: { "User-Agent": "ALPrepsIndex/1.0" },
         signal: controller.signal,
       });
       if (!res.ok) {
-        problems.push(`${t.name}: HTTP ${res.status}`);
+        // Naming the URL makes a wrong source-side spelling obvious.
+        problems.push(
+          `${t.name}: HTTP ${res.status} for "${decodeURIComponent(
+            ahsfhsUrl(t.name).split("Team=")[1],
+          )}" — check the ahsfhs spelling`,
+        );
         continue;
       }
       const out = rowsFromPage(await res.text(), t, index, aliases);

@@ -2,114 +2,115 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import Icon from "./Icon";
 import ThemeToggle from "./ThemeToggle";
 
+/**
+ * RPI and the explainer are intentionally absent: RPI is meaningless until a
+ * few weeks of results exist, and the nav should carry only what is worth
+ * looking at now. Both routes still work if linked directly.
+ */
 const LINKS = [
   { href: "/", label: "Power Index" },
-  { href: "/rpi", label: "RPI" },
   { href: "/teams", label: "Teams" },
   { href: "/schedule", label: "Schedule" },
-  { href: "/about", label: "How it works" },
 ] as const;
 
-export default function TopNav({ generated }: { generated?: string }) {
+export default function TopNav({
+  generated,
+  season = "2026",
+}: {
+  generated?: string;
+  season?: string;
+}) {
   const pathname = usePathname();
   const isActive = (href: string) =>
-    href === "/" ? pathname === "/" || pathname.startsWith("/team/") : pathname === href;
+    href === "/"
+      ? pathname === "/" || pathname.startsWith("/team/")
+      : pathname === href;
 
   return (
     <header
-      className="sticky top-0 z-30 border-b"
+      className="relative overflow-hidden border-b"
       style={{
-        background: "rgb(var(--surface))",
         borderColor: "rgb(var(--border))",
+        background:
+          "linear-gradient(105deg, rgb(var(--hero-from)) 0%, rgb(var(--hero-to)) 62%)",
       }}
     >
-      <div className="mx-auto max-w-[1240px] px-5 sm:px-7">
-        <div className="flex h-[58px] items-center gap-6">
-          <Link href="/" className="flex shrink-0 items-baseline gap-[7px]">
-            <span className="text-[17px] font-bold tracking-tight">
-              ALPreps
-            </span>
-            <span
-              className="text-[17px] font-bold tracking-tight"
-              style={{ color: "rgb(var(--brand))" }}
-            >
-              Index
-            </span>
-          </Link>
+      {/* Oversized wordmark bleeding off the right edge, as on the 2025 site. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -right-6 top-1/2 hidden -translate-y-1/2 select-none text-[86px] font-extrabold leading-none tracking-tighter md:block"
+        style={{ color: "rgb(255 255 255 / 0.04)" }}
+      >
+        ALPREPS
+      </span>
 
-          {/* Tabs scroll horizontally on narrow screens rather than wrapping
-              or collapsing into a menu — five items stay reachable. */}
-          <nav className="table-scroll scroll-thin -mb-px min-w-0 flex-1">
-            <div className="flex h-[57px] items-center gap-6">
-              {LINKS.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  className={`tab ${isActive(l.href) ? "tab-active" : ""}`}
-                >
-                  {l.label}
-                </Link>
-              ))}
-            </div>
-          </nav>
-
-          <div className="flex shrink-0 items-center gap-3">
-            {generated && (
-              <span
-                className="hidden text-xs lg:inline"
-                style={{ color: "rgb(var(--text-faint))" }}
-              >
-                Updated{" "}
-                {new Date(generated).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
+      <div className="relative mx-auto max-w-[1400px] px-5 pt-5 sm:px-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <Link href="/" className="flex items-baseline gap-2">
+              <span className="text-[30px] font-extrabold leading-none tracking-tight text-white sm:text-[34px]">
+                ALPREPS
               </span>
-            )}
-            <ThemeToggle />
+              <span
+                className="text-[30px] font-extrabold leading-none tracking-tight sm:text-[34px]"
+                style={{ color: "rgb(var(--brand))" }}
+              >
+                INDEX
+              </span>
+              <span
+                className="text-[30px] font-extrabold leading-none sm:text-[34px]"
+                style={{ color: "rgb(var(--brand))" }}
+              >
+                .
+              </span>
+            </Link>
+            <p
+              className="mt-1.5 text-[12.5px] font-medium"
+              style={{ color: "rgb(255 255 255 / 0.55)" }}
+            >
+              AHSAA Football Power Ratings · {season} Season
+              {generated && (
+                <>
+                  {" · Updated "}
+                  {new Date(generated).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </>
+              )}
+            </p>
           </div>
+
+          <ThemeToggle />
         </div>
+
+        <nav className="table-scroll scroll-thin mt-4">
+          <div className="flex items-center gap-7">
+            {LINKS.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="relative whitespace-nowrap pb-2.5 text-[13.5px] font-semibold transition-colors"
+                style={{
+                  color: isActive(l.href)
+                    ? "#fff"
+                    : "rgb(255 255 255 / 0.5)",
+                }}
+              >
+                {l.label}
+                {isActive(l.href) && (
+                  <span
+                    className="absolute inset-x-0 -bottom-px h-[2.5px] rounded-t"
+                    style={{ background: "rgb(var(--brand))" }}
+                  />
+                )}
+              </Link>
+            ))}
+          </div>
+        </nav>
       </div>
     </header>
-  );
-}
-
-export function Footer() {
-  return (
-    <footer
-      className="mt-14 border-t"
-      style={{ borderColor: "rgb(var(--border))" }}
-    >
-      <div className="mx-auto max-w-[1240px] px-5 py-7 sm:px-7">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-baseline gap-[6px]">
-            <span className="text-sm font-bold tracking-tight">ALPreps</span>
-            <span
-              className="text-sm font-bold tracking-tight"
-              style={{ color: "rgb(var(--brand))" }}
-            >
-              Index
-            </span>
-            <span
-              className="ml-2 text-xs"
-              style={{ color: "rgb(var(--text-faint))" }}
-            >
-              AHSAA Football · 2026
-            </span>
-          </div>
-          <Link
-            href="/about"
-            className="inline-flex items-center gap-1.5 text-xs hover:underline"
-            style={{ color: "rgb(var(--text-muted))" }}
-          >
-            <Icon name="info" size={13} />
-            How the ratings work
-          </Link>
-        </div>
-      </div>
-    </footer>
   );
 }

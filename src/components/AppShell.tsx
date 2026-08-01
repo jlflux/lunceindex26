@@ -1,9 +1,9 @@
-import TopNav, { Footer } from "./TopNav";
+import Link from "next/link";
+import TopNav from "./TopNav";
 
 /**
- * Public site chrome: a sticky top bar and one centred content column.
- * No sidebar — five destinations do not need a rail, and the extra column
- * was costing horizontal room the ratings table actually wants.
+ * Public site chrome: a coloured masthead carrying the wordmark and nav, then
+ * one wide content column. No sidebar — the ratings table wants the width.
  */
 export default function AppShell({
   generated,
@@ -15,11 +15,33 @@ export default function AppShell({
   return (
     <div className="flex min-h-screen flex-col">
       <TopNav generated={generated} />
-      <main className="mx-auto w-full max-w-[1240px] flex-1 px-5 py-8 sm:px-7 sm:py-10">
+      <main className="mx-auto w-full max-w-[1400px] flex-1 px-5 py-6 sm:px-8">
         {children}
       </main>
       <Footer />
     </div>
+  );
+}
+
+function Footer() {
+  return (
+    <footer
+      className="mt-10 border-t"
+      style={{ borderColor: "rgb(var(--border))" }}
+    >
+      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-3 px-5 py-6 sm:px-8">
+        <p className="text-[12px]" style={{ color: "rgb(var(--text-faint))" }}>
+          ALPreps Index · AHSAA Football · 2026
+        </p>
+        <Link
+          href="/about"
+          className="text-[12px] hover:underline"
+          style={{ color: "rgb(var(--text-muted))" }}
+        >
+          How the ratings work
+        </Link>
+      </div>
+    </footer>
   );
 }
 
@@ -34,14 +56,14 @@ export function PageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-[27px] font-bold leading-[1.15] sm:text-[32px]">
+        <h1 className="text-[24px] font-bold leading-tight sm:text-[27px]">
           {title}
         </h1>
         {subtitle && (
           <p
-            className="mt-2 max-w-[62ch] text-[14px] leading-relaxed"
+            className="mt-1.5 max-w-[68ch] text-[13.5px] leading-relaxed"
             style={{ color: "rgb(var(--text-muted))" }}
           >
             {subtitle}

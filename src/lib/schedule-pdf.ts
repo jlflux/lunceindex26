@@ -121,7 +121,27 @@ function toCells(row: Row): string[] {
   return cells;
 }
 
-const DATE_RE = /^[A-Z][a-z]{2}\.?\s+\d{1,2},\s*\d{4}$/;
+/**
+ * Two date formats appear in the same file. Most rows read "Aug. 21, 2026",
+ * but sections the AHSAA built differently carry a raw Excel serial date
+ * ("2026-08-22 0:00:00"). Matching only the first silently drops every row in
+ * those sections — the Week 0 Saturday block went missing this way.
+ */
+const DATE_RE =
+  /^(?:[A-Z][a-z]{2}\.?\s+\d{1,2},\s*\d{4}|\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)$/;
+
+/** Normalises either form to the display format used everywhere else. */
+function displayDate(raw: string): string {
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!iso) return raw;
+  const d = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00Z`);
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).replace(/^(\w{3})/, "$1.");
+}
 
 /**
  * A classification cell: an AHSAA class (tolerating the `4a\`` typos and the
@@ -152,6 +172,12 @@ interface RowFields {
 function readRow(cells: string[]): RowFields | null {
   if (cells.length < 5 || !DATE_RE.test(cells[0])) return null;
 
+  // "2026-08-22 0:00:00" can arrive as two cells; drop the time part so it
+  // is not mistaken for the start of the home team's name.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cells[0]) && /^\d{1,2}:\d{2}/.test(cells[1] ?? "")) {
+    cells = [cells[0], ...cells.slice(2)];
+  }
+
   const classIdx: number[] = [];
   for (let i = 1; i < cells.length; i++) {
     if (CLASS_RE.test(cells[i])) classIdx.push(i);
@@ -169,7 +195,7 @@ function readRow(cells: string[]): RowFields | null {
   if (i1 <= homeStart - 1 || i2 <= awayStart - 1) return null;
 
   return {
-    date: cells[0],
+    date: displayDate(cells[0]),
     home: cells.slice(homeStart, i1).join(" ").trim(),
     cl1: cells[i1],
     reg1: hasReg1 ? cells[i1 + 1] : "",

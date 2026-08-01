@@ -3,115 +3,108 @@
 @tailwind utilities;
 
 /*
- * Light-first, no chrome for its own sake: a neutral canvas, one content
- * column, and type doing most of the work. Dark mode is a full peer — the
- * toggle stamps `data-theme` on <html> and must win over the system
- * preference in both directions.
+ * Dark by default: :root carries the dark palette, so the site is dark before
+ * any JavaScript runs and there is no flash. Light is opt-in via the toggle,
+ * which stamps `data-theme` on <html>.
+ *
+ * There is deliberately no `prefers-color-scheme` block — the theme is a
+ * choice between two, not three, and honouring the OS as a third state made
+ * the toggle ambiguous.
  */
 :root {
-  --canvas: 247 247 248;
-  --surface: 255 255 255;
-  --surface-2: 249 250 251;
-  --surface-3: 243 244 246;
-  --border: 232 233 237;
-  --border-strong: 214 216 222;
+  --canvas: 9 14 24;
+  --surface: 15 22 37;
+  --surface-2: 20 29 47;
+  --surface-3: 28 39 60;
+  --border: 32 45 68;
+  --border-strong: 48 65 92;
 
-  --text: 17 18 22;
-  --text-muted: 106 112 124;
-  --text-faint: 152 157 168;
+  --text: 226 233 244;
+  --text-muted: 141 156 181;
+  --text-faint: 102 118 143;
 
-  --brand: 206 40 40;
-  --brand-soft: 253 238 238;
-  --primary: 17 18 22;
-  --primary-fg: 255 255 255;
+  --brand: 244 63 63;
+  --brand-soft: 58 20 24;
+  --primary: 226 233 244;
+  --primary-fg: 12 18 30;
 
-  --good: 21 128 61;
-  --good-soft: 236 250 241;
-  --bad: 194 45 45;
-  --bad-soft: 253 238 238;
-  --warn: 168 108 8;
-  --warn-soft: 253 246 230;
+  --good: 74 222 128;
+  --good-soft: 16 43 30;
+  --bad: 248 113 113;
+  --bad-soft: 58 20 24;
+  --warn: 250 204 21;
+  --warn-soft: 48 39 12;
 
-  --shadow-sm: 0 1px 2px rgb(17 18 22 / 0.05);
-  --shadow: 0 1px 3px rgb(17 18 22 / 0.06), 0 8px 24px -10px rgb(17 18 22 / 0.1);
-}
+  --rating: 74 222 128;
+  --hero-from: 13 23 42;
+  --hero-to: 8 13 23;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --canvas: 11 12 14;
-    --surface: 22 24 28;
-    --surface-2: 28 30 35;
-    --surface-3: 35 38 44;
-    --border: 42 45 52;
-    --border-strong: 58 62 71;
-
-    --text: 240 241 244;
-    --text-muted: 158 164 176;
-    --text-faint: 116 122 134;
-
-    --brand: 248 113 113;
-    --brand-soft: 45 23 24;
-    --primary: 240 241 244;
-    --primary-fg: 17 18 22;
-
-    --good: 74 222 128;
-    --good-soft: 18 40 28;
-    --bad: 248 113 113;
-    --bad-soft: 45 23 24;
-    --warn: 250 204 21;
-    --warn-soft: 42 35 14;
-
-    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
-    --shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 10px 30px -12px rgb(0 0 0 / 0.6);
-  }
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow: 0 2px 6px rgb(0 0 0 / 0.45), 0 16px 40px -16px rgb(0 0 0 / 0.7);
 }
 
 :root[data-theme="light"] {
-  --canvas: 247 247 248;
+  --canvas: 244 246 249;
   --surface: 255 255 255;
-  --surface-2: 249 250 251;
-  --surface-3: 243 244 246;
-  --border: 232 233 237;
-  --border-strong: 214 216 222;
-  --text: 17 18 22;
-  --text-muted: 106 112 124;
-  --text-faint: 152 157 168;
+  --surface-2: 248 250 252;
+  --surface-3: 241 245 249;
+  --border: 226 232 240;
+  --border-strong: 203 213 225;
+
+  --text: 15 23 42;
+  --text-muted: 92 105 128;
+  --text-faint: 139 152 172;
+
   --brand: 206 40 40;
-  --brand-soft: 253 238 238;
-  --primary: 17 18 22;
+  --brand-soft: 254 238 238;
+  --primary: 15 23 42;
   --primary-fg: 255 255 255;
+
   --good: 21 128 61;
   --good-soft: 236 250 241;
   --bad: 194 45 45;
   --bad-soft: 253 238 238;
   --warn: 168 108 8;
   --warn-soft: 253 246 230;
-  --shadow-sm: 0 1px 2px rgb(17 18 22 / 0.05);
-  --shadow: 0 1px 3px rgb(17 18 22 / 0.06), 0 8px 24px -10px rgb(17 18 22 / 0.1);
+
+  --rating: 21 128 61;
+  --hero-from: 23 37 64;
+  --hero-to: 15 23 42;
+
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05);
+  --shadow: 0 2px 6px rgb(15 23 42 / 0.06), 0 16px 40px -18px rgb(15 23 42 / 0.2);
 }
 
 :root[data-theme="dark"] {
-  --canvas: 11 12 14;
-  --surface: 22 24 28;
-  --surface-2: 28 30 35;
-  --surface-3: 35 38 44;
-  --border: 42 45 52;
-  --border-strong: 58 62 71;
-  --text: 240 241 244;
-  --text-muted: 158 164 176;
-  --text-faint: 116 122 134;
-  --brand: 248 113 113;
-  --brand-soft: 45 23 24;
-  --primary: 240 241 244;
-  --primary-fg: 17 18 22;
+  --canvas: 9 14 24;
+  --surface: 15 22 37;
+  --surface-2: 20 29 47;
+  --surface-3: 28 39 60;
+  --border: 32 45 68;
+  --border-strong: 48 65 92;
+
+  --text: 226 233 244;
+  --text-muted: 141 156 181;
+  --text-faint: 102 118 143;
+
+  --brand: 244 63 63;
+  --brand-soft: 58 20 24;
+  --primary: 226 233 244;
+  --primary-fg: 12 18 30;
+
   --good: 74 222 128;
-  --good-soft: 18 40 28;
+  --good-soft: 16 43 30;
   --bad: 248 113 113;
-  --bad-soft: 45 23 24;
+  --bad-soft: 58 20 24;
   --warn: 250 204 21;
-  --warn-soft: 42 35 14;
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.35);
-  --shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 10px 30px -12px rgb(0 0 0 / 0.6);
+  --warn-soft: 48 39 12;
+
+  --rating: 74 222 128;
+  --hero-from: 13 23 42;
+  --hero-to: 8 13 23;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow: 0 2px 6px rgb(0 0 0 / 0.45), 0 16px 40px -16px rgb(0 0 0 / 0.7);
 }
 
 @layer base {

@@ -154,9 +154,9 @@ export default async function TeamPage({
             <SectionTitle icon="sliders">Rating breakdown</SectionTitle>
             <div className="card divide-y" style={{ borderColor: "rgb(var(--border))" }}>
               <Metric
-                label="Massey"
-                value={fmt(t.massey)}
-                hint="Iterative solve, before adjustments"
+                label="Index Rating"
+                value={fmt(t.rating)}
+                hint="Composite, after all adjustments"
               />
               <Metric
                 label="Strength of schedule"
@@ -182,11 +182,6 @@ export default async function TeamPage({
               <Metric
                 label="Points allowed per game"
                 value={hasPlayed ? fmt(t.papg, 1) : "—"}
-              />
-              <Metric
-                label="Preseason carry-over"
-                value={`${Math.round(t.prior_blend * 100)}%`}
-                hint="Weight still given to last season"
               />
             </div>
           </div>

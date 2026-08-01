@@ -1,4 +1,4 @@
-import AppShell, { PageHeader } from "@/components/AppShell";
+import AppShell from "@/components/AppShell";
 import RatingsTable from "@/components/RatingsTable";
 import StatCard from "@/components/StatCard";
 import EmptyState from "@/components/EmptyState";
@@ -25,12 +25,7 @@ export default async function HomePage({
 
   return (
     <AppShell generated={data.ratings.length ? data.generated : undefined}>
-      <PageHeader
-        title="AHSAA Power Ratings"
-        subtitle="A composite rating blending a Massey-style solve with strength of schedule, scoring efficiency and win quality. Select any team for its full breakdown, schedule and projections."
-      />
-
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-3 gap-3">
         <StatCard
           icon="users"
           label="Teams rated"
@@ -51,12 +46,6 @@ export default async function HomePage({
           }
           note={played.length === 0 ? "season not started" : "latest result"}
         />
-        <StatCard
-          icon="database"
-          label="Preseason carry-over"
-          value={`${Math.round(data.prior_blend * 100)}%`}
-          note="weight on last season"
-        />
       </div>
 
       {data.ratings.length === 0 ? (
@@ -65,12 +54,7 @@ export default async function HomePage({
           body="Seed the teams, then publish from the admin dashboard to generate the first board."
         />
       ) : (
-        <RatingsTable
-          mode="index"
-          ratings={data.ratings}
-          rpi={data.rpi}
-          initialClass={initialClass}
-        />
+        <RatingsTable mode="index" payload={data} initialClass={initialClass} />
       )}
     </AppShell>
   );

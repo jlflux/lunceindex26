@@ -6,60 +6,58 @@ import Icon from "./Icon";
 const STORAGE_KEY = "alpreps-theme";
 
 /**
- * Applies the stored theme before first paint. Without this the page renders
- * in the system theme and then flips, which reads as a flash of wrong colour.
+ * Applies the stored theme before first paint.
+ *
+ * Dark is the default and lives in `:root`, so there is nothing to do unless
+ * the visitor has explicitly chosen light. The OS preference is deliberately
+ * not consulted — the toggle offers two states, not three.
  */
 export function ThemeScript() {
   const js = `
     try {
-      var t = localStorage.getItem('${STORAGE_KEY}');
-      if (t === 'light' || t === 'dark') {
-        document.documentElement.setAttribute('data-theme', t);
+      if (localStorage.getItem('${STORAGE_KEY}') === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
       }
     } catch (e) {}
   `;
   return <script dangerouslySetInnerHTML={{ __html: js }} />;
 }
 
-type Theme = "light" | "dark" | "system";
+type Theme = "light" | "dark";
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("system");
+  const [theme, setTheme] = useState<Theme>("dark");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "light" || stored === "dark") setTheme(stored);
+    setTheme(
+      localStorage.getItem(STORAGE_KEY) === "light" ? "light" : "dark",
+    );
     setMounted(true);
   }, []);
 
-  function apply(next: Theme) {
+  function toggle() {
+    const next: Theme = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    if (next === "system") {
-      localStorage.removeItem(STORAGE_KEY);
-      document.documentElement.removeAttribute("data-theme");
+    localStorage.setItem(STORAGE_KEY, next);
+    if (next === "light") {
+      document.documentElement.setAttribute("data-theme", "light");
     } else {
-      localStorage.setItem(STORAGE_KEY, next);
-      document.documentElement.setAttribute("data-theme", next);
+      document.documentElement.setAttribute("data-theme", "dark");
     }
   }
 
-  // Cycles system → light → dark.
-  const next: Theme =
-    theme === "system" ? "light" : theme === "light" ? "dark" : "system";
-  const icon = theme === "system" ? "monitor" : theme === "light" ? "sun" : "moon";
-  const label = `Theme: ${theme}. Switch to ${next}.`;
+  const label = `Switch to ${theme === "dark" ? "light" : "dark"} mode`;
 
   return (
     <button
-      onClick={() => apply(next)}
-      className="btn !h-9 !w-9 !p-0"
+      onClick={toggle}
+      className="btn !h-8 !w-8 !p-0"
       title={label}
       aria-label={label}
-      // Server renders the system icon; suppress the mismatch until hydrated.
       suppressHydrationWarning
     >
-      <Icon name={mounted ? icon : "monitor"} size={16} />
+      <Icon name={mounted && theme === "light" ? "sun" : "moon"} size={15} />
     </button>
   );
 }

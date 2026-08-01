@@ -3,8 +3,8 @@
 --
 -- Teams: 393, with 392 preseason ratings
 -- Aliases: 90
--- Games: 139
--- Week 0: 145 rows -> 139 games, 6 duplicates collapsed, 0 skipped
+-- Games: 140
+-- Week 0: 146 rows -> 140 games, 6 duplicates collapsed, 0 skipped
 --   check: "Southside High School" is ambiguous; picked by class+region. Verify.
 --   check: "Lee High School" is ambiguous; picked by class+region. Verify.
 --
@@ -657,7 +657,8 @@ insert into games (t1, s1, t2, s2, week, type, round, date, status) values
   ('McGill-Toolen', NULL, 'Foley', NULL, 0, 'regular', NULL, 'Aug. 21, 2026', 'scheduled'),
   ('St. Paul''s', NULL, 'Alma Bryant', NULL, 0, 'regular', NULL, 'Aug. 21, 2026', 'scheduled'),
   ('Westminster Christian', NULL, 'Madison County', NULL, 0, 'regular', NULL, 'Aug. 21, 2026', 'scheduled'),
-  ('Christian Collegiate Academy', NULL, 'St. Luke''s', NULL, 0, 'regular', NULL, 'Aug. 21, 2026', 'scheduled')
+  ('Christian Collegiate Academy', NULL, 'St. Luke''s', NULL, 0, 'regular', NULL, 'Aug. 21, 2026', 'scheduled'),
+  ('Columbia', NULL, 'Greensboro', NULL, 0, 'regular', NULL, 'Aug. 22, 2026', 'scheduled')
 on conflict (t1, t2, week, type) do update set
   date = excluded.date
   where games.s1 is null and games.s2 is null;

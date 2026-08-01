@@ -1,69 +1,75 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import Icon from "./Icon";
-import { fmt, fmtPct, fmtSigned, ordinal, record } from "@/lib/format";
+import TeamPanel from "./TeamPanel";
+import { fmt, fmtPct, fmtSigned, record } from "@/lib/format";
 import {
   CLS_FILTER_ORDER,
   type Classification,
   type RatingRow,
+  type RatingsPayload,
   type RpiRow,
 } from "@/lib/types";
 
 type Mode = "index" | "rpi";
 
 /**
- * Ranks within each numeric column, so a team's rating can be read against
- * the field — this is the one thing the old site did that a plain table
- * loses. Computed once per dataset, not per render of a row.
+ * Rank within a numeric column across the whole field, so a figure can be read
+ * against the other 392 rather than in isolation. Keyed by slug because the
+ * table is filtered and re-sorted constantly.
  */
-function columnRanks<T>(rows: T[], get: (r: T) => number, higherIsBetter = true) {
-  const order = rows
-    .map((r, i) => ({ i, v: get(r) }))
-    .sort((a, b) => (higherIsBetter ? b.v - a.v : a.v - b.v));
-  const ranks = new Array<number>(rows.length);
-  order.forEach((o, idx) => (ranks[o.i] = idx + 1));
-  return ranks;
+function columnRank<T extends { slug: string }>(
+  rows: T[],
+  get: (r: T) => number,
+  higherIsBetter = true,
+) {
+  const m = new Map<string, number>();
+  [...rows]
+    .sort((a, b) => (higherIsBetter ? get(b) - get(a) : get(a) - get(b)))
+    .forEach((r, i) => m.set(r.slug, i + 1));
+  return m;
 }
+
+/** How much of the board gets the highlight treatment. */
+const HIGHLIGHT_OVERALL = 25;
+const HIGHLIGHT_IN_CLASS = 10;
 
 export default function RatingsTable({
   mode,
-  ratings,
-  rpi,
+  payload,
   initialClass = "all",
 }: {
   mode: Mode;
-  ratings: RatingRow[];
-  rpi: RpiRow[];
+  payload: RatingsPayload;
   initialClass?: Classification | "all";
 }) {
+  const { ratings, rpi } = payload;
   const [cls, setCls] = useState<Classification | "all">(initialClass);
   const [region, setRegion] = useState<number | "all">("all");
   const [query, setQuery] = useState("");
+  const [openSlug, setOpenSlug] = useState<string | null>(null);
 
   const source = mode === "index" ? ratings : rpi;
-  const played = mode === "index" ? ratings.filter((r) => r.wins + r.losses > 0) : [];
+  const hasResults = ratings.some((r) => r.wins + r.losses > 0);
 
-  // Column ranks come from the full field, so filtering to 3A still shows a
-  // team's standing among all 393 rather than among its class.
-  const ranks = useMemo(() => {
-    if (mode !== "index") return null;
-    const rs = ratings;
-    return {
-      sos: columnRanks(rs, (r) => r.sos),
-      oEff: columnRanks(rs, (r) => r.o_eff),
-      dEff: columnRanks(rs, (r) => r.d_eff),
-      ppg: columnRanks(rs, (r) => r.ppg),
-      papg: columnRanks(rs, (r) => r.papg, false),
-      index: new Map(rs.map((r, i) => [r.slug, i])),
-    };
-  }, [mode, ratings]);
+  const ranks = useMemo(
+    () => ({
+      sos: columnRank(ratings, (r) => r.sos),
+      oEff: columnRank(ratings, (r) => r.o_eff),
+      dEff: columnRank(ratings, (r) => r.d_eff),
+      ppg: columnRank(ratings, (r) => r.ppg),
+      papg: columnRank(ratings, (r) => r.papg, false),
+    }),
+    [ratings],
+  );
 
   const regions = useMemo(() => {
     if (cls === "all") return [];
     return [
-      ...new Set(source.filter((r) => r.classification === cls).map((r) => r.region)),
+      ...new Set(
+        source.filter((r) => r.classification === cls).map((r) => r.region),
+      ),
     ].sort((a, b) => a - b);
   }, [source, cls]);
 
@@ -78,13 +84,19 @@ export default function RatingsTable({
   }, [source, cls, region, query]);
 
   const scoped = cls !== "all";
-  const hasResults = played.length > 0;
+  const cutoff = scoped ? HIGHLIGHT_IN_CLASS : HIGHLIGHT_OVERALL;
 
   return (
-    <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="relative lg:w-72">
+    <>
+      {/* Toolbar */}
+      <div
+        className="mb-4 flex flex-col gap-3 rounded-xl border px-3 py-3 lg:flex-row lg:items-center"
+        style={{
+          background: "rgb(var(--surface))",
+          borderColor: "rgb(var(--border))",
+        }}
+      >
+        <div className="relative lg:w-64">
           <span
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
             style={{ color: "rgb(var(--text-faint))" }}
@@ -98,12 +110,19 @@ export default function RatingsTable({
             placeholder="Search teams…"
             className="input !pl-9"
             aria-label="Search teams"
+            style={{ background: "rgb(var(--surface-2))" }}
           />
         </div>
 
-        <div className="table-scroll scroll-thin -mx-4 px-4 lg:mx-0 lg:flex-1 lg:px-0">
-          <div className="flex gap-1.5 pb-0.5">
-            <Chip
+        <div className="table-scroll scroll-thin min-w-0 lg:flex-1">
+          <div className="flex items-center gap-1.5">
+            <span
+              className="mr-1 shrink-0 text-[10.5px] font-bold uppercase tracking-wider"
+              style={{ color: "rgb(var(--text-faint))" }}
+            >
+              Class
+            </span>
+            <Pill
               active={cls === "all"}
               onClick={() => {
                 setCls("all");
@@ -112,7 +131,7 @@ export default function RatingsTable({
               label="All"
             />
             {CLS_FILTER_ORDER.map((c) => (
-              <Chip
+              <Pill
                 key={c}
                 active={cls === c}
                 onClick={() => {
@@ -124,18 +143,25 @@ export default function RatingsTable({
             ))}
           </div>
         </div>
+
+        <span
+          className="shrink-0 text-[12px] tnum"
+          style={{ color: "rgb(var(--text-muted))" }}
+        >
+          {rows.length} teams
+        </span>
       </div>
 
       {regions.length > 0 && (
-        <div className="table-scroll scroll-thin -mx-4 px-4 sm:mx-0 sm:px-0">
-          <div className="flex gap-1.5 pb-0.5">
-            <Chip
+        <div className="table-scroll scroll-thin mb-4">
+          <div className="flex gap-1.5">
+            <Pill
               active={region === "all"}
               onClick={() => setRegion("all")}
               label="All regions"
             />
             {regions.map((r) => (
-              <Chip
+              <Pill
                 key={r}
                 active={region === r}
                 onClick={() => setRegion(r)}
@@ -146,23 +172,12 @@ export default function RatingsTable({
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
-          <span className="font-semibold" style={{ color: "rgb(var(--text))" }}>
-            {rows.length}
-          </span>{" "}
-          team{rows.length === 1 ? "" : "s"}
-          {scoped && ` · ranked within ${cls}`}
-        </p>
-        {mode === "index" && !hasResults && (
-          <span className="chip" style={{ background: "rgb(var(--warn-soft))", color: "rgb(var(--warn))" }}>
-            Preseason — no games played
-          </span>
-        )}
-      </div>
-
-      <div className="card table-scroll scroll-thin overflow-hidden">
-        <table className={`w-full ${hasResults || mode === "rpi" ? "min-w-[780px]" : "min-w-[560px]"}`}>
+      {/* Table */}
+      <div
+        className="table-scroll scroll-thin overflow-hidden rounded-xl border"
+        style={{ borderColor: "rgb(var(--border))" }}
+      >
+        <table className="w-full min-w-[880px]">
           <thead>
             <tr
               className="border-b"
@@ -171,144 +186,138 @@ export default function RatingsTable({
                 background: "rgb(var(--surface-2))",
               }}
             >
-              <th className="th w-14 !text-center">#</th>
+              <th className="th w-12 !text-center">#</th>
               <th className="th">Team</th>
+              <th className="th !text-center">Class</th>
+              <th className="th !text-center">Record</th>
               {mode === "index" ? (
                 <>
-                  <th className="th !text-right">Rating</th>
-                  <th className="th !text-center">In class</th>
-                  <th className="th !text-center">Rec</th>
-                  {/* Every one of these reads "—" before a game is played.
-                      Hiding them keeps the preseason board legible; they
-                      return the moment there are results. */}
-                  {hasResults && (
-                    <>
-                      <th className="th !text-right">SOS</th>
-                      <th className="th !text-right">Off</th>
-                      <th className="th !text-right">Def</th>
-                      <th className="th hidden !text-right lg:table-cell">PF/G</th>
-                      <th className="th hidden !text-right lg:table-cell">PA/G</th>
-                    </>
-                  )}
+                  <th className="th !text-right">SOS</th>
+                  <th className="th !text-right">O-Eff</th>
+                  <th className="th !text-right">D-Eff</th>
+                  <th className="th hidden !text-right xl:table-cell">PF/G</th>
+                  <th className="th hidden !text-right xl:table-cell">PA/G</th>
+                  <th className="th !pr-4 !text-right">Rating</th>
                 </>
               ) : (
                 <>
-                  <th className="th !text-right">RPI</th>
-                  <th className="th !text-center">In class</th>
-                  <th className="th !text-center">Rec</th>
                   <th className="th !text-right">Win%</th>
                   <th className="th !text-right">OWP</th>
-                  <th className="th hidden !text-right sm:table-cell">OOWP</th>
+                  <th className="th hidden !text-right lg:table-cell">OOWP</th>
+                  <th className="th !pr-4 !text-right">RPI</th>
                 </>
               )}
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => {
-              const idx = ranks?.index.get(r.slug);
+              const shown = scoped ? r.class_rank : r.rank;
+              const top = shown <= cutoff;
               const ir = mode === "index" ? (r as RatingRow) : null;
               const rr = mode === "rpi" ? (r as RpiRow) : null;
-              const hasGames = r.wins + r.losses > 0;
+              const games = r.wins + r.losses > 0;
 
               return (
                 <tr
                   key={r.slug}
-                  className="row-hover border-b transition-colors last:border-0"
-                  style={{ borderColor: "rgb(var(--border))" }}
+                  onClick={() => setOpenSlug(r.slug)}
+                  className="row-hover cursor-pointer border-b last:border-0"
+                  style={{
+                    borderColor: "rgb(var(--border))",
+                    // The top of the board reads as one block rather than a
+                    // few decorated rows.
+                    background: top ? "rgb(var(--brand) / 0.05)" : undefined,
+                  }}
                 >
                   <td className="td !text-center">
-                    <RankBadge n={scoped ? r.class_rank : r.rank} />
-                  </td>
-
-                  <td className="td !whitespace-nowrap">
-                    <Link
-                      href={`/team/${r.slug}`}
-                      className="text-[13.5px] font-semibold hover:underline"
+                    <span
+                      className="text-[13px] font-bold tnum"
+                      style={{
+                        color: top
+                          ? "rgb(var(--brand))"
+                          : "rgb(var(--text-faint))",
+                      }}
                     >
-                      {r.name}
-                    </Link>
-                    <div className="mt-1 flex items-center gap-1.5">
-                      <span className={`chip cls-${r.classification}`}>
-                        {r.classification}
-                      </span>
-                      <span
-                        className="text-[11px]"
-                        style={{ color: "rgb(var(--text-faint))" }}
-                      >
-                        Region {r.region}
-                      </span>
-                    </div>
+                      {shown}
+                    </span>
                   </td>
 
-                  {ir && ranks && idx !== undefined ? (
+                  <td className="td">
+                    <span className="block text-[15.5px] font-bold leading-tight">
+                      {r.name}
+                    </span>
+                    <span
+                      className="mt-0.5 block text-[11px]"
+                      style={{ color: "rgb(var(--text-faint))" }}
+                    >
+                      Region {r.region}
+                    </span>
+                  </td>
+
+                  <td className="td !text-center">
+                    <span className={`chip cls-${r.classification}`}>
+                      {r.classification}
+                    </span>
+                  </td>
+
+                  <td
+                    className="td !text-center font-semibold"
+                    style={{ color: "rgb(var(--text-muted))" }}
+                  >
+                    {record(r.wins, r.losses)}
+                  </td>
+
+                  {ir ? (
                     <>
-                      <td className="td !text-right">
-                        <span className="text-[15px] font-bold">
-                          {fmt(ir.rating)}
+                      <Cell
+                        value={games ? fmt(ir.sos, 1) : "—"}
+                        rank={games ? ranks.sos.get(r.slug) : undefined}
+                      />
+                      <Cell
+                        value={games ? fmtSigned(ir.o_eff) : "—"}
+                        rank={games ? ranks.oEff.get(r.slug) : undefined}
+                        tone={games ? ir.o_eff : undefined}
+                      />
+                      <Cell
+                        value={games ? fmtSigned(ir.d_eff) : "—"}
+                        rank={games ? ranks.dEff.get(r.slug) : undefined}
+                        tone={games ? ir.d_eff : undefined}
+                      />
+                      <Cell
+                        className="hidden xl:table-cell"
+                        value={games ? fmt(ir.ppg, 1) : "—"}
+                        rank={games ? ranks.ppg.get(r.slug) : undefined}
+                      />
+                      <Cell
+                        className="hidden xl:table-cell"
+                        value={games ? fmt(ir.papg, 1) : "—"}
+                        rank={games ? ranks.papg.get(r.slug) : undefined}
+                      />
+                      <td className="td !pr-4 !text-right">
+                        <span
+                          className="text-[17px] font-extrabold tnum"
+                          style={{ color: "rgb(var(--rating))" }}
+                        >
+                          {fmt(ir.rating, 1)}
                         </span>
                       </td>
-                      <ClassRankCell
-                        rank={ir.class_rank}
-                        cls={ir.classification}
-                      />
-                      <td
-                        className="td !text-center"
-                        style={{ color: "rgb(var(--text-muted))" }}
-                      >
-                        {record(ir.wins, ir.losses)}
-                      </td>
-                      {hasResults && (
-                        <>
-                          <Cell
-                            value={hasGames ? fmt(ir.sos) : "—"}
-                            rank={hasGames ? ranks.sos[idx] : undefined}
-                          />
-                          <Cell
-                            value={hasGames ? fmtSigned(ir.o_eff) : "—"}
-                            rank={hasGames ? ranks.oEff[idx] : undefined}
-                            tone={hasGames ? ir.o_eff : undefined}
-                          />
-                          <Cell
-                            value={hasGames ? fmtSigned(ir.d_eff) : "—"}
-                            rank={hasGames ? ranks.dEff[idx] : undefined}
-                            tone={hasGames ? ir.d_eff : undefined}
-                          />
-                          <Cell
-                            className="hidden lg:table-cell"
-                            value={hasGames ? fmt(ir.ppg, 1) : "—"}
-                            rank={hasGames ? ranks.ppg[idx] : undefined}
-                          />
-                          <Cell
-                            className="hidden lg:table-cell"
-                            value={hasGames ? fmt(ir.papg, 1) : "—"}
-                            rank={hasGames ? ranks.papg[idx] : undefined}
-                          />
-                        </>
-                      )}
                     </>
                   ) : rr ? (
                     <>
-                      <td className="td !text-right">
-                        <span className="text-[15px] font-bold">
+                      <Cell value={games ? fmtPct(rr.win_pct) : "—"} />
+                      <Cell value={games ? fmtPct(rr.opp_win_pct) : "—"} />
+                      <Cell
+                        className="hidden lg:table-cell"
+                        value={games ? fmtPct(rr.opp_opp_win_pct) : "—"}
+                      />
+                      <td className="td !pr-4 !text-right">
+                        <span
+                          className="text-[17px] font-extrabold tnum"
+                          style={{ color: "rgb(var(--rating))" }}
+                        >
                           {rr.rpi.toFixed(4)}
                         </span>
                       </td>
-                      <ClassRankCell
-                        rank={rr.class_rank}
-                        cls={rr.classification}
-                      />
-                      <td
-                        className="td !text-center"
-                        style={{ color: "rgb(var(--text-muted))" }}
-                      >
-                        {record(rr.wins, rr.losses)}
-                      </td>
-                      <Cell value={hasGames ? fmtPct(rr.win_pct) : "—"} />
-                      <Cell value={hasGames ? fmtPct(rr.opp_win_pct) : "—"} />
-                      <Cell
-                        className="hidden sm:table-cell"
-                        value={hasGames ? fmtPct(rr.opp_opp_win_pct) : "—"}
-                      />
                     </>
                   ) : null}
                 </tr>
@@ -329,48 +338,28 @@ export default function RatingsTable({
           </tbody>
         </table>
       </div>
-    </div>
+
+      {!hasResults && mode === "index" && (
+        <p
+          className="mt-3 text-[12px]"
+          style={{ color: "rgb(var(--text-faint))" }}
+        >
+          Preseason — no games played yet. Schedule-based figures fill in once
+          results are entered.
+        </p>
+      )}
+
+      <TeamPanel
+        payload={payload}
+        slug={openSlug}
+        onClose={() => setOpenSlug(null)}
+        columnRanks={ranks}
+      />
+    </>
   );
 }
 
-/** A team's standing inside its own classification, e.g. "2nd in 5A". */
-function ClassRankCell({
-  rank,
-  cls,
-}: {
-  rank: number;
-  cls: Classification;
-}) {
-  return (
-    <td className="td !text-center">
-      <span className="text-[12.5px] font-semibold tnum">{ordinal(rank)}</span>
-      <span
-        className="ml-1 text-[11px]"
-        style={{ color: "rgb(var(--text-faint))" }}
-      >
-        {cls}
-      </span>
-    </td>
-  );
-}
-
-function RankBadge({ n }: { n: number }) {
-  const top = n <= 3;
-  return (
-    <span
-      className="inline-grid h-[26px] min-w-[26px] place-items-center rounded-md px-1.5 text-[12.5px] font-semibold tnum"
-      style={
-        top
-          ? { color: "rgb(var(--brand))", fontWeight: 700 }
-          : { color: "rgb(var(--text-faint))" }
-      }
-    >
-      {n}
-    </span>
-  );
-}
-
-/** Numeric cell with the old site's parenthetical field rank underneath. */
+/** Numeric cell carrying its rank across the field, as on the 2025 site. */
 function Cell({
   value,
   rank,
@@ -393,13 +382,13 @@ function Cell({
 
   return (
     <td className={`td !text-right ${className}`}>
-      <span className="font-semibold" style={{ color }}>
+      <span className="text-[13px] font-semibold tnum" style={{ color }}>
         {value}
       </span>
       {rank !== undefined && (
         <span
-          className="ml-1 text-[10px] font-medium"
-          style={{ color: "rgb(var(--text-faint))" }}
+          className="ml-1 text-[10px] tnum"
+          style={{ color: "rgb(var(--brand) / 0.75)" }}
         >
           #{rank}
         </span>
@@ -408,7 +397,7 @@ function Cell({
   );
 }
 
-function Chip({
+function Pill({
   active,
   onClick,
   label,
@@ -418,10 +407,7 @@ function Chip({
   label: string;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`pill ${active ? "pill-active" : ""}`}
-    >
+    <button onClick={onClick} className={`pill ${active ? "pill-active" : ""}`}>
       {label}
     </button>
   );

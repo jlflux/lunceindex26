@@ -22,7 +22,7 @@ export default async function RpiPage() {
           body="RPI needs played games. Enter results and publish from the admin dashboard."
         />
       ) : (
-        <RatingsTable mode="rpi" ratings={data.ratings} rpi={data.rpi} />
+        <RatingsTable mode="rpi" payload={data} />
       )}
     </AppShell>
   );

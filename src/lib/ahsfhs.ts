@@ -85,13 +85,26 @@ function text(html: string): string {
 const SCHEDULE_END = /season\s+totals|standings|by\s+the\s+decade|border\s+wars/i;
 
 /**
+ * Where a table cell's content ends.
+ *
+ * Deliberately a boundary rather than `</td>`: the raw pages do not reliably
+ * close their cells, and requiring the closing tag means one missing tag eats
+ * everything up to the next one it does find.
+ */
+const CELL_END = String.raw`(?=<\/td>|<td\b|<\/tr>|<tr\b|<\/table>|$)`;
+
+/** Fresh matcher each call — a shared /g regex carries `lastIndex` between uses. */
+const colorbarRe = () =>
+  new RegExp(`<td\\b[^>]*class="colorbar"[^>]*>([\\s\\S]*?)${CELL_END}`, "gi");
+
+/**
  * Slices out one `colorbar` section.
  *
  * Runs to the next heading that looks like the end of the schedule, and only
  * falls back to "the very next heading" when no such marker exists.
  */
 function section(html: string, heading: RegExp): string | null {
-  const bar = /<td[^>]*class="colorbar"[^>]*>([\s\S]*?)<\/td>/gi;
+  const bar = colorbarRe();
   let m: RegExpExecArray | null;
   let start = -1;
   let nextBar = -1;
@@ -126,9 +139,9 @@ function section(html: string, heading: RegExp): string | null {
  * here: the site cannot be reached from the build environment.
  */
 export function sectionHeadings(html: string): string[] {
-  const bar = /<td[^>]*class="colorbar"[^>]*>([\s\S]*?)<\/td>/gi;
   const out: string[] = [];
   let m: RegExpExecArray | null;
+  const bar = colorbarRe();
   while ((m = bar.exec(html))) out.push(text(m[1]));
   return out;
 }
@@ -227,19 +240,34 @@ export function parseAhsfhsTeamPage(
   }
 
   const games: AhsfhsGame[] = [];
-  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  let row: RegExpExecArray | null;
 
-  while ((row = rowRe.exec(body))) {
-    const cells = [...row[1].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((c) =>
-      text(c[1]),
-    );
-    if (cells.length < 2) continue;
+  // Cells in document order, NOT grouped by <tr>.
+  //
+  // Row grouping looked obvious and was wrong. A browser-saved copy of this
+  // page is a serialised DOM — every tag balanced, because the parser repaired
+  // it on the way in — while the bytes the server actually sends need not
+  // close their rows at all. Matching <tr>…</tr> against the raw page then
+  // swallows the whole table as a single row, which yields exactly one date
+  // cell and so exactly one game per team.
+  //
+  // A game therefore starts wherever a date appears and runs to the next date,
+  // which holds under either markup. Content is taken up to the next
+  // structural boundary rather than a closing tag, so a missing </td> costs
+  // one cell instead of the rest of the table.
+  const cellRe = new RegExp(`<td\\b[^>]*>([\\s\\S]*?)${CELL_END}`, "gi");
+  const cells = [...body.matchAll(cellRe)].map((c) => text(c[1]));
 
-    const dateLabel = cells[0];
-    if (!isDateCell(dateLabel)) continue;
+  const starts = cells
+    .map((c, i) => (isDateCell(c) ? i : -1))
+    .filter((i) => i >= 0);
 
-    const opponentCell = cells[1];
+  for (let n = 0; n < starts.length; n++) {
+    const from = starts[n];
+    const to = n + 1 < starts.length ? starts[n + 1] : cells.length;
+    const dateLabel = cells[from];
+    const opponentCell = cells[from + 1] ?? "";
+    // Everything up to the next date is the outcome, once one exists.
+    const trailing = cells.slice(from + 2, to);
     if (/^open$/i.test(opponentCell.replace(/\*/g, "").trim())) {
       continue; // bye week
     }
@@ -269,8 +297,10 @@ export function parseAhsfhsTeamPage(
       continue;
     }
 
-    // Trailing cells hold the outcome once a game has been played.
-    const rest = cells.slice(2).join(" ");
+    // Trailing cells hold the outcome once a game has been played. Scoped to
+    // this game's cells — `cells` is now the whole table, so slicing from a
+    // fixed index would read every later game's score into the first one.
+    const rest = trailing.join(" ");
     const resultMatch = rest.match(/\b([WLT])\b/);
     const scoreMatch = rest.match(/\b(\d{1,3})\s*-\s*(\d{1,3})\b/);
 

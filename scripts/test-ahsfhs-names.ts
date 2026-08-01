@@ -250,7 +250,42 @@ console.log("\n8. Both page layouts read the same schedule");
   );
 }
 
-console.log("\n9. The fetch asks for the games-by-year page");
+console.log("\n9. Unclosed rows do not collapse the schedule");
+{
+  // Why this matters: a browser-saved page is a serialised DOM with every tag
+  // balanced, because the browser repaired it on the way in. The bytes the
+  // server sends need not close their rows. Grouping cells by <tr> then reads
+  // the whole table as one row — one date cell, one game, for every team.
+  //
+  // Both saved samples are already repaired, so the raw shape is simulated by
+  // stripping the row tags back out.
+  for (const file of [
+    "data/samples/ahsfhs-fairhope.html",
+    "data/samples/ahsfhs-fairhope-gamesbyyear.html",
+  ]) {
+    const html = readFileSync(file, "utf8");
+    const mangled = html.replace(/<\/tr>/gi, "");
+    const page = parseAhsfhsTeamPage(mangled);
+    check(
+      `${file.split("/").pop()} survives losing its </tr> tags`,
+      page.games.length === 10,
+      `got ${page.games.length}`,
+    );
+  }
+
+  // And a missing </td> costs its own cell, not the rest of the table.
+  const noCells = readFileSync(
+    "data/samples/ahsfhs-fairhope-gamesbyyear.html",
+    "utf8",
+  ).replace(/<\/td>/gi, "");
+  check(
+    "and losing its </td> tags",
+    parseAhsfhsTeamPage(noCells).games.length === 10,
+    `got ${parseAhsfhsTeamPage(noCells).games.length}`,
+  );
+}
+
+console.log("\n10. The fetch asks for the games-by-year page");
 {
   const url = ahsfhsUrl("Carver Montgomery");
   check("uses gamesbyyear.asp", url.includes("gamesbyyear.asp"), url);

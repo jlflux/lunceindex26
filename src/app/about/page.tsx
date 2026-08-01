@@ -1,131 +1,114 @@
 import AppShell, { PageHeader } from "@/components/AppShell";
-import { loadRatings } from "@/lib/data";
 
-export const revalidate = 300;
-export const metadata = { title: "How ratings work" };
+export const metadata = { title: "How the ALPreps Index works" };
 
-export default async function AboutPage() {
-  const { config } = await loadRatings();
-
+/**
+ * Plain copy, no data. It used to render a panel of live config values, which
+ * meant the page had to fetch ratings and re-render on a schedule; it now says
+ * nothing that changes when a slider moves, so it is fully static.
+ */
+export default function AboutPage() {
   return (
     <AppShell>
-      <PageHeader
-        title="How the ratings work"
-        subtitle="What goes into a team's number, and why it is built the way it is."
-      />
+      <PageHeader title="How the ALPreps Index Works" />
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
-        <div className="space-y-5">
-          <Panel title="The short version">
-            <p>
-              Every team gets a single composite rating. It starts from a
-              Massey-style solve — an iterative pass over every played game that
-              rates you by your margin against the quality of who you played —
-              and then adjusts for strength of schedule, scoring efficiency and
-              win quality.
-            </p>
-            <p>
-              Ratings only move when games are played. A full season schedule
-              can sit on the site from day one without affecting anything,
-              because a game is only counted once both scores exist.
-            </p>
-          </Panel>
-
-          <Panel title="Why not a pure Massey rating">
-            <p>
-              A plain Massey or SRS rating is <em>predictive</em>: it optimises
-              margin against schedule and does not care whether you actually
-              won. Tested against FBS 2025, plain SRS put a team that missed the
-              playoff above a team that won a playoff game, purely because it
-              ran up bigger margins on a weaker slate.
-            </p>
-            <p>
-              So win quality is its own term, and schedule strength is weighted
-              to dominate raw record.
-            </p>
-          </Panel>
-
-          <Panel title="Why classification matters">
-            <p>
-              Every team is pulled toward a baseline set by its classification,
-              and that pull is re-applied on every pass of the solve rather than
-              just used as a starting point. Without it, an undefeated Class 1A
-              team beating its own classification by 40 a week outranks a 6A
-              playoff team — which is the failure the whole design exists to
-              avoid.
-            </p>
-            <p>
-              Early in the season each team also carries part of its rating over
-              from last year, regressed toward its new classification&rsquo;s
-              average to account for roster turnover. That carry-over decays to
-              nothing by week four.
-            </p>
-          </Panel>
-
-          <Panel title="Strength of schedule and efficiency">
-            <p>
-              Strength of schedule is the mean rating of every opponent you have
-              faced. Offensive efficiency measures how much better you scored
-              than your opponents typically allow; defensive efficiency, how
-              much better you defended than they typically score.
-            </p>
-            <p>
-              Efficiency credit is damped by schedule quality — you do not get
-              full marks for outscoring weak opponents.
-            </p>
-          </Panel>
-
-          <Panel title="RPI">
-            <p>
-              RPI is a separate, simpler measure kept alongside the index: 25%
-              your win percentage, 50% your opponents&rsquo; win percentage, and
-              25% your opponents&rsquo; opponents&rsquo; win percentage.
-            </p>
-            <p>
-              Out-of-state opponents count toward your own record but are
-              excluded from the opponent-strength terms, since there is no
-              in-system record for them.
-            </p>
-          </Panel>
-
-          <Panel title="Projections">
-            <p>
-              Each scheduled game shows a projected margin from the rating gap
-              plus home-field advantage. Once a result is entered, it is
-              labelled against that projection — dominant, exceeded, as
-              expected, or below expectation. Projections never feed back into
-              the ratings.
-            </p>
-          </Panel>
-        </div>
-
-        <aside>
-          <h2 className="mb-2.5 text-[13px] font-bold uppercase tracking-wider">
-            Current settings
-          </h2>
-          <div className="card divide-y" style={{ borderColor: "rgb(var(--border))" }}>
-            <Setting label="Schedule strength weight" value={config.sos_w} />
-            <Setting label="Efficiency weight" value={config.eff_w} />
-            <Setting label="Win-rate bonus" value={config.wr_w} />
-            <Setting label="Classification pull" value={config.prior_w} />
-            <Setting label="Margin cap" value={`${config.cap} pts`} />
-            <Setting label="Home-field advantage" value={`${config.hfa} pts`} />
-            <Setting
-              label="Championship multiplier"
-              value={`${config.playoff_r5}×`}
-            />
-          </div>
-          <p
-            className="mt-3 text-xs leading-relaxed"
-            style={{ color: "rgb(var(--text-faint))" }}
+      <div className="max-w-[72ch] space-y-5">
+        <section className="card p-5">
+          <div
+            className="space-y-3.5 text-[15px] leading-relaxed"
+            style={{ color: "rgb(var(--text-muted))" }}
           >
-            The margin cap stops blowouts being farmed — winning by 50 counts
-            the same as winning by {config.cap}. Playoff margins are weighted
-            more heavily round by round.
+            <p>
+              Every team starts with a rating. Win, and it goes up. Lose, and it
+              goes down. That&rsquo;s the simple explanation.
+            </p>
+            <p>
+              But not all wins are equal. Beating a strong team moves your
+              rating a lot more than beating a weak one. That&rsquo;s true for
+              your opponents too. Your rating depends on who you played, whose
+              ratings depend on who they played, and so on across the state. The
+              system runs that loop hundreds of times until every rating settles
+              into place.
+            </p>
+
+            <p style={{ color: "rgb(var(--text))" }}>
+              A few things it accounts for:
+            </p>
+            <ul className="space-y-2 pl-1">
+              <Point>Margin of victory does matter &mdash; to a point.</Point>
+              <Point>
+                Your schedule matters a lot. A 7-3 team that played everybody
+                tough could possibly rate higher than a 10-0 team that
+                didn&rsquo;t.
+              </Point>
+              <Point>
+                Classification matters a little. A 1A powerhouse and a 6A
+                powerhouse aren&rsquo;t the same thing, and the ratings reflect
+                that.
+              </Point>
+              <Point>
+                When the playoffs start, those wins will count for a little
+                extra.
+              </Point>
+            </ul>
+
+            <p>
+              Preseason, teams start where last season left them. We ran this
+              formula starting with the full 2025 season, then adjusted for the
+              new classifications. That head start fades as the weeks roll on
+              and games are played, and it&rsquo;s gone entirely by midseason.
+            </p>
+            <p>
+              One last note &mdash; these ratings are for fun and don&rsquo;t
+              mean anything when it comes to region standings or the playoff
+              picture. Everything here is math with no opinion or eye test
+              involved. We hope every team that is listed as an underdog here
+              proves the model wrong!
+            </p>
+            <p style={{ color: "rgb(var(--text))" }}>
+              If you see any errors or anything that stands out, please let us
+              know!
+            </p>
+          </div>
+        </section>
+
+        <Panel title="RPI">
+          <p>
+            RPI is a separate, simpler measure kept alongside the index: 25%
+            your win percentage, 50% your opponents&rsquo; win percentage, and
+            25% your opponents&rsquo; opponents&rsquo; win percentage.
           </p>
-        </aside>
+          <p>
+            Out-of-state opponents count toward your own record but are excluded
+            from the opponent-strength terms, since there is no in-system record
+            for them.
+          </p>
+        </Panel>
+
+        <Panel title="Projections">
+          <p>
+            Each scheduled game shows a projected margin from the rating gap
+            plus home-field advantage. Once a result is entered, it is labelled
+            against that projection &mdash; dominant, exceeded, as expected, or
+            below expectation. Projections never feed back into the ratings.
+          </p>
+        </Panel>
       </div>
     </AppShell>
+  );
+}
+
+/** Bulleted point with a class-coloured marker rather than a browser bullet. */
+function Point({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex gap-2.5">
+      <span
+        aria-hidden
+        className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full"
+        style={{ background: "rgb(var(--brand))" }}
+      />
+      <span>{children}</span>
+    </li>
   );
 }
 
@@ -140,22 +123,11 @@ function Panel({
     <section className="card p-5">
       <h2 className="mb-2 text-base font-bold tracking-tight">{title}</h2>
       <div
-        className="space-y-2.5 text-sm leading-relaxed"
+        className="space-y-2.5 text-[15px] leading-relaxed"
         style={{ color: "rgb(var(--text-muted))" }}
       >
         {children}
       </div>
     </section>
-  );
-}
-
-function Setting({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="flex items-center justify-between gap-3 px-4 py-2.5">
-      <span className="text-[13px]" style={{ color: "rgb(var(--text-muted))" }}>
-        {label}
-      </span>
-      <span className="text-[13px] font-bold tnum">{value}</span>
-    </div>
   );
 }

@@ -38,7 +38,7 @@ function Footer() {
           className="text-[12px] hover:underline"
           style={{ color: "rgb(var(--text-muted))" }}
         >
-          How the ratings work
+          How the ALPreps Index works
         </Link>
       </div>
     </footer>

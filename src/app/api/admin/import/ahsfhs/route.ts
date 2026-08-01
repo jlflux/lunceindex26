@@ -179,6 +179,31 @@ export const PUT = withAdmin(async (req: Request) => {
 });
 
 /**
+ * One page, with a timeout so an unresponsive request cannot consume the whole
+ * invocation, and one retry so a single slow response does not cost a team its
+ * entire schedule — which is what happened to Cleburne County, whose page was
+ * fine when visited by hand a minute later.
+ */
+async function fetchPage(url: string, attempts = 2): Promise<Response> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      return await fetch(url, {
+        headers: { "User-Agent": "ALPrepsIndex/1.0" },
+        signal: controller.signal,
+      });
+    } catch (e) {
+      last = e;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw last;
+}
+
+/**
  * Fetches one batch of team pages from ahsfhs.org.
  *
  * Deliberately batched rather than looping over all 393 in a single request:
@@ -219,8 +244,15 @@ export const PATCH = withAdmin(async (req: Request) => {
   const rows: Row[] = [];
   const problems: string[] = [];
   let fetched = 0;
+  let processed = 0;
+
+  // Leaves room inside maxDuration to serialise and return what we have. The
+  // client walks by nextOffset, so stopping early costs a round trip, not data.
+  const deadline = Date.now() + 45_000;
 
   for (const t of slice) {
+    if (Date.now() > deadline) break;
+    processed++;
     // The two lists spell punctuation differently — hyphens for spaces,
     // "BB Comer" for "B.B. Comer" — so a miss is retried with the next
     // plausible spelling rather than reported. A team we already spell their
@@ -231,14 +263,8 @@ export const PATCH = withAdmin(async (req: Request) => {
 
     for (const candidate of candidates) {
       tried.push(candidate);
-      // A single unresponsive page must not consume the whole invocation.
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
       try {
-        const res = await fetch(ahsfhsUrl(candidate), {
-          headers: { "User-Agent": "ALPrepsIndex/1.0" },
-          signal: controller.signal,
-        });
+        const res = await fetchPage(ahsfhsUrl(candidate));
         if (!res.ok) continue;
 
         const parsed = parseAhsfhsTeamPage(await res.text(), DEFAULT_ANCHOR);
@@ -254,8 +280,6 @@ export const PATCH = withAdmin(async (req: Request) => {
         problems.push(
           `${t.name}: ${e instanceof Error ? e.message : "fetch failed"}`,
         );
-      } finally {
-        clearTimeout(timer);
       }
     }
 
@@ -274,11 +298,11 @@ export const PATCH = withAdmin(async (req: Request) => {
     fetched++;
   }
 
-  const nextOffset = offset + slice.length;
+  const nextOffset = offset + processed;
   return NextResponse.json({
     ok: true,
     fetched,
-    attempted: slice.length,
+    attempted: processed,
     offset,
     nextOffset,
     total: roster.length,

@@ -42,6 +42,10 @@ const KNOWN: [string, string][] = [
   ["Hope Christian", "Hope Christian Academy"],
   // All-caps names, which have no space to key the expansion off.
   ["DAR", "D.A.R."],
+  // The roster drops a trailing word that ahsfhs.org keeps.
+  ["Lee-Scott", "Lee-Scott Academy"],
+  ["Northside Methodist", "Northside Methodist Academy"],
+  ["University Charter", "University Charter School"],
 ];
 
 console.log("\n1. The spelling ahsfhs.org uses is among the candidates");

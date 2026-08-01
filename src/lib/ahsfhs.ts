@@ -234,8 +234,10 @@ export const AHSFHS_NAMES: Record<string, string | string[]> = {
   "Montgomery Catholic": "Catholic Montgomery",
   Berry: "Berry Fayette",
   "Hope Christian": "Hope Christian Academy",
-  // Unconfirmed. The bare roster name returns nothing, and these are the
-  // schools' full names, so they are the obvious things to try next.
+  // The roster drops a trailing "Academy" or "School" that ahsfhs.org keeps.
+  "Lee-Scott": "Lee-Scott Academy",
+  "Northside Methodist": "Northside Methodist Academy",
+  "University Charter": "University Charter School",
   "Fort Dale": "Fort Dale Academy",
   "Decatur Heritage": [
     "Decatur Heritage Christian",

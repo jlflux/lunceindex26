@@ -208,10 +208,11 @@ export function parseAhsfhsTeamPage(
 /**
  * Roster name → the name ahsfhs.org files the team under.
  *
- * Only entries where the two disagree. A wrong name here is an HTTP 500 on
- * the fetch, which is how these were found. `names.ts` derives the reverse
- * direction from this same map so the school is also recognised when it turns
- * up as somebody else's opponent.
+ * Only for names that differ in substance. Punctuation disagreements —
+ * hyphens, periods, apostrophes — do not belong here; `ahsfhsCandidates`
+ * below generates those. `names.ts` derives the reverse direction from this
+ * same map so the school is also recognised when it turns up as somebody
+ * else's opponent.
  *
  * Dothan is the instructive one: ahsfhs moved the program to a "Dothan High"
  * page after a merger, so the bare name no longer resolves.
@@ -225,8 +226,49 @@ export const AHSFHS_NAMES: Record<string, string> = {
   Berry: "Berry Fayette",
 };
 
-/** The page URL for a roster team. */
-export function ahsfhsUrl(rosterName: string): string {
-  const source = AHSFHS_NAMES[rosterName] ?? rosterName;
-  return `https://www.ahsfhs.org/teams2/teampage.asp?year=&Team=${encodeURIComponent(source)}`;
+/** "BB Comer" → "B.B. Comer". Two letters only, so "UMS-Wright" is left alone. */
+const dotInitials = (s: string) => s.replace(/^([A-Z])([A-Z])\s/, "$1.$2. ");
+
+/** The reverse, for a roster that spells the initials out. */
+const bareInitials = (s: string) => s.replace(/^([A-Z])\.\s?([A-Z])\.\s/, "$1$2 ");
+
+/** Most teams resolve on the first try, so there is little point going deeper. */
+const MAX_CANDIDATES = 6;
+
+/**
+ * Plausible ahsfhs.org spellings of a roster name, best guess first.
+ *
+ * The two lists disagree mostly about punctuation, and always in the same few
+ * ways: we write "Carver-Montgomery" where they write "Carver Montgomery", and
+ * "BB Comer" where they write "B.B. Comer". Rather than hand-maintain 393
+ * mappings, the fetch walks these candidates until a page comes back — the
+ * first entry is what we already believed, so a correctly spelled team costs
+ * exactly one request as before.
+ *
+ * `AHSFHS_NAMES` still wins where the difference is not punctuation at all
+ * ("Dothan" → "Dothan High"); its value becomes the base the variants are
+ * built from.
+ */
+export function ahsfhsCandidates(rosterName: string): string[] {
+  const base = AHSFHS_NAMES[rosterName] ?? rosterName;
+  const out: string[] = [];
+  const add = (s: string) => {
+    const v = s.replace(/\s+/g, " ").trim();
+    if (v && !out.includes(v)) out.push(v);
+  };
+
+  for (const hyphen of [base, base.replace(/-/g, " ")]) {
+    for (const form of [hyphen, dotInitials(hyphen), bareInitials(hyphen)]) {
+      add(form);
+      add(form.replace(/['’]/g, "")); // "St. Paul's" → "St. Pauls"
+      add(form.replace(/\./g, ""));
+      add(form.replace(/['’.]/g, ""));
+    }
+  }
+  return out.slice(0, MAX_CANDIDATES);
+}
+
+/** The page URL for one candidate spelling. */
+export function ahsfhsUrl(sourceName: string): string {
+  return `https://www.ahsfhs.org/teams2/teampage.asp?year=&Team=${encodeURIComponent(sourceName)}`;
 }

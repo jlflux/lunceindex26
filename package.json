@@ -18,7 +18,8 @@
     "setup": "tsx scripts/setup.ts",
     "seed:sql": "tsx scripts/make-seed-sql.ts",
     "parse-ahsfhs": "tsx scripts/test-ahsfhs.ts",
-    "test:duplicates": "tsx scripts/test-duplicates.ts"
+    "test:duplicates": "tsx scripts/test-duplicates.ts",
+    "test:names": "tsx scripts/test-ahsfhs-names.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

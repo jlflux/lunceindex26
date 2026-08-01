@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { withAdmin } from "@/lib/admin-auth";
-import { DEFAULT_ANCHOR, ahsfhsUrl, parseAhsfhsTeamPage } from "@/lib/ahsfhs";
+import {
+  DEFAULT_ANCHOR,
+  ahsfhsCandidates,
+  ahsfhsUrl,
+  parseAhsfhsTeamPage,
+  type AhsfhsPage,
+} from "@/lib/ahsfhs";
 import { loadAliases, loadTeams } from "@/lib/data";
 import { serviceClient } from "@/lib/db";
 import { buildIndex, matchTeam } from "@/lib/names";
@@ -23,12 +29,11 @@ interface Row {
 
 /** Turns one team's page into oriented home/away rows. */
 function rowsFromPage(
-  html: string,
+  page: AhsfhsPage,
   sourceTeam: Team,
   index: ReturnType<typeof buildIndex>,
   aliases: Record<string, string>,
 ): { rows: Row[]; problems: string[] } {
-  const page = parseAhsfhsTeamPage(html, DEFAULT_ANCHOR);
   const rows: Row[] = [];
   const problems: string[] = [];
 
@@ -95,7 +100,7 @@ export const POST = withAdmin(async (req: Request) => {
       continue;
     }
 
-    const out = rowsFromPage(html, sourceTeam, index, aliases);
+    const out = rowsFromPage(page, sourceTeam, index, aliases);
     rows.push(...out.rows);
     problems.push(...out.problems);
     for (const s of page.skipped) {
@@ -216,34 +221,65 @@ export const PATCH = withAdmin(async (req: Request) => {
   let fetched = 0;
 
   for (const t of slice) {
-    // A single unresponsive page must not consume the whole invocation.
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    try {
-      const res = await fetch(ahsfhsUrl(t.name), {
-        headers: { "User-Agent": "ALPrepsIndex/1.0" },
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        // Naming the URL makes a wrong source-side spelling obvious.
+    // The two lists spell punctuation differently — hyphens for spaces,
+    // "BB Comer" for "B.B. Comer" — so a miss is retried with the next
+    // plausible spelling rather than reported. A team we already spell their
+    // way resolves on the first candidate and costs one request.
+    const candidates = ahsfhsCandidates(t.name);
+    const tried: string[] = [];
+    let page: AhsfhsPage | null = null;
+
+    for (const candidate of candidates) {
+      tried.push(candidate);
+      // A single unresponsive page must not consume the whole invocation.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      try {
+        const res = await fetch(ahsfhsUrl(candidate), {
+          headers: { "User-Agent": "ALPrepsIndex/1.0" },
+          signal: controller.signal,
+        });
+        if (!res.ok) continue;
+
+        const parsed = parseAhsfhsTeamPage(await res.text(), DEFAULT_ANCHOR);
+
+        // A punctuation variant could in principle land on a different school.
+        // Reject only a confident match to somebody else — an unrecognised
+        // page name is normal, since their spelling is the thing in question.
+        const self = parsed.team
+          ? matchTeam({ raw: parsed.team, extraAliases: aliases }, index)
+          : null;
+        if (self?.name && self.name !== t.name) {
+          problems.push(
+            `${t.name}: "${candidate}" is ${self.name}'s page — skipped`,
+          );
+          continue;
+        }
+
+        page = parsed;
+        break;
+      } catch (e) {
         problems.push(
-          `${t.name}: HTTP ${res.status} for "${decodeURIComponent(
-            ahsfhsUrl(t.name).split("Team=")[1],
-          )}" — check the ahsfhs spelling`,
+          `${t.name}: ${e instanceof Error ? e.message : "fetch failed"}`,
         );
-        continue;
+      } finally {
+        clearTimeout(timer);
       }
-      const out = rowsFromPage(await res.text(), t, index, aliases);
-      rows.push(...out.rows);
-      problems.push(...out.problems);
-      fetched++;
-    } catch (e) {
-      problems.push(
-        `${t.name}: ${e instanceof Error ? e.message : "fetch failed"}`,
-      );
-    } finally {
-      clearTimeout(timer);
     }
+
+    if (!page) {
+      problems.push(
+        `${t.name}: no page found — tried ${tried
+          .map((c) => `"${c}"`)
+          .join(", ")}`,
+      );
+      continue;
+    }
+
+    const out = rowsFromPage(page, t, index, aliases);
+    rows.push(...out.rows);
+    problems.push(...out.problems);
+    fetched++;
   }
 
   const nextOffset = offset + slice.length;

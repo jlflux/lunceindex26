@@ -5,10 +5,12 @@
  * both halves matter: the right spelling has to be in there, and the list has
  * to stay short.
  */
+import { readFileSync } from "node:fs";
 import {
   AHSFHS_NAMES,
   ahsfhsCandidates,
   ahsfhsNamesFor,
+  ahsfhsUrl,
   parseAhsfhsTeamPage,
 } from "../src/lib/ahsfhs";
 import { buildIndex, matchTeam } from "../src/lib/names";
@@ -204,6 +206,56 @@ console.log("\n7. A heading inside the schedule does not truncate it");
     "and nothing from beyond the end marker",
     !cut.games.some((g) => g.opponentRaw.includes("Not A Real Game")),
   );
+}
+
+console.log("\n8. Both page layouts read the same schedule");
+{
+  // The team page and the games-by-year page disagree about date format and
+  // about how the page names its own team. Both saved samples are Fairhope's
+  // 2026 season, so both must produce the same ten games.
+  const read = (file: string) =>
+    parseAhsfhsTeamPage(readFileSync(file, "utf8"));
+
+  const teamPage = read("data/samples/ahsfhs-fairhope.html");
+  const byYear = read("data/samples/ahsfhs-fairhope-gamesbyyear.html");
+
+  check("team page names its team", teamPage.team === "Fairhope");
+  check(
+    "games-by-year names its team",
+    byYear.team === "Fairhope",
+    // Its <title> is the site's own, identical on every page — reading that
+    // would report every school in the state as "Alabama".
+    `got ${byYear.team}`,
+  );
+  check("team page: ten games", teamPage.games.length === 10);
+  check(
+    "games-by-year: ten games",
+    byYear.games.length === 10,
+    `got ${byYear.games.length}`,
+  );
+  check(
+    "same weeks either way",
+    JSON.stringify(teamPage.games.map((g) => g.week)) ===
+      JSON.stringify(byYear.games.map((g) => g.week)),
+  );
+  check(
+    "same opponents either way",
+    JSON.stringify(teamPage.games.map((g) => g.opponentRaw)) ===
+      JSON.stringify(byYear.games.map((g) => g.opponentRaw)),
+  );
+  check(
+    "same home/away either way",
+    JSON.stringify(teamPage.games.map((g) => g.isHome)) ===
+      JSON.stringify(byYear.games.map((g) => g.isHome)),
+  );
+}
+
+console.log("\n9. The fetch asks for the games-by-year page");
+{
+  const url = ahsfhsUrl("Carver Montgomery");
+  check("uses gamesbyyear.asp", url.includes("gamesbyyear.asp"), url);
+  check("scopes to the season", url.includes("Year=2026"), url);
+  check("encodes the name", url.includes("Carver%20Montgomery"), url);
 }
 
 console.log(

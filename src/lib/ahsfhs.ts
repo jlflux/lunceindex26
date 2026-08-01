@@ -143,14 +143,41 @@ function weekFor(iso: string | null, anchor: SeasonAnchor): number | null {
   return week >= 0 && week <= 20 ? week : null;
 }
 
-/** "8/21" plus the season year → an ISO date. */
+const MONTHS: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+
+/**
+ * A date cell plus the season year → an ISO date.
+ *
+ * Two shapes, because the two pages that carry a schedule do not agree:
+ * the team page writes "8/21", the games-by-year page "Fri., Aug. 21".
+ */
 function isoDate(label: string, year: number): string | null {
-  const m = label.match(/^(\d{1,2})\/(\d{1,2})$/);
-  if (!m) return null;
-  const mm = String(Number(m[1])).padStart(2, "0");
-  const dd = String(Number(m[2])).padStart(2, "0");
-  return `${year}-${mm}-${dd}`;
+  const slash = label.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (slash) {
+    const mm = String(Number(slash[1])).padStart(2, "0");
+    const dd = String(Number(slash[2])).padStart(2, "0");
+    return `${year}-${mm}-${dd}`;
+  }
+
+  const named = label.match(
+    /^(?:[A-Za-z]{3,9}\.?,?\s+)?([A-Za-z]{3,9})\.?\s+(\d{1,2})$/,
+  );
+  if (named) {
+    const mm = MONTHS[named[1].slice(0, 3).toLowerCase()];
+    if (!mm) return null;
+    return `${year}-${String(mm).padStart(2, "0")}-${String(
+      Number(named[2]),
+    ).padStart(2, "0")}`;
+  }
+
+  return null;
 }
+
+/** Whether a cell looks like either date form. */
+const isDateCell = (s: string) => isoDate(s, 2000) !== null;
 
 export function parseAhsfhsTeamPage(
   html: string,
@@ -158,22 +185,31 @@ export function parseAhsfhsTeamPage(
 ): AhsfhsPage {
   const skipped: { text: string; reason: string }[] = [];
 
-  // Which team the page belongs to.
+  // Which team the page belongs to — only ever from a self-referential link.
   //
-  // NOT from a `teampage.asp?Team=` link: every opponent in the schedule is
-  // one of those, and the first one on the page is an opponent, not the
-  // subject. Reading those made Abbeville's page look like Headland's. The
-  // print-schedule link is self-referential and therefore trustworthy.
+  // NOT from a bare `teampage.asp?Team=` link: on the team page every opponent
+  // in the schedule is one of those, and the first is an opponent rather than
+  // the subject. Reading those made Abbeville's page look like Headland's.
+  //
+  // The print-schedule link identifies the team page; the "all years" link,
+  // recognisable by its empty Year, identifies the games-by-year page, where
+  // opponents link through gamesbyyear.asp instead.
   const teamMatch =
     html.match(/Printschedule2\.asp\?year=\d*&(?:amp;)?team=([^"'&\s]+)/i) ??
+    html.match(
+      /gamesbyyear\.asp\?p=1&(?:amp;)?Year=&(?:amp;)?Team=([^"'&\s]+)/i,
+    ) ??
     html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const team = teamMatch
+  const raw = teamMatch
     ? decodeURIComponent(teamMatch[1].replace(/\+/g, " "))
         // Titles read "Abbeville High School Football History".
         .replace(/\s+football\s+history\s*$/i, "")
         .replace(/\s+high\s+school\s*$/i, "")
         .trim()
     : null;
+  // The games-by-year page's title is the site's own, identical on every
+  // page. Better to report no team than to report every school as "Alabama".
+  const team = raw && !/^alabama$/i.test(raw) ? raw : null;
 
   // Anchored at both ends on purpose: the same page also carries "2026 Season
   // Preview" and "2026 Season Totals", neither of which is the schedule.
@@ -201,7 +237,7 @@ export function parseAhsfhsTeamPage(
     if (cells.length < 2) continue;
 
     const dateLabel = cells[0];
-    if (!/^\d{1,2}\/\d{1,2}$/.test(dateLabel)) continue;
+    if (!isDateCell(dateLabel)) continue;
 
     const opponentCell = cells[1];
     if (/^open$/i.test(opponentCell.replace(/\*/g, "").trim())) {
@@ -345,7 +381,21 @@ export function ahsfhsCandidates(rosterName: string): string[] {
   return out.slice(0, MAX_CANDIDATES);
 }
 
-/** The page URL for one candidate spelling. */
-export function ahsfhsUrl(sourceName: string): string {
-  return `https://www.ahsfhs.org/teams2/teampage.asp?year=&Team=${encodeURIComponent(sourceName)}`;
+/**
+ * The page URL for one candidate spelling.
+ *
+ * Points at gamesbyyear.asp, not the team page. The team page carries a
+ * "<year> Season" panel that showed the whole schedule before the season and
+ * collapsed to the next fixture alone once the site published its season
+ * previews — a roster's worth of week-0-only imports. The games-by-year page
+ * is the full fixture list and is scoped to one season by the URL, so it does
+ * not change shape as the year progresses.
+ */
+export function ahsfhsUrl(
+  sourceName: string,
+  year: number = DEFAULT_ANCHOR.year,
+): string {
+  return `https://www.ahsfhs.org/Teams2/gamesbyyear.asp?Team=${encodeURIComponent(
+    sourceName,
+  )}&Year=${year}`;
 }

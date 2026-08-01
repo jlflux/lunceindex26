@@ -224,6 +224,7 @@ export const AHSFHS_NAMES: Record<string, string> = {
   "West End": "West End Walnut Grove",
   "Montgomery Catholic": "Catholic Montgomery",
   Berry: "Berry Fayette",
+  "Hope Christian": "Hope Christian Academy",
 };
 
 /** "BB Comer" → "B.B. Comer". Two letters only, so "UMS-Wright" is left alone. */

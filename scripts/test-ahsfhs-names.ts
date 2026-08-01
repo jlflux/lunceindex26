@@ -34,6 +34,7 @@ const KNOWN: [string, string][] = [
   // Genuinely different name, so the explicit map has to carry it.
   ["Dothan", "Dothan High"],
   ["Montgomery Catholic", "Catholic Montgomery"],
+  ["Hope Christian", "Hope Christian Academy"],
 ];
 
 console.log("\n1. The spelling ahsfhs.org uses is among the candidates");

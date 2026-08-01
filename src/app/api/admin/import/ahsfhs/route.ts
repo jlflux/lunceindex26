@@ -242,22 +242,14 @@ export const PATCH = withAdmin(async (req: Request) => {
         if (!res.ok) continue;
 
         const parsed = parseAhsfhsTeamPage(await res.text(), DEFAULT_ANCHOR);
-
-        // A punctuation variant could in principle land on a different school.
-        // Reject only a confident match to somebody else — an unrecognised
-        // page name is normal, since their spelling is the thing in question.
-        const self = parsed.team
-          ? matchTeam({ raw: parsed.team, extraAliases: aliases }, index)
-          : null;
-        if (self?.name && self.name !== t.name) {
-          problems.push(
-            `${t.name}: "${candidate}" is ${self.name}'s page — skipped`,
-          );
-          continue;
+        // Keep the first page that answered, so a spelling that resolves to a
+        // page without a current season still gets reported rather than
+        // vanishing. Prefer any candidate that actually carries a schedule.
+        page ??= parsed;
+        if (parsed.games.length) {
+          page = parsed;
+          break;
         }
-
-        page = parsed;
-        break;
       } catch (e) {
         problems.push(
           `${t.name}: ${e instanceof Error ? e.message : "fetch failed"}`,

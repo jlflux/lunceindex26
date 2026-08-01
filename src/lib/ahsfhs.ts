@@ -119,12 +119,21 @@ export function parseAhsfhsTeamPage(
 ): AhsfhsPage {
   const skipped: { text: string; reason: string }[] = [];
 
-  // The page title carries the team, e.g. "…?Team=Fairhope".
+  // Which team the page belongs to.
+  //
+  // NOT from a `teampage.asp?Team=` link: every opponent in the schedule is
+  // one of those, and the first one on the page is an opponent, not the
+  // subject. Reading those made Abbeville's page look like Headland's. The
+  // print-schedule link is self-referential and therefore trustworthy.
   const teamMatch =
-    html.match(/teampage\.asp\?year=&(?:amp;)?Team=([^"'&\s]+)/i) ??
-    html.match(/Printschedule2\.asp\?year=\d+&(?:amp;)?team=([^"'&\s]+)/i);
+    html.match(/Printschedule2\.asp\?year=\d*&(?:amp;)?team=([^"'&\s]+)/i) ??
+    html.match(/<title[^>]*>([^<]+)<\/title>/i);
   const team = teamMatch
-    ? decodeURIComponent(teamMatch[1].replace(/\+/g, " ")).trim()
+    ? decodeURIComponent(teamMatch[1].replace(/\+/g, " "))
+        // Titles read "Abbeville High School Football History".
+        .replace(/\s+football\s+history\s*$/i, "")
+        .replace(/\s+high\s+school\s*$/i, "")
+        .trim()
     : null;
 
   const seasonHeading = new RegExp(`^${anchor.year}\\s+Season$`, "i");
@@ -217,7 +226,7 @@ export function parseAhsfhsTeamPage(
  * Dothan is the instructive one: ahsfhs moved the program to a "Dothan High"
  * page after a merger, so the bare name no longer resolves.
  */
-export const AHSFHS_NAMES: Record<string, string> = {
+export const AHSFHS_NAMES: Record<string, string | string[]> = {
   Dothan: "Dothan High",
   Phillips: "Phillips Bear Creek",
   "Lindsay Lane": "Lindsay Lane Christian",
@@ -225,13 +234,32 @@ export const AHSFHS_NAMES: Record<string, string> = {
   "Montgomery Catholic": "Catholic Montgomery",
   Berry: "Berry Fayette",
   "Hope Christian": "Hope Christian Academy",
+  // Unconfirmed. The bare roster name returns nothing, and these are the
+  // schools' full names, so they are the obvious things to try next.
+  "Fort Dale": "Fort Dale Academy",
+  "Decatur Heritage": [
+    "Decatur Heritage Christian",
+    "Decatur Heritage Christian Academy",
+  ],
 };
 
-/** "BB Comer" → "B.B. Comer". Two letters only, so "UMS-Wright" is left alone. */
-const dotInitials = (s: string) => s.replace(/^([A-Z])([A-Z])\s/, "$1.$2. ");
+/** The mapped spellings for a roster name, most likely first. */
+export function ahsfhsNamesFor(rosterName: string): string[] {
+  const v = AHSFHS_NAMES[rosterName];
+  return v === undefined ? [] : Array.isArray(v) ? v : [v];
+}
+
+/** "BB Comer" → "B.B. Comer", "DAR" → "D.A.R.". */
+const dotInitials = (s: string) =>
+  s.replace(
+    /^([A-Z]{2,3})(\s|$)/,
+    (_, letters: string, tail: string) =>
+      `${letters.split("").join(".")}.${tail}`,
+  );
 
 /** The reverse, for a roster that spells the initials out. */
-const bareInitials = (s: string) => s.replace(/^([A-Z])\.\s?([A-Z])\.\s/, "$1$2 ");
+const bareInitials = (s: string) =>
+  s.replace(/^([A-Z])\.\s?([A-Z])\.(\s|$)/, "$1$2$3");
 
 /** Most teams resolve on the first try, so there is little point going deeper. */
 const MAX_CANDIDATES = 6;
@@ -251,19 +279,24 @@ const MAX_CANDIDATES = 6;
  * built from.
  */
 export function ahsfhsCandidates(rosterName: string): string[] {
-  const base = AHSFHS_NAMES[rosterName] ?? rosterName;
+  const mapped = ahsfhsNamesFor(rosterName);
+  // A mapped name replaces the roster name rather than joining it. Dothan is
+  // why: their bare "Dothan" page still exists and is the wrong program.
+  const bases = mapped.length ? mapped : [rosterName];
   const out: string[] = [];
   const add = (s: string) => {
     const v = s.replace(/\s+/g, " ").trim();
     if (v && !out.includes(v)) out.push(v);
   };
 
-  for (const hyphen of [base, base.replace(/-/g, " ")]) {
-    for (const form of [hyphen, dotInitials(hyphen), bareInitials(hyphen)]) {
-      add(form);
-      add(form.replace(/['’]/g, "")); // "St. Paul's" → "St. Pauls"
-      add(form.replace(/\./g, ""));
-      add(form.replace(/['’.]/g, ""));
+  for (const base of bases) {
+    for (const hyphen of [base, base.replace(/-/g, " ")]) {
+      for (const form of [hyphen, dotInitials(hyphen), bareInitials(hyphen)]) {
+        add(form);
+        add(form.replace(/['’]/g, "")); // "St. Paul's" → "St. Pauls"
+        add(form.replace(/\./g, ""));
+        add(form.replace(/['’.]/g, ""));
+      }
     }
   }
   return out.slice(0, MAX_CANDIDATES);

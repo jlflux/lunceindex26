@@ -16,7 +16,7 @@
  * match is reported with its confidence for a human to check.
  */
 
-import { AHSFHS_NAMES } from "./ahsfhs";
+import { AHSFHS_NAMES, ahsfhsNamesFor } from "./ahsfhs";
 import type { Classification, Team } from "./types";
 
 export function slugify(name: string): string {
@@ -201,8 +201,8 @@ export const ALIASES: Record<string, string> = {
 
 // ahsfhs.org files several schools under a different name. Deriving the
 // reverse here means the mapping lives in exactly one place.
-for (const [roster, source] of Object.entries(AHSFHS_NAMES)) {
-  ALIASES[source] = roster;
+for (const roster of Object.keys(AHSFHS_NAMES)) {
+  for (const source of ahsfhsNamesFor(roster)) ALIASES[source] = roster;
 }
 
 /**
@@ -308,11 +308,15 @@ export function similarity(a: string, b: string): number {
 
 // ---- the matcher ----------------------------------------------------------
 
+/** Width of the opponent column on ahsfhs.org; longer names arrive cut off. */
+export const TRUNCATION_LENGTH = 20;
+
 export type MatchMethod =
   | "alias"
   | "exact"
   | "suffix"
   | "class-region"
+  | "truncated"
   | "fuzzy"
   | "out-of-state"
   | "unmatched";
@@ -452,6 +456,33 @@ export function matchTeam(
         method: "class-region",
         confidence: 0.8,
         note: `"${raw}" is ambiguous; picked by class+region. Verify.`,
+      };
+    }
+  }
+
+  // 4c. ahsfhs.org cuts opponent names off at 20 characters, so the roster
+  // name arrives as a prefix of the real one ("Lindsay Lane Christi") or the
+  // real one arrives as a prefix of the roster name ("Hope Christian Acade"
+  // against "Hope Christian"). Fuzzy matching cannot reach these — six
+  // missing characters out of twenty scores 0.70, well under the cutoff.
+  if (raw.length >= TRUNCATION_LENGTH) {
+    const t = normalize(raw);
+    const hits = new Map<string, Team>();
+    for (const team of index.teams) {
+      for (const v of variants(team.name)) {
+        // A short variant is a prefix of far too much to be evidence.
+        if (v.length < 5) continue;
+        if (v.startsWith(t) || t.startsWith(v)) hits.set(team.name, team);
+      }
+    }
+    if (hits.size === 1) {
+      const team = [...hits.values()][0];
+      return {
+        ...base,
+        name: team.name,
+        method: "truncated",
+        confidence: 0.9,
+        note: `"${raw}" looks cut off at ${TRUNCATION_LENGTH} characters; read as ${team.name}.`,
       };
     }
   }

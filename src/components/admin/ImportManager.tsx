@@ -8,6 +8,29 @@ import { PLAYOFF_ROUND_LABELS, type PlayoffRound } from "@/lib/types";
 
 const ROUNDS = Object.keys(PLAYOFF_ROUND_LABELS) as PlayoffRound[];
 
+/**
+ * Reads a response that is *supposed* to be JSON.
+ *
+ * A serverless function that times out or crashes returns the platform's HTML
+ * error page. Parsing that as JSON produced "Unexpected token 'A'…", which
+ * says nothing useful, so non-JSON is surfaced as its own message.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function readJson<T = any>(res: Response): Promise<T> {
+  const body = await res.text();
+  try {
+    return JSON.parse(body) as T;
+  } catch {
+    const snippet = body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    throw new Error(
+      res.status === 504 || /timed? ?out/i.test(snippet)
+        ? "The server took too long and gave up. Try a smaller batch."
+        : `Server returned ${res.status}: ${snippet.slice(0, 160) || "no details"}`,
+    );
+  }
+}
+
+
 type Mode = "scores" | "schedule" | "ahsfhs";
 
 export default function ImportManager() {
@@ -84,7 +107,7 @@ function ScoreImport() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ csv, week: Number(week), type, round }),
       });
-      const body = await res.json();
+      const body = await readJson(res);
       if (!res.ok) throw new Error(body.error ?? "Could not read that CSV.");
       setRows(body.rows);
       setMessage({
@@ -110,7 +133,7 @@ function ScoreImport() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows }),
       });
-      const body = await res.json();
+      const body = await readJson(res);
       if (!res.ok) throw new Error(body.error ?? "Import failed.");
       setMessage({
         tone: "good",
@@ -361,7 +384,7 @@ function ScheduleImport() {
         method: "POST",
         body: form,
       });
-      const body = await res.json();
+      const body = await readJson(res);
       if (!res.ok) throw new Error(body.error ?? "Could not read that PDF.");
       setReport(body);
       setMessage({
@@ -396,7 +419,7 @@ function ScheduleImport() {
           round,
         }),
       });
-      const body = await res.json();
+      const body = await readJson(res);
       if (!res.ok) throw new Error(body.error ?? "Import failed.");
       setMessage({
         tone: "good",
@@ -632,6 +655,10 @@ function AhsfhsImport() {
   const [rows, setRows] = useState<AhsfhsRow[] | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [message, setMessage] = useState<{
     tone: "good" | "bad" | "warn";
     text: string;
@@ -648,7 +675,7 @@ function AhsfhsImport() {
         method: "POST",
         body: form,
       });
-      const body = await res.json();
+      const body = await readJson(res);
       if (!res.ok) throw new Error(body.error ?? "Could not read those pages.");
       setRows(body.games);
       setProblems(body.problems ?? []);
@@ -670,27 +697,64 @@ function AhsfhsImport() {
     setBusy(true);
     setMessage(null);
     setRows(null);
+    setProblems([]);
+
+    // Walked in batches: one request cannot outlive a serverless invocation,
+    // and 393 pages is far more than it allows.
+    const all: AhsfhsRow[] = [];
+    const issues: string[] = [];
+    let offset = 0;
+    let total = 0;
+    let fetched = 0;
+
     try {
-      const res = await fetch("/api/admin/import/ahsfhs", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ onlyMissing: false }),
+      for (;;) {
+        const res = await fetch("/api/admin/import/ahsfhs", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ offset, batch: 20 }),
+        });
+        const body = await readJson(res);
+        if (!res.ok) throw new Error(String(body.error ?? "Fetch failed."));
+
+        all.push(...((body.games as AhsfhsRow[]) ?? []));
+        issues.push(...((body.problems as string[]) ?? []));
+        fetched += Number(body.fetched ?? 0);
+        total = Number(body.total ?? 0);
+        offset = Number(body.nextOffset ?? offset);
+
+        setProgress({ done: offset, total });
+        if (body.done) break;
+      }
+
+      // Both teams list the same fixture; orientation makes the key identical.
+      const seen = new Set<string>();
+      const unique = all.filter((r) => {
+        const key = `${r.home}|${r.away}|${r.week}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
       });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error ?? "Fetch failed.");
-      setRows(body.games);
-      setProblems(body.problems ?? []);
+
+      setRows(unique);
+      setProblems([...new Set(issues)]);
       setMessage({
-        tone: body.problems?.length ? "warn" : "good",
-        text: `Fetched ${body.fetched} of ${body.attempted} team pages → ${body.games.length} games.`,
+        tone: issues.length ? "warn" : "good",
+        text: `Fetched ${fetched} of ${total} team pages → ${unique.length} games after collapsing duplicates.`,
       });
     } catch (e) {
+      // Whatever came back before the failure is still worth keeping.
+      if (all.length) setRows(all);
+      setProblems([...new Set(issues)]);
       setMessage({
         tone: "bad",
-        text: e instanceof Error ? e.message : "Fetch failed.",
+        text: `${e instanceof Error ? e.message : "Fetch failed."}${
+          all.length ? ` Stopped after ${offset} of ${total} teams.` : ""
+        }`,
       });
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   }
 
@@ -703,7 +767,7 @@ function AhsfhsImport() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ games: rows }),
       });
-      const body = await res.json();
+      const body = await readJson(res);
       if (!res.ok) throw new Error(body.error ?? "Import failed.");
       setMessage({
         tone: "good",
@@ -741,8 +805,16 @@ function AhsfhsImport() {
 
         <div className="flex flex-wrap items-center gap-2">
           <button className="btn btn-primary" onClick={fetchAll} disabled={busy}>
-            {busy ? "Working…" : "Fetch all teams"}
+            {busy ? "Fetching…" : "Fetch all teams"}
           </button>
+          {progress && (
+            <span
+              className="text-xs tnum"
+              style={{ color: "rgb(var(--text-muted))" }}
+            >
+              {progress.done} / {progress.total} teams
+            </span>
+          )}
           <span className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
             or upload saved pages:
           </span>

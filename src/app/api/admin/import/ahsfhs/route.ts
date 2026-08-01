@@ -7,7 +7,7 @@ import { buildIndex, matchTeam } from "@/lib/names";
 import type { Game, Team } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 interface Row {
   home: string;
@@ -174,41 +174,55 @@ export const PUT = withAdmin(async (req: Request) => {
 });
 
 /**
- * Fetches pages directly from ahsfhs.org for every roster team.
+ * Fetches one batch of team pages from ahsfhs.org.
+ *
+ * Deliberately batched rather than looping over all 393 in a single request:
+ * a serverless invocation cannot stay alive long enough for that, and the
+ * gateway kills it with an HTML error page rather than JSON. The client walks
+ * the roster by offset and accumulates.
  *
  * Only usable where the deployment can reach the site — it works on Vercel but
  * not from every environment, which is why the upload path above exists.
- * Requests are serialised with a small delay rather than fired in parallel.
  */
 export const PATCH = withAdmin(async (req: Request) => {
-  const { onlyMissing = true, limit = 400 } = (await req.json()) as {
+  const {
+    offset = 0,
+    batch = 20,
+    onlyMissing = false,
+  } = (await req.json()) as {
+    offset?: number;
+    batch?: number;
     onlyMissing?: boolean;
-    limit?: number;
   };
 
   const [teams, aliases] = await Promise.all([loadTeams(true), loadAliases()]);
   const index = buildIndex(teams);
 
-  const db = serviceClient();
-  const { data: existingGames } = await db.from("games").select("t1, t2");
-  const haveGames = new Set<string>();
-  for (const g of (existingGames ?? []) as { t1: string; t2: string }[]) {
-    haveGames.add(g.t1);
-    haveGames.add(g.t2);
+  let roster = teams;
+  if (onlyMissing) {
+    const db = serviceClient();
+    const { data: existingGames } = await db.from("games").select("t1, t2");
+    const have = new Set<string>();
+    for (const g of (existingGames ?? []) as { t1: string; t2: string }[]) {
+      have.add(g.t1);
+      have.add(g.t2);
+    }
+    roster = teams.filter((t) => !have.has(t.name));
   }
 
-  const targets = teams
-    .filter((t) => !onlyMissing || !haveGames.has(t.name))
-    .slice(0, limit);
-
+  const slice = roster.slice(offset, offset + batch);
   const rows: Row[] = [];
   const problems: string[] = [];
   let fetched = 0;
 
-  for (const t of targets) {
+  for (const t of slice) {
+    // A single unresponsive page must not consume the whole invocation.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
     try {
       const res = await fetch(ahsfhsUrl(t.prior_source ?? t.name), {
         headers: { "User-Agent": "ALPrepsIndex/1.0" },
+        signal: controller.signal,
       });
       if (!res.ok) {
         problems.push(`${t.name}: HTTP ${res.status}`);
@@ -222,23 +236,21 @@ export const PATCH = withAdmin(async (req: Request) => {
       problems.push(
         `${t.name}: ${e instanceof Error ? e.message : "fetch failed"}`,
       );
+    } finally {
+      clearTimeout(timer);
     }
-    await new Promise((r) => setTimeout(r, 120));
   }
 
-  const seen = new Set<string>();
-  const unique = rows.filter((r) => {
-    const key = `${r.home}|${r.away}|${r.week}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
+  const nextOffset = offset + slice.length;
   return NextResponse.json({
     ok: true,
     fetched,
-    attempted: targets.length,
-    games: unique,
-    problems: [...new Set(problems)].slice(0, 200),
+    attempted: slice.length,
+    offset,
+    nextOffset,
+    total: roster.length,
+    done: nextOffset >= roster.length,
+    games: rows,
+    problems: [...new Set(problems)],
   });
 });

@@ -12,7 +12,9 @@ export default function AboutPage() {
     <AppShell>
       <PageHeader title="How the ALPreps Index Works" />
 
-      <div className="max-w-[72ch] space-y-5">
+      {/* Full width, in two columns — a single 1280px line of body copy is
+          unreadable however much room there is to set it in. */}
+      <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0">
         <section className="card p-5">
           <div
             className="space-y-3.5 text-[15px] leading-relaxed"
@@ -72,27 +74,30 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <Panel title="RPI">
-          <p>
-            RPI is a separate, simpler measure kept alongside the index: 25%
-            your win percentage, 50% your opponents&rsquo; win percentage, and
-            25% your opponents&rsquo; opponents&rsquo; win percentage.
-          </p>
-          <p>
-            Out-of-state opponents count toward your own record but are excluded
-            from the opponent-strength terms, since there is no in-system record
-            for them.
-          </p>
-        </Panel>
+        <div className="space-y-5">
+          <Panel title="RPI">
+            <p>
+              RPI is a separate, simpler measure kept alongside the index: 25%
+              your win percentage, 50% your opponents&rsquo; win percentage, and
+              25% your opponents&rsquo; opponents&rsquo; win percentage.
+            </p>
+            <p>
+              Out-of-state opponents count toward your own record but are
+              excluded from the opponent-strength terms, since there is no
+              in-system record for them.
+            </p>
+          </Panel>
 
-        <Panel title="Projections">
-          <p>
-            Each scheduled game shows a projected margin from the rating gap
-            plus home-field advantage. Once a result is entered, it is labelled
-            against that projection &mdash; dominant, exceeded, as expected, or
-            below expectation. Projections never feed back into the ratings.
-          </p>
-        </Panel>
+          <Panel title="Projections">
+            <p>
+              Each scheduled game shows a projected margin from the rating gap
+              plus home-field advantage. Once a result is entered, it is
+              labelled against that projection &mdash; dominant, exceeded, as
+              expected, or below expectation. Projections never feed back into
+              the ratings.
+            </p>
+          </Panel>
+        </div>
       </div>
     </AppShell>
   );

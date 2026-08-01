@@ -6,14 +6,14 @@ import Icon from "./Icon";
 import ThemeToggle from "./ThemeToggle";
 
 /**
- * RPI and the explainer are intentionally absent: RPI is meaningless until a
- * few weeks of results exist, and the nav should carry only what is worth
- * looking at now. Both routes still work if linked directly.
+ * RPI is intentionally absent: it is meaningless until a few weeks of results
+ * exist. The route still works if linked directly.
  */
 const LINKS = [
   { href: "/", label: "Power Index" },
   { href: "/teams", label: "Teams" },
   { href: "/schedule", label: "Schedule" },
+  { href: "/about", label: "How It Works" },
 ] as const;
 
 export default function TopNav({

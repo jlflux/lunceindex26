@@ -132,6 +132,9 @@ export const POST = withAdmin(async (req: Request) => {
   });
 });
 
+/** Rows written per request. Keeps any one statement well inside limits. */
+const WRITE_CHUNK = 400;
+
 /** Commits the confirmed rows. Existing scores are never disturbed. */
 export const PUT = withAdmin(async (req: Request) => {
   const { games } = (await req.json()) as { games?: Row[] };
@@ -139,42 +142,80 @@ export const PUT = withAdmin(async (req: Request) => {
   if (!rows.length) throw new Error("Nothing to import.");
 
   const db = serviceClient();
-  const { data: existing, error: readErr } = await db
-    .from("games")
-    .select("t1, t2, week, type, s1, s2");
-  if (readErr) throw new Error(readErr.message);
+
+  // Paged. A plain select stops at 1000 rows, and any game past that would
+  // then look unplayed — so a re-import would blank scores already entered.
+  const existing: Game[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from("games")
+      .select("t1, t2, week, type, s1, s2")
+      .order("id")
+      .range(from, from + 999);
+    if (error) throw new Error(error.message);
+    existing.push(...((data ?? []) as Game[]));
+    if (!data || data.length < 1000) break;
+  }
 
   const played = new Set(
-    ((existing ?? []) as Game[])
+    existing
       .filter((g) => g.s1 !== null && g.s2 !== null)
       .map((g) => `${g.t1}|${g.t2}|${g.week}|${g.type}`),
   );
 
-  const toWrite = rows
-    .filter((r) => !played.has(`${r.home}|${r.away}|${r.week}|regular`))
-    .map((r) => ({
-      t1: r.home,
-      t2: r.away,
-      s1: null,
-      s2: null,
-      week: r.week,
-      type: "regular" as const,
-      round: null,
-      date: r.date,
-      status: "scheduled",
-    }));
+  // Deduplicate on the real conflict key. Postgres rejects an ON CONFLICT
+  // statement that would touch the same row twice, which fails the whole
+  // batch — so two source pages disagreeing about nothing but the date must
+  // not both reach the upsert.
+  const byKey = new Map<string, Row>();
+  let alreadyPlayed = 0;
+  for (const r of rows) {
+    const key = `${r.home}|${r.away}|${r.week}|regular`;
+    if (played.has(key)) {
+      alreadyPlayed++;
+      continue;
+    }
+    if (!byKey.has(key)) byKey.set(key, r);
+  }
 
-  if (toWrite.length) {
+  const toWrite = [...byKey.values()].map((r) => ({
+    t1: r.home,
+    t2: r.away,
+    s1: null,
+    s2: null,
+    week: r.week,
+    type: "regular" as const,
+    round: null,
+    date: r.date,
+    status: "scheduled",
+  }));
+
+  // Chunked, so one oversized statement cannot take the whole import with it
+  // and the count reported back is what actually landed.
+  let written = 0;
+  for (let i = 0; i < toWrite.length; i += WRITE_CHUNK) {
+    const slice = toWrite.slice(i, i + WRITE_CHUNK);
     const { error } = await db
       .from("games")
-      .upsert(toWrite, { onConflict: "t1,t2,week,type" });
-    if (error) throw new Error(error.message);
+      .upsert(slice, { onConflict: "t1,t2,week,type" });
+    if (error) {
+      throw new Error(
+        `${error.message} — ${written} of ${toWrite.length} games were written before this failed.`,
+      );
+    }
+    written += slice.length;
   }
+
+  const byWeek: Record<number, number> = {};
+  for (const g of toWrite) byWeek[g.week] = (byWeek[g.week] ?? 0) + 1;
 
   return NextResponse.json({
     ok: true,
-    imported: toWrite.length,
-    skippedAlreadyPlayed: rows.length - toWrite.length,
+    received: rows.length,
+    imported: written,
+    skippedAlreadyPlayed: alreadyPlayed,
+    collapsed: rows.length - alreadyPlayed - toWrite.length,
+    byWeek,
   });
 });
 

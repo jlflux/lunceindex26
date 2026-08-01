@@ -647,6 +647,20 @@ interface AhsfhsRow {
 }
 
 /**
+ * "wk0 140 · wk1 196 · …", so a fetch that quietly comes back week-0-only is
+ * visible before anything is committed rather than after.
+ */
+function weekSpread(rows: { week: number }[]): string {
+  const byWeek = new Map<number, number>();
+  for (const r of rows) byWeek.set(r.week, (byWeek.get(r.week) ?? 0) + 1);
+  if (!byWeek.size) return "";
+  return [...byWeek.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([w, n]) => `wk${w} ${n}`)
+    .join(" · ");
+}
+
+/**
  * The AHSAA's weekly PDFs omit games. ahsfhs.org carries a full schedule per
  * team, so this pulls from there — either by fetching directly (only works
  * where the deployment can reach the site) or from saved pages.
@@ -740,7 +754,9 @@ function AhsfhsImport() {
       setProblems([...new Set(issues)]);
       setMessage({
         tone: issues.length ? "warn" : "good",
-        text: `Fetched ${fetched} of ${total} team pages → ${unique.length} games after collapsing duplicates.`,
+        text:
+          `Fetched ${fetched} of ${total} team pages → ${unique.length} games ` +
+          `after collapsing duplicates. ${weekSpread(unique)}`,
       });
     } catch (e) {
       // Whatever came back before the failure is still worth keeping.
@@ -769,13 +785,19 @@ function AhsfhsImport() {
       });
       const body = await readJson(res);
       if (!res.ok) throw new Error(body.error ?? "Import failed.");
+      const spread = Object.entries(
+        (body.byWeek ?? {}) as Record<string, number>,
+      )
+        .sort((a, b) => Number(a[0]) - Number(b[0]))
+        .map(([w, n]) => `wk${w} ${n}`)
+        .join(" · ");
       setMessage({
         tone: "good",
-        text: `Imported ${body.imported} games${
-          body.skippedAlreadyPlayed
-            ? `, left ${body.skippedAlreadyPlayed} alone because they already have scores`
-            : ""
-        }. Publish from the dashboard to update the site.`,
+        text:
+          `Sent ${body.received}, wrote ${body.imported}` +
+          `${body.skippedAlreadyPlayed ? `, left ${body.skippedAlreadyPlayed} alone because they already have scores` : ""}` +
+          `${body.collapsed ? `, collapsed ${body.collapsed} duplicate listings` : ""}` +
+          `.${spread ? ` ${spread}.` : ""} Publish from the dashboard to update the site.`,
       });
       setRows(null);
     } catch (e) {

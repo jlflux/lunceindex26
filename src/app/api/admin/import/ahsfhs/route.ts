@@ -5,6 +5,7 @@ import {
   ahsfhsCandidates,
   ahsfhsUrl,
   parseAhsfhsTeamPage,
+  sectionHeadings,
   type AhsfhsPage,
 } from "@/lib/ahsfhs";
 import { loadAliases, loadTeams } from "@/lib/data";
@@ -260,11 +261,57 @@ export const PATCH = withAdmin(async (req: Request) => {
     offset = 0,
     batch = 20,
     onlyMissing = false,
+    diagnose,
   } = (await req.json()) as {
     offset?: number;
     batch?: number;
     onlyMissing?: boolean;
+    diagnose?: string;
   };
+
+  // Single-team read-only probe. Reports what the parser actually saw on the
+  // live page — which headings exist, which candidate answered, every row it
+  // recognised — because the site cannot be reached from a dev machine and a
+  // page saved before the season does not necessarily match one saved during.
+  if (diagnose) {
+    const out: Record<string, unknown>[] = [];
+    for (const candidate of ahsfhsCandidates(diagnose)) {
+      try {
+        const res = await fetchPage(ahsfhsUrl(candidate), 1);
+        if (!res.ok) {
+          out.push({ candidate, status: res.status });
+          continue;
+        }
+        const html = await res.text();
+        const parsed = parseAhsfhsTeamPage(html, DEFAULT_ANCHOR);
+        out.push({
+          candidate,
+          status: res.status,
+          bytes: html.length,
+          pageTeam: parsed.team,
+          season: parsed.season,
+          headings: sectionHeadings(html),
+          gameCount: parsed.games.length,
+          games: parsed.games.map((g) => ({
+            date: g.dateLabel,
+            week: g.week,
+            home: g.isHome,
+            opponent: g.opponentRaw,
+            score:
+              g.teamScore === null ? null : `${g.teamScore}-${g.oppScore}`,
+          })),
+          skipped: parsed.skipped,
+        });
+        break;
+      } catch (e) {
+        out.push({
+          candidate,
+          error: e instanceof Error ? e.message : "fetch failed",
+        });
+      }
+    }
+    return NextResponse.json({ ok: true, diagnose, attempts: out });
+  }
 
   const [teams, aliases] = await Promise.all([loadTeams(true), loadAliases()]);
   const index = buildIndex(teams);

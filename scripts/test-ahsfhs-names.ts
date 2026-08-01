@@ -168,6 +168,44 @@ console.log("\n6. A page is identified by its own team, not its first opponent")
   check("falls back to the title", noPrint.team === "Abbeville", `got ${noPrint.team}`);
 }
 
+console.log("\n7. A heading inside the schedule does not truncate it");
+{
+  // The failure this guards: the slice used to stop at the very next heading,
+  // so anything the site drops in mid-table cut the schedule off there. A cut
+  // after the opener leaves exactly one game per team — a whole roster's
+  // worth of week-0-only fixtures, which is what it looked like in practice.
+  const row = (date: string, opp: string) =>
+    `<tr><td class="smcenter">${date}</td><td class="smleft">vs. ${opp}</td></tr>`;
+
+  const page = (interruption: string) => `
+    <html><head><title>Fairhope High School Football History</title></head><body>
+    <table><tr><td class="colorbar">2026 Season</td></tr>
+    ${row("8/21", "Pace")}
+    ${interruption}
+    ${row("8/28", "Baldwin County")}
+    ${row("9/4", "Foley")}
+    </table>
+    <table><tr><td class="colorbar">2026 Season Totals</td></tr>
+    <tr><td class="smcenter">9/11</td><td class="smleft">vs. Not A Real Game</td></tr>
+    </table></body></html>`;
+
+  const clean = parseAhsfhsTeamPage(page(""));
+  check("all three games without an interruption", clean.games.length === 3);
+
+  const promo = `<tr><td class="colorbar">Next Game</td></tr>`;
+  const cut = parseAhsfhsTeamPage(page(promo));
+  check(
+    "all three games with one in the middle",
+    cut.games.length === 3,
+    `got ${cut.games.length}: ${cut.games.map((g) => g.dateLabel).join(", ")}`,
+  );
+
+  check(
+    "and nothing from beyond the end marker",
+    !cut.games.some((g) => g.opponentRaw.includes("Not A Real Game")),
+  );
+}
+
 console.log(
   failures === 0
     ? "\nCandidate spellings behave.\n"

@@ -673,6 +673,7 @@ function AhsfhsImport() {
     done: number;
     total: number;
   } | null>(null);
+  const [diag, setDiag] = useState<string | null>(null);
   const [message, setMessage] = useState<{
     tone: "good" | "bad" | "warn";
     text: string;
@@ -774,6 +775,29 @@ function AhsfhsImport() {
     }
   }
 
+  async function diagnose() {
+    const team = prompt(
+      "Which team? Type the roster name exactly, e.g. Fairhope",
+    );
+    if (!team) return;
+    setBusy(true);
+    setDiag(null);
+    try {
+      const res = await fetch("/api/admin/import/ahsfhs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diagnose: team }),
+      });
+      const body = await readJson(res);
+      if (!res.ok) throw new Error(String(body.error ?? "Diagnose failed."));
+      setDiag(JSON.stringify(body, null, 2));
+    } catch (e) {
+      setDiag(e instanceof Error ? e.message : "Diagnose failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function commit() {
     if (!rows) return;
     setBusy(true);
@@ -848,8 +872,31 @@ function AhsfhsImport() {
             disabled={busy}
             onChange={(e) => e.target.files?.length && upload(e.target.files)}
           />
+          <button className="btn !py-1.5 !text-xs" onClick={diagnose} disabled={busy}>
+            Diagnose one team
+          </button>
         </div>
       </div>
+
+      {diag && (
+        <div className="card p-4">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h3 className="text-[13px] font-bold">What the parser saw</h3>
+            <button
+              className="btn !py-1 !text-xs"
+              onClick={() => navigator.clipboard?.writeText(diag)}
+            >
+              Copy
+            </button>
+          </div>
+          <pre
+            className="scroll-thin max-h-[420px] overflow-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed"
+            style={{ color: "rgb(var(--text-muted))" }}
+          >
+            {diag}
+          </pre>
+        </div>
+      )}
 
       {message && <Banner tone={message.tone}>{message.text}</Banner>}
 

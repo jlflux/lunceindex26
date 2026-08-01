@@ -73,25 +73,64 @@ function text(html: string): string {
     .trim();
 }
 
-/** Slices out one `colorbar` section, up to wherever the next one starts. */
+/**
+ * Headings that reliably come after the schedule and never inside it.
+ *
+ * The slice used to stop at whichever heading came next, which assumed the
+ * schedule table contains no headings of its own. That assumption is not the
+ * site's to keep — anything the site adds mid-table (a promo panel, a "next
+ * game" marker) truncates the schedule at that point, and a truncation right
+ * after the opener leaves precisely one game per team.
+ */
+const SCHEDULE_END = /season\s+totals|standings|by\s+the\s+decade|border\s+wars/i;
+
+/**
+ * Slices out one `colorbar` section.
+ *
+ * Runs to the next heading that looks like the end of the schedule, and only
+ * falls back to "the very next heading" when no such marker exists.
+ */
 function section(html: string, heading: RegExp): string | null {
   const bar = /<td[^>]*class="colorbar"[^>]*>([\s\S]*?)<\/td>/gi;
   let m: RegExpExecArray | null;
   let start = -1;
-  let end = html.length;
+  let nextBar = -1;
+  let end = -1;
 
   while ((m = bar.exec(html))) {
     const label = text(m[1]);
-    if (start < 0 && heading.test(label)) {
-      start = m.index + m[0].length;
+    if (start < 0) {
+      if (heading.test(label)) start = m.index + m[0].length;
       continue;
     }
-    if (start >= 0) {
+    if (nextBar < 0) nextBar = m.index;
+    if (SCHEDULE_END.test(label)) {
       end = m.index;
       break;
     }
   }
-  return start < 0 ? null : html.slice(start, end);
+
+  if (start < 0) return null;
+  // No end marker at all → the old behaviour, which is still right for a page
+  // whose schedule really is followed by unrelated content.
+  const stop = end >= 0 ? end : nextBar >= 0 ? nextBar : html.length;
+  return html.slice(start, stop);
+}
+
+/**
+ * Every `colorbar` heading on the page, in order.
+ *
+ * The schedule is sliced out by heading — from "<year> Season" to whatever
+ * heading comes next — so when a page yields the wrong games, the list of
+ * headings is the first thing worth seeing. There is no way to guess it from
+ * here: the site cannot be reached from the build environment.
+ */
+export function sectionHeadings(html: string): string[] {
+  const bar = /<td[^>]*class="colorbar"[^>]*>([\s\S]*?)<\/td>/gi;
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = bar.exec(html))) out.push(text(m[1]));
+  return out;
 }
 
 function weekFor(iso: string | null, anchor: SeasonAnchor): number | null {
@@ -136,6 +175,8 @@ export function parseAhsfhsTeamPage(
         .trim()
     : null;
 
+  // Anchored at both ends on purpose: the same page also carries "2026 Season
+  // Preview" and "2026 Season Totals", neither of which is the schedule.
   const seasonHeading = new RegExp(`^${anchor.year}\\s+Season$`, "i");
   const body = section(html, seasonHeading);
   if (!body) {

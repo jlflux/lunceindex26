@@ -16,6 +16,34 @@ export const CLS_MAX = 8;
 
 export type Classification = keyof typeof CLS_ORDER;
 
+/**
+ * Strength tier used for the rating baseline — deliberately NOT the same as
+ * CLS_ORDER.
+ *
+ * CLS_ORDER is an identity and validation list, and its numbering puts A and
+ * AA below 1A because that is where they sit in the roster listing. They are
+ * not below 1A in playing strength: the private/independent split is a
+ * different bracket rather than another rung on the public-school ladder, and
+ * seeding them at the bottom would hand every A and AA school an unearned
+ * penalty before a snap is played.
+ *
+ * So AA is seeded like 4A and A like 2A. Everything else keeps its own tier.
+ *
+ * This only bites once results exist. With no games played the prior blend is
+ * 1, meaning a team's carry-over rating is used whole and the class baseline
+ * contributes nothing — so preseason ratings are unchanged by this map.
+ */
+export const CLS_TIER: Record<Classification, number> = {
+  A: CLS_ORDER["2A"],
+  AA: CLS_ORDER["4A"],
+  "1A": CLS_ORDER["1A"],
+  "2A": CLS_ORDER["2A"],
+  "3A": CLS_ORDER["3A"],
+  "4A": CLS_ORDER["4A"],
+  "5A": CLS_ORDER["5A"],
+  "6A": CLS_ORDER["6A"],
+};
+
 /** Display order for filters: 6A down to 1A, then AA, then A. */
 export const CLS_FILTER_ORDER: Classification[] = [
   "6A",

@@ -16,7 +16,7 @@
 
 import {
   CLS_MAX,
-  CLS_ORDER,
+  CLS_TIER,
   DEFAULT_CONFIG,
   type Classification,
   type EngineConfig,
@@ -60,6 +60,11 @@ function playoffMultiplier(g: Game, cfg: EngineConfig): number {
 
 /**
  * The classification baseline every team is pulled toward.
+ *
+ * Keyed on CLS_TIER, not CLS_ORDER: AA is seeded like 4A and A like 2A,
+ * because the private/independent bracket is a separate system rather than
+ * two more rungs below 1A. See the note on CLS_TIER.
+ *
  * Float division throughout — integer division here silently flattens the
  * whole ladder.
  */
@@ -67,7 +72,7 @@ export function classPrior(
   classification: Classification,
   cfg: EngineConfig,
 ): number {
-  const tier = CLS_ORDER[classification] ?? 1;
+  const tier = CLS_TIER[classification] ?? 1;
   return (
     cfg.prior_min +
     ((tier - 1) / (CLS_MAX - 1)) * (cfg.prior_max - cfg.prior_min)

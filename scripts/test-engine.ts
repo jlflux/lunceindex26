@@ -281,6 +281,57 @@ console.log("\n10. Prediction helpers");
   );
 }
 
+console.log("\n11. The private bracket is not seeded below 1A");
+{
+  // AA and A are listed after 1A on the roster, but that is an ordering of
+  // the list, not of playing strength. Seeding them at the bottom would
+  // penalise every private school before a snap.
+  check(
+    "AA is seeded exactly like 4A",
+    classPrior("AA", DEFAULT_CONFIG) === classPrior("4A", DEFAULT_CONFIG),
+    `AA ${classPrior("AA", DEFAULT_CONFIG)} vs 4A ${classPrior("4A", DEFAULT_CONFIG)}`,
+  );
+  check(
+    "A is seeded exactly like 2A",
+    classPrior("A", DEFAULT_CONFIG) === classPrior("2A", DEFAULT_CONFIG),
+    `A ${classPrior("A", DEFAULT_CONFIG)} vs 2A ${classPrior("2A", DEFAULT_CONFIG)}`,
+  );
+  check(
+    "both sit above 1A",
+    classPrior("A", DEFAULT_CONFIG) > classPrior("1A", DEFAULT_CONFIG) &&
+      classPrior("AA", DEFAULT_CONFIG) > classPrior("1A", DEFAULT_CONFIG),
+  );
+  check(
+    "the public ladder is untouched",
+    classPrior("1A", DEFAULT_CONFIG) < classPrior("2A", DEFAULT_CONFIG) &&
+      classPrior("2A", DEFAULT_CONFIG) < classPrior("3A", DEFAULT_CONFIG) &&
+      classPrior("3A", DEFAULT_CONFIG) < classPrior("4A", DEFAULT_CONFIG) &&
+      classPrior("4A", DEFAULT_CONFIG) < classPrior("5A", DEFAULT_CONFIG) &&
+      classPrior("5A", DEFAULT_CONFIG) < classPrior("6A", DEFAULT_CONFIG),
+  );
+}
+
+console.log("\n12. Reseeding the private bracket cannot move a preseason board");
+{
+  // The guarantee the whole site rests on: nothing moves until a game is
+  // played. With no results the blend is 1, so the class baseline — whatever
+  // it is set to — contributes nothing at all.
+  const teams = [
+    team("Private", "AA", 1, 12.5),
+    team("Small", "1A", 1, 12.5),
+    team("Big", "6A", 1, 40),
+  ];
+  const res = computeRatings(teams, []);
+  for (const t of teams) {
+    const got = res.ratings.find((r) => r.name === t.name)!;
+    check(
+      `${t.name} still rated ${t.preseason_prior}`,
+      Math.abs(got.rating - (t.preseason_prior as number)) < 1e-9,
+      `got ${got.rating}`,
+    );
+  }
+}
+
 console.log(
   failures === 0
     ? "\nAll engine invariants hold.\n"

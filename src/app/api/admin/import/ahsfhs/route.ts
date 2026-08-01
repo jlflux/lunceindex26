@@ -8,9 +8,9 @@ import {
   sectionHeadings,
   type AhsfhsPage,
 } from "@/lib/ahsfhs";
-import { loadAliases, loadTeams } from "@/lib/data";
+import { loadAliases, loadNonMembers, loadTeams } from "@/lib/data";
 import { serviceClient } from "@/lib/db";
-import { buildIndex, matchTeam } from "@/lib/names";
+import { buildIndex, matchTeam, nonMemberSet } from "@/lib/names";
 import type { Game, Team } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -34,6 +34,7 @@ function rowsFromPage(
   sourceTeam: Team,
   index: ReturnType<typeof buildIndex>,
   aliases: Record<string, string>,
+  nonMembers?: Set<string>,
 ): { rows: Row[]; problems: string[] } {
   const rows: Row[] = [];
   const problems: string[] = [];
@@ -44,7 +45,10 @@ function rowsFromPage(
       continue;
     }
 
-    const m = matchTeam({ raw: g.opponentRaw, extraAliases: aliases }, index);
+    const m = matchTeam(
+      { raw: g.opponentRaw, extraAliases: aliases, nonMembers },
+      index,
+    );
     if (!m.name) {
       // AISA and defunct programs live on this site alongside AHSAA members,
       // so an unmatched name is expected rather than an error.
@@ -77,7 +81,12 @@ export const POST = withAdmin(async (req: Request) => {
   const files = form.getAll("files").filter((f): f is File => f instanceof File);
   if (!files.length) throw new Error("Attach at least one saved team page.");
 
-  const [teams, aliases] = await Promise.all([loadTeams(true), loadAliases()]);
+  const [teams, aliases, nonMemberNames] = await Promise.all([
+    loadTeams(true),
+    loadAliases(),
+    loadNonMembers(),
+  ]);
+  const nonMembers = nonMemberSet(nonMemberNames);
   const index = buildIndex(teams);
   const byName = new Map(teams.map((t) => [t.name, t]));
 
@@ -90,7 +99,7 @@ export const POST = withAdmin(async (req: Request) => {
 
     // The page names its own team; match it to the roster like any other.
     const self = page.team
-      ? matchTeam({ raw: page.team, extraAliases: aliases }, index)
+      ? matchTeam({ raw: page.team, extraAliases: aliases, nonMembers }, index)
       : null;
     const sourceTeam = self?.name ? byName.get(self.name) : undefined;
 
@@ -101,7 +110,7 @@ export const POST = withAdmin(async (req: Request) => {
       continue;
     }
 
-    const out = rowsFromPage(page, sourceTeam, index, aliases);
+    const out = rowsFromPage(page, sourceTeam, index, aliases, nonMembers);
     rows.push(...out.rows);
     problems.push(...out.problems);
     for (const s of page.skipped) {
@@ -313,7 +322,12 @@ export const PATCH = withAdmin(async (req: Request) => {
     return NextResponse.json({ ok: true, diagnose, attempts: out });
   }
 
-  const [teams, aliases] = await Promise.all([loadTeams(true), loadAliases()]);
+  const [teams, aliases, nonMemberNames] = await Promise.all([
+    loadTeams(true),
+    loadAliases(),
+    loadNonMembers(),
+  ]);
+  const nonMembers = nonMemberSet(nonMemberNames);
   const index = buildIndex(teams);
 
   let roster = teams;
@@ -380,7 +394,7 @@ export const PATCH = withAdmin(async (req: Request) => {
       continue;
     }
 
-    const out = rowsFromPage(page, t, index, aliases);
+    const out = rowsFromPage(page, t, index, aliases, nonMembers);
     rows.push(...out.rows);
     problems.push(...out.problems);
     fetched++;

@@ -52,12 +52,31 @@ export function isOutOfStateToken(cl: string): boolean {
  * have no roster entry. Treated exactly like out-of-state opponents — their
  * games count toward the opponent's record and are valued off the field mean,
  * but they never receive a rating or a ranking of their own.
+ *
+ * The shipped list is only a fallback. The live one lives in the `non_members`
+ * table so it can be maintained without a deploy — schools go independent
+ * between seasons, and every one that does otherwise turns into a recurring
+ * pile of "no roster match" reports.
  */
 export const NON_MEMBER_SCHOOLS = new Set(["vina"]);
 
-export function isNonMember(raw: string): boolean {
+/**
+ * Whether a name is a known non-member.
+ *
+ * `extra` holds the admin-maintained names, already normalised. Both sides are
+ * compared across suffix variants so "Tharptown High School" matches an entry
+ * of "Tharptown".
+ */
+export function isNonMember(raw: string, extra?: Set<string>): boolean {
   const forms = variants(raw);
-  return forms.some((f) => NON_MEMBER_SCHOOLS.has(f));
+  return forms.some((f) => NON_MEMBER_SCHOOLS.has(f) || extra?.has(f));
+}
+
+/** Normalises a stored list of non-member names for matching. */
+export function nonMemberSet(names: string[]): Set<string> {
+  const out = new Set<string>();
+  for (const n of names) for (const v of variants(n)) out.add(v);
+  return out;
 }
 
 /** Every US state except Alabama — a trailing one marks an outside opponent. */
@@ -360,6 +379,8 @@ export interface MatchInput {
   regionToken?: string;
   /** Extra aliases resolved by an admin previously. */
   extraAliases?: Record<string, string>;
+  /** Admin-maintained non-members, normalised by `nonMemberSet`. */
+  nonMembers?: Set<string>;
 }
 
 export function matchTeam(
@@ -381,7 +402,7 @@ export function matchTeam(
   // values them off the field mean.
   if (
     (input.classToken && isOutOfStateToken(input.classToken)) ||
-    isNonMember(raw) ||
+    isNonMember(raw, input.nonMembers) ||
     hasOutOfStateSuffix(raw)
   ) {
     return {

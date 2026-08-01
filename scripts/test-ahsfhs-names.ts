@@ -13,7 +13,7 @@ import {
   ahsfhsUrl,
   parseAhsfhsTeamPage,
 } from "../src/lib/ahsfhs";
-import { buildIndex, matchTeam } from "../src/lib/names";
+import { buildIndex, matchTeam, nonMemberSet } from "../src/lib/names";
 import { loadRosterCsv } from "../src/lib/roster-csv";
 
 let failures = 0;
@@ -285,7 +285,46 @@ console.log("\n9. Unclosed rows do not collapse the schedule");
   );
 }
 
-console.log("\n10. The fetch asks for the games-by-year page");
+console.log("\n10. Listed non-members import as out-of-state");
+{
+  const teams = loadRosterCsv("data/AHSAA_Class_List_2026.csv");
+  const index = buildIndex(teams);
+  const listed = nonMemberSet(["Tharptown", "Snook Christian"]);
+
+  // Without the list an independent is indistinguishable from a typo, so it
+  // is reported and its games are dropped.
+  check(
+    "unlisted, Tharptown does not match",
+    matchTeam({ raw: "Tharptown" }, index).name === null,
+  );
+
+  const m = matchTeam({ raw: "Tharptown", nonMembers: listed }, index);
+  check("listed, it resolves", m.name === "Tharptown", `got ${m.name}`);
+  check("and is flagged out-of-state", m.outOfState === true);
+
+  // Suffix variants of a listed name count too.
+  check(
+    "\"Tharptown High School\" resolves as well",
+    matchTeam({ raw: "Tharptown High School", nonMembers: listed }, index)
+      .outOfState === true,
+  );
+
+  // A genuine misspelling must still be reported rather than silently
+  // becoming a new out-of-state school.
+  check(
+    "\"Hackelburg\" is still not out-of-state",
+    matchTeam({ raw: "Hackelburg", nonMembers: listed }, index).outOfState ===
+      false,
+  );
+
+  // The shipped fallback still applies when the table is unreachable.
+  check(
+    "Vina holds without any list",
+    matchTeam({ raw: "Vina" }, index).outOfState === true,
+  );
+}
+
+console.log("\n11. The fetch asks for the games-by-year page");
 {
   const url = ahsfhsUrl("Carver Montgomery");
   check("uses gamesbyyear.asp", url.includes("gamesbyyear.asp"), url);

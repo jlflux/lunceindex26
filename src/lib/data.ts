@@ -154,6 +154,22 @@ export async function loadRatings(): Promise<RatingsPayload> {
   }
 }
 
+/**
+ * Schools that play a schedule but hold no rating: independents, AISA
+ * programs, anyone off the classification list.
+ *
+ * Falls back to an empty list rather than throwing, so a deployment whose
+ * migration has not been run yet keeps importing — it simply reports these
+ * names as unmatched, exactly as it did before the table existed.
+ */
+export async function loadNonMembers(): Promise<string[]> {
+  const { data, error } = await serviceClient()
+    .from("non_members")
+    .select("name");
+  if (error) return [];
+  return ((data ?? []) as { name: string }[]).map((r) => r.name);
+}
+
 /** Admin-resolved PDF name aliases, keyed by the raw PDF spelling. */
 export async function loadAliases(): Promise<Record<string, string>> {
   const { data, error } = await serviceClient()

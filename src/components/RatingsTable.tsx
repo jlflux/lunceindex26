@@ -25,9 +25,26 @@ function columnRank<T extends { slug: string }>(
   higherIsBetter = true,
 ) {
   const m = new Map<string, number>();
-  [...rows]
-    .sort((a, b) => (higherIsBetter ? get(b) - get(a) : get(a) - get(b)))
-    .forEach((r, i) => m.set(r.slug, i + 1));
+  if (!rows.length) return m;
+
+  const values = rows.map(get);
+  // A column where every team holds the same figure has no ordering in it.
+  // After a single week that is exactly what efficiency looks like: your
+  // opponent's only points-allowed figure is what you scored on them, so it
+  // cancels to zero for everybody. Numbering that 1 to 393 invents a ladder
+  // out of array order.
+  if (Math.min(...values) === Math.max(...values)) return m;
+
+  const sorted = [...rows].sort((a, b) =>
+    higherIsBetter ? get(b) - get(a) : get(a) - get(b),
+  );
+  // Equal figures share a rank, rather than being separated by whichever the
+  // sort happened to put first.
+  let rank = 1;
+  sorted.forEach((r, i) => {
+    if (i > 0 && get(r) !== get(sorted[i - 1])) rank = i + 1;
+    m.set(r.slug, rank);
+  });
   return m;
 }
 

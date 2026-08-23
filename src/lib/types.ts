@@ -103,6 +103,8 @@ export interface EngineConfig {
   prior_min: number;
   prior_max: number;
   prior_w: number;
+  /** Extra weight on the carry-over while priorBlend is still decaying. */
+  early_anchor: number;
   sos_w: number;
   eff_w: number;
   wr_w: number;
@@ -135,6 +137,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
   prior_min: 0,
   prior_max: 14,
   prior_w: 0.22,
+  early_anchor: 0,
   sos_w: 0.9,
   eff_w: 0.07,
   wr_w: 6.0,

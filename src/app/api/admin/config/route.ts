@@ -9,6 +9,7 @@ const BOUNDS: Record<keyof EngineConfig, [number, number]> = {
   prior_min: [-20, 40],
   prior_max: [-20, 60],
   prior_w: [0, 1],
+  early_anchor: [0, 1],
   sos_w: [0, 3],
   eff_w: [0, 1],
   wr_w: [0, 20],

@@ -22,6 +22,7 @@ const GROUPS: { title: string; blurb: string; knobs: Knob[] }[] = [
       { key: "prior_min", label: "Lowest class baseline", min: -10, max: 30, step: 0.5, help: "Rating floor for Class A." },
       { key: "prior_max", label: "Highest class baseline", min: 0, max: 40, step: 0.5, help: "Rating baseline for 6A." },
       { key: "prior_w", label: "Prior weight", min: 0, max: 1, step: 0.01, help: "How hard the baseline pulls. Higher is more classification-driven." },
+      { key: "early_anchor", label: "Early-season anchor", min: 0, max: 1, step: 0.05, help: "Extra hold on last season's rating while the carry-over is still live. Fades to nothing by week four, so it never touches a finished season. At 0 a single Week 0 result carries 78% of a team's rating." },
     ],
   },
   {

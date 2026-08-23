@@ -164,6 +164,13 @@ export function computeRatings(
     }
   }
 
+  // How tightly the carry-over binds during the solve. `priorBlend` runs from
+  // 1 in week 0 to 0 by week four, so this starts high and relaxes to the
+  // steady-state `prior_w` — with early_anchor at 0 it IS prior_w throughout,
+  // which is the behaviour every earlier season was rated under.
+  const anchoredPriorW =
+    cfg.prior_w + (1 - cfg.prior_w) * priorBlend * (cfg.early_anchor ?? 0);
+
   // ---- Step 2: Massey iteration ------------------------------------------
   const rating = new Map<string, number>();
   for (const t of teams) rating.set(t.name, effPrior.get(t.name) as number);
@@ -196,7 +203,7 @@ export function computeRatings(
       // Teams with nothing played simply hold their prior.
       next.set(
         t.name,
-        b.length ? cfg.prior_w * prior + (1 - cfg.prior_w) * mean(b) : prior,
+        b.length ? anchoredPriorW * prior + (1 - anchoredPriorW) * mean(b) : prior,
       );
     }
     for (const [k, v] of next) rating.set(k, v);

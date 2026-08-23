@@ -12,6 +12,7 @@ import {
   ahsfhsNamesFor,
   ahsfhsUrl,
   parseAhsfhsTeamPage,
+  readOutcome,
 } from "../src/lib/ahsfhs";
 import { buildIndex, matchTeam, nonMemberSet } from "../src/lib/names";
 import { loadRosterCsv } from "../src/lib/roster-csv";
@@ -324,7 +325,74 @@ console.log("\n10. Listed non-members import as out-of-state");
   );
 }
 
-console.log("\n11. The fetch asks for the games-by-year page");
+console.log("\n11. Reading a played game's result");
+{
+  // The page's header spans "Score" across two cells without saying whether
+  // they hold "35" and "14" or "W" and "35-14", so both are accepted.
+  const combined = readOutcome(["W", "35-14", "", ""]);
+  check(
+    "W plus a combined 35-14",
+    combined.result === "W" &&
+      combined.teamScore === 35 &&
+      combined.oppScore === 14,
+    JSON.stringify(combined),
+  );
+
+  const split = readOutcome(["W", "35", "14", ""]);
+  check(
+    "W plus two separate numbers",
+    split.result === "W" && split.teamScore === 35 && split.oppScore === 14,
+    JSON.stringify(split),
+  );
+
+  const loss = readOutcome(["L", "7", "42"]);
+  check(
+    "a loss keeps the source team's score first",
+    loss.result === "L" && loss.teamScore === 7 && loss.oppScore === 42,
+    JSON.stringify(loss),
+  );
+
+  check("an en dash separator works", readOutcome(["W", "21–0"]).oppScore === 0);
+  check("lowercase w is accepted", readOutcome(["w", "21-0"]).result === "W");
+
+  // The guard that matters: those cells also carry records and streaks, and
+  // "1-0" reads as a perfectly good score. Without a W/L/T nothing is taken,
+  // so an unplayed fixture cannot import as a 1-0 win.
+  const unplayed = readOutcome(["", "", "1-0", "W1"]);
+  check(
+    "no result letter means no score",
+    unplayed.result === null &&
+      unplayed.teamScore === null &&
+      unplayed.oppScore === null,
+    JSON.stringify(unplayed),
+  );
+
+  check(
+    "empty cells read as unplayed",
+    readOutcome(["", "", "", "", ""]).result === null,
+  );
+
+  // A letter with no readable score still reports as played, so it surfaces
+  // rather than silently vanishing.
+  const noScore = readOutcome(["W", "", ""]);
+  check(
+    "a letter alone reports the result without inventing a score",
+    noScore.result === "W" && noScore.teamScore === null,
+    JSON.stringify(noScore),
+  );
+
+  // Nothing on the shipped samples has been played, so the schedule-only
+  // pages must still come back with no scores at all.
+  const sample = parseAhsfhsTeamPage(
+    readFileSync("data/samples/ahsfhs-fairhope-gamesbyyear.html", "utf8"),
+  );
+  check(
+    "the unplayed sample yields no scores",
+    sample.games.every((g) => g.teamScore === null && g.result === null),
+  );
+}
+
+console.log("\n12. The fetch asks for the games-by-year page");
 {
   const url = ahsfhsUrl("Carver Montgomery");
   check("uses gamesbyyear.asp", url.includes("gamesbyyear.asp"), url);

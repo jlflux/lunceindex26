@@ -644,6 +644,8 @@ interface AhsfhsRow {
   date: string | null;
   source: string;
   note: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
 }
 
 /**
@@ -815,14 +817,24 @@ function AhsfhsImport() {
         .sort((a, b) => Number(a[0]) - Number(b[0]))
         .map(([w, n]) => `wk${w} ${n}`)
         .join(" · ");
+      const conflicts = (body.conflicts ?? []) as string[];
       setMessage({
-        tone: "good",
+        tone: conflicts.length ? "warn" : "good",
         text:
           `Sent ${body.received}, wrote ${body.imported}` +
+          `${body.scored ? ` including ${body.scored} with scores` : ""}` +
           `${body.skippedAlreadyPlayed ? `, left ${body.skippedAlreadyPlayed} alone because they already have scores` : ""}` +
           `${body.collapsed ? `, collapsed ${body.collapsed} duplicate listings` : ""}` +
           `.${spread ? ` ${spread}.` : ""} Publish from the dashboard to update the site.`,
       });
+      // Scores already on file are never overwritten; a disagreement is
+      // reported so it can be settled by hand.
+      if (conflicts.length) {
+        setProblems([
+          `${conflicts.length} game(s) already have a different score on file — left as they are:`,
+          ...conflicts,
+        ]);
+      }
       setRows(null);
     } catch (e) {
       setMessage({
@@ -930,6 +942,7 @@ function AhsfhsImport() {
                 >
                   <th className="px-3 py-2 text-left">Wk</th>
                   <th className="px-3 py-2 text-left">Matchup</th>
+                  <th className="px-3 py-2 text-right">Score</th>
                   <th className="px-3 py-2 text-left">Date</th>
                   <th className="px-3 py-2 text-left">Note</th>
                 </tr>
@@ -948,6 +961,15 @@ function AhsfhsImport() {
                         {" vs "}
                       </span>
                       <span className="font-semibold">{r.away}</span>
+                    </td>
+                    {/* Visible before anything is written, so a misread score
+                        is caught here rather than in the published ratings. */}
+                    <td className="px-3 py-2 text-right text-sm font-bold tnum">
+                      {r.homeScore !== null && r.awayScore !== null ? (
+                        `${r.homeScore}–${r.awayScore}`
+                      ) : (
+                        <span style={{ color: "rgb(var(--text-faint))" }}>—</span>
+                      )}
                     </td>
                     <td
                       className="px-3 py-2 text-xs"

@@ -43,6 +43,8 @@ export interface AhsfhsGame {
   result: "W" | "L" | "T" | null;
   teamScore: number | null;
   oppScore: number | null;
+  /** The outcome cells verbatim, so a layout change can be seen not guessed. */
+  resultCells: string[];
 }
 
 export interface AhsfhsPage {
@@ -192,6 +194,63 @@ function isoDate(label: string, year: number): string | null {
 /** Whether a cell looks like either date form. */
 const isDateCell = (s: string) => isoDate(s, 2000) !== null;
 
+export interface Outcome {
+  result: "W" | "L" | "T" | null;
+  teamScore: number | null;
+  oppScore: number | null;
+}
+
+/**
+ * Reads a played game's outcome from the cells after the opponent.
+ *
+ * The header spans "Score" across two cells, which does not say whether they
+ * hold "35" and "14" or "W" and "35-14". Rather than commit to one, this
+ * accepts a combined "35-14" cell or two standalone numbers, and requires a
+ * W/L/T alongside them.
+ *
+ * Requiring the letter is the safeguard. The trailing cells also carry records
+ * and streaks, and "1-0" parses as a score perfectly well — without the letter
+ * an unplayed fixture would import as a 1-0 win.
+ */
+export function readOutcome(cells: string[]): Outcome {
+  const cleaned = cells.map((c) => c.replace(/\s+/g, " ").trim());
+
+  const letter = cleaned.find((c) => /^[WLT]$/i.test(c));
+  const result = letter
+    ? (letter.toUpperCase() as "W" | "L" | "T")
+    : null;
+  if (!result) return { result: null, teamScore: null, oppScore: null };
+
+  const score = (n: string) => {
+    const v = Number(n);
+    return Number.isInteger(v) && v >= 0 && v <= 200 ? v : null;
+  };
+
+  // "35-14" in one cell.
+  for (const c of cleaned) {
+    const m = c.match(/^(\d{1,3})\s*[-–]\s*(\d{1,3})$/);
+    if (m) {
+      const a = score(m[1]);
+      const b = score(m[2]);
+      if (a !== null && b !== null) {
+        return { result, teamScore: a, oppScore: b };
+      }
+    }
+  }
+
+  // Otherwise the first two standalone numbers, in order.
+  const numbers = cleaned
+    .filter((c) => /^\d{1,3}$/.test(c))
+    .map(score)
+    .filter((n): n is number => n !== null);
+  if (numbers.length >= 2) {
+    return { result, teamScore: numbers[0], oppScore: numbers[1] };
+  }
+
+  // A letter with no readable score is still worth reporting as played.
+  return { result, teamScore: null, oppScore: null };
+}
+
 export function parseAhsfhsTeamPage(
   html: string,
   anchor: SeasonAnchor = DEFAULT_ANCHOR,
@@ -300,10 +359,7 @@ export function parseAhsfhsTeamPage(
     // Trailing cells hold the outcome once a game has been played. Scoped to
     // this game's cells — `cells` is now the whole table, so slicing from a
     // fixed index would read every later game's score into the first one.
-    const rest = trailing.join(" ");
-    const resultMatch = rest.match(/\b([WLT])\b/);
-    const scoreMatch = rest.match(/\b(\d{1,3})\s*-\s*(\d{1,3})\b/);
-
+    const outcome = readOutcome(trailing);
     const date = isoDate(dateLabel, anchor.year);
     games.push({
       dateLabel,
@@ -312,9 +368,10 @@ export function parseAhsfhsTeamPage(
       isHome: home,
       opponentRaw,
       regionGame,
-      result: (resultMatch?.[1] as "W" | "L" | "T") ?? null,
-      teamScore: scoreMatch ? Number(scoreMatch[1]) : null,
-      oppScore: scoreMatch ? Number(scoreMatch[2]) : null,
+      result: outcome.result,
+      teamScore: outcome.teamScore,
+      oppScore: outcome.oppScore,
+      resultCells: trailing.filter((c) => c.trim() !== ""),
     });
   }
 

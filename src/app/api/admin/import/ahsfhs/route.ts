@@ -16,6 +16,9 @@ import type { Game, Team } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+/** Weeks 0–10 are the regular season; anything later is a playoff round. */
+const REGULAR_SEASON_LAST_WEEK = 10;
+
 interface Row {
   home: string;
   away: string;
@@ -26,6 +29,9 @@ interface Row {
   homeOk: boolean;
   awayOk: boolean;
   note: string | null;
+  /** Null until the game has been played. Oriented to home/away, not source. */
+  homeScore: number | null;
+  awayScore: number | null;
 }
 
 /** Turns one team's page into oriented home/away rows. */
@@ -45,6 +51,18 @@ function rowsFromPage(
       continue;
     }
 
+    // Everything imported here is written as a regular-season game. Once the
+    // brackets are up, a November fixture would otherwise land as regular
+    // week 12 — no playoff multiplier, and counted as regular season in the
+    // ratings. Reported instead, to be entered with its round by hand.
+    if (g.week > REGULAR_SEASON_LAST_WEEK) {
+      problems.push(
+        `${sourceTeam.name}: ${g.dateLabel} vs ${g.opponentRaw} is past week ` +
+          `${REGULAR_SEASON_LAST_WEEK} — enter playoff games by hand so the round is right`,
+      );
+      continue;
+    }
+
     const m = matchTeam(
       { raw: g.opponentRaw, extraAliases: aliases, nonMembers },
       index,
@@ -58,6 +76,8 @@ function rowsFromPage(
       continue;
     }
 
+    // The page reports from its own team's side; the row is stored home-first.
+    const played = g.teamScore !== null && g.oppScore !== null;
     rows.push({
       home: g.isHome ? sourceTeam.name : m.name,
       away: g.isHome ? m.name : sourceTeam.name,
@@ -67,6 +87,8 @@ function rowsFromPage(
       homeOk: true,
       awayOk: true,
       note: m.outOfState ? `${m.name} is non-AHSAA` : m.note ?? null,
+      homeScore: !played ? null : g.isHome ? g.teamScore : g.oppScore,
+      awayScore: !played ? null : g.isHome ? g.oppScore : g.teamScore,
     });
   }
   return { rows, problems };
@@ -120,16 +142,20 @@ export const POST = withAdmin(async (req: Request) => {
 
   // The same fixture appears on both teams' pages; orientation makes the key
   // identical, so collapsing here mirrors what the upsert would do anyway.
-  const seen = new Set<string>();
+  // Both teams list the fixture, but only one side may have its score posted
+  // yet — so a scored copy replaces an unscored one rather than losing to it.
+  const seen = new Map<string, number>();
   const unique: Row[] = [];
   let duplicates = 0;
   for (const r of rows) {
     const key = `${r.home}|${r.away}|${r.week}`;
-    if (seen.has(key)) {
+    const at = seen.get(key);
+    if (at !== undefined) {
       duplicates++;
+      if (unique[at].homeScore === null && r.homeScore !== null) unique[at] = r;
       continue;
     }
-    seen.add(key);
+    seen.set(key, unique.length);
     unique.push(r);
   }
 
@@ -167,38 +193,64 @@ export const PUT = withAdmin(async (req: Request) => {
     if (!data || data.length < 1000) break;
   }
 
-  const played = new Set(
-    existing
-      .filter((g) => g.s1 !== null && g.s2 !== null)
-      .map((g) => `${g.t1}|${g.t2}|${g.week}|${g.type}`),
-  );
+  const onFile = new Map<string, Game>();
+  for (const g of existing) {
+    onFile.set(`${g.t1}|${g.t2}|${g.week}|${g.type}`, g);
+  }
 
   // Deduplicate on the real conflict key. Postgres rejects an ON CONFLICT
   // statement that would touch the same row twice, which fails the whole
   // batch — so two source pages disagreeing about nothing but the date must
-  // not both reach the upsert.
+  // not both reach the upsert. A scored copy wins over an unscored one.
   const byKey = new Map<string, Row>();
-  let alreadyPlayed = 0;
   for (const r of rows) {
     const key = `${r.home}|${r.away}|${r.week}|regular`;
-    if (played.has(key)) {
-      alreadyPlayed++;
-      continue;
+    const held = byKey.get(key);
+    if (!held || (held.homeScore === null && r.homeScore !== null)) {
+      byKey.set(key, r);
     }
-    if (!byKey.has(key)) byKey.set(key, r);
   }
 
-  const toWrite = [...byKey.values()].map((r) => ({
-    t1: r.home,
-    t2: r.away,
-    s1: null,
-    s2: null,
-    week: r.week,
-    type: "regular" as const,
-    round: null,
-    date: r.date,
-    status: "scheduled",
-  }));
+  const conflicts: string[] = [];
+  let scored = 0;
+  let unchanged = 0;
+
+  const toWrite: Record<string, unknown>[] = [];
+  for (const [key, r] of byKey) {
+    const current = onFile.get(key);
+    const hasScore = r.homeScore !== null && r.awayScore !== null;
+    const held = current && current.s1 !== null && current.s2 !== null;
+
+    // A score already entered is never overwritten. If the source disagrees
+    // it is reported for a human to settle — silently replacing a corrected
+    // result with the one that was corrected away is the worse failure.
+    if (held) {
+      if (
+        hasScore &&
+        (current.s1 !== r.homeScore || current.s2 !== r.awayScore)
+      ) {
+        conflicts.push(
+          `${r.home} ${current.s1}–${current.s2} ${r.away} (wk ${r.week}) — ahsfhs says ${r.homeScore}–${r.awayScore}`,
+        );
+      } else {
+        unchanged++;
+      }
+      continue;
+    }
+
+    if (hasScore) scored++;
+    toWrite.push({
+      t1: r.home,
+      t2: r.away,
+      s1: r.homeScore,
+      s2: r.awayScore,
+      week: r.week,
+      type: "regular" as const,
+      round: null,
+      date: r.date,
+      status: hasScore ? "final" : "scheduled",
+    });
+  }
 
   // Chunked, so one oversized statement cannot take the whole import with it
   // and the count reported back is what actually landed.
@@ -217,14 +269,19 @@ export const PUT = withAdmin(async (req: Request) => {
   }
 
   const byWeek: Record<number, number> = {};
-  for (const g of toWrite) byWeek[g.week] = (byWeek[g.week] ?? 0) + 1;
+  for (const g of toWrite) {
+    const w = g.week as number;
+    byWeek[w] = (byWeek[w] ?? 0) + 1;
+  }
 
   return NextResponse.json({
     ok: true,
     received: rows.length,
     imported: written,
-    skippedAlreadyPlayed: alreadyPlayed,
-    collapsed: rows.length - alreadyPlayed - toWrite.length,
+    scored,
+    skippedAlreadyPlayed: unchanged,
+    collapsed: rows.length - byKey.size,
+    conflicts,
     byWeek,
   });
 });
@@ -306,8 +363,12 @@ export const PATCH = withAdmin(async (req: Request) => {
             week: g.week,
             home: g.isHome,
             opponent: g.opponentRaw,
+            result: g.result,
             score:
               g.teamScore === null ? null : `${g.teamScore}-${g.oppScore}`,
+            // Verbatim, so a score layout that does not parse can be read off
+            // the report rather than guessed at.
+            resultCells: g.resultCells,
           })),
           skipped: parsed.skipped,
         });

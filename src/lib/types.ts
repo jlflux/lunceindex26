@@ -103,7 +103,13 @@ export interface EngineConfig {
   prior_min: number;
   prior_max: number;
   prior_w: number;
-  /** Extra weight on the carry-over while priorBlend is still decaying. */
+  /**
+   * Extra weight on the carry-over while priorBlend is still decaying.
+   *
+   * Without it a single Week 0 result carries 78% of a team's rating, because
+   * `prior_w` is 0.22 and the Massey solve is built to converge across a
+   * season rather than be read after one game.
+   */
   early_anchor: number;
   sos_w: number;
   eff_w: number;
@@ -137,7 +143,9 @@ export const DEFAULT_CONFIG: EngineConfig = {
   prior_min: 0,
   prior_max: 14,
   prior_w: 0.22,
-  early_anchor: 0,
+  // Weeks 0–3 only; identical to 0 from week four, so the 2025 validation is
+  // unaffected either way.
+  early_anchor: 0.8,
   sos_w: 0.9,
   eff_w: 0.07,
   wr_w: 6.0,

@@ -332,6 +332,56 @@ console.log("\n12. Reseeding the private bracket cannot move a preseason board")
   }
 }
 
+console.log("\n13. The early anchor damps week 0 and then gets out of the way");
+{
+  // St. Michael's actual week 0: a 23.95 team losing by 28 to an out-of-state
+  // opponent, which the engine can only value at the field mean. At anchor 0
+  // that one game carried 78% of the rating and dropped them ~40 points.
+  const roster = () => [
+    team("Strong", "AA", 1, 23.95),
+    team("Other", "5A", 1, 12),
+    team("Third", "3A", 1, 6),
+  ];
+  const wk0 = [game("Away Academy GA", 31, "Strong", 3, 0)];
+
+  const damped = computeRatings(roster(), wk0, { early_anchor: 0.8 });
+  const raw = computeRatings(roster(), wk0, { early_anchor: 0 });
+  const s = (r: ReturnType<typeof computeRatings>) =>
+    r.ratings.find((x) => x.name === "Strong")!.rating;
+
+  check(
+    "one week 0 loss costs less with the anchor than without",
+    s(damped) > s(raw),
+    `anchored ${s(damped).toFixed(2)} vs raw ${s(raw).toFixed(2)}`,
+  );
+  check(
+    "the team still drops — the anchor damps, it does not freeze",
+    s(damped) < 23.95,
+    `got ${s(damped).toFixed(2)}`,
+  );
+
+  // The whole reason validating against a finished season could not catch
+  // this: once four weeks are played the two are the same computation.
+  const season = [
+    game("Strong", 21, "Other", 14, 0),
+    game("Other", 20, "Third", 17, 2),
+    game("Strong", 28, "Third", 7, 4),
+  ];
+  const lateA = computeRatings(roster(), season, { early_anchor: 0 });
+  const lateB = computeRatings(roster(), season, { early_anchor: 0.8 });
+  check("prior_blend has reached 0 by week 4", lateA.priorBlend === 0);
+  const worst = Math.max(
+    ...lateA.ratings.map((r) =>
+      Math.abs(r.rating - lateB.ratings.find((x) => x.name === r.name)!.rating),
+    ),
+  );
+  check(
+    "and from there the anchor changes nothing at all",
+    worst === 0,
+    `worst difference ${worst}`,
+  );
+}
+
 console.log(
   failures === 0
     ? "\nAll engine invariants hold.\n"

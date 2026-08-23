@@ -11,6 +11,7 @@ const BOUNDS: Record<keyof EngineConfig, [number, number]> = {
   prior_w: [0, 1],
   early_anchor: [0, 1],
   sos_w: [0, 3],
+  sos_ramp: [1, 12],
   eff_w: [0, 1],
   wr_w: [0, 20],
   cap: [7, 70],

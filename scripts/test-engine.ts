@@ -382,6 +382,77 @@ console.log("\n13. The early anchor damps week 0 and then gets out of the way");
   );
 }
 
+console.log("\n14. Losing badly cannot raise a rating");
+{
+  // Parker's actual week 0: a 23.85 team beaten by three scores by the
+  // strongest side on the board, and its rating went UP. After one game SOS
+  // is just that opponent's rating, so the season-calibrated schedule bonus
+  // was worth more than the loss cost.
+  // A field wide enough for the median SOS to mean something — with only a
+  // handful of teams every schedule looks extreme and the term misbehaves for
+  // a different reason.
+  const roster = () => {
+    const out = [
+      team("Parker", "5A", 5, 23.85),
+      team("Giant", "6A", 3, 36.97),
+    ];
+    for (let i = 0; i < 24; i++) {
+      out.push(team(`Filler ${i}`, "4A", 1, 12 - i * 0.9));
+    }
+    return out;
+  };
+  const wk0 = [game("Giant", 42, "Parker", 21, 0)];
+  for (let i = 0; i + 1 < 24; i += 2) {
+    wk0.push(game(`Filler ${i}`, 24, `Filler ${i + 1}`, 20, 0));
+  }
+
+  const parker = (r: ReturnType<typeof computeRatings>) =>
+    r.ratings.find((x) => x.name === "Parker")!.rating;
+
+  const ramped = computeRatings(roster(), wk0, { sos_ramp: 4 });
+  const unramped = computeRatings(roster(), wk0, { sos_ramp: 1 });
+  // sos_w 0 removes the schedule term entirely, which isolates its size.
+  const noSos = computeRatings(roster(), wk0, { sos_w: 0 });
+
+  check(
+    "without the ramp, a three-score loss raises the rating",
+    parker(unramped) > 23.85,
+    `got ${parker(unramped).toFixed(2)}`,
+  );
+
+  // The exact guarantee: after one game the schedule bonus is worth a quarter
+  // of full strength. Whether that is enough to stop a rise depends on the
+  // shape of the field, so the invariant is the fraction, not the sign.
+  const fullTerm = parker(unramped) - parker(noSos);
+  const rampedTerm = parker(ramped) - parker(noSos);
+  check(
+    "one game earns a quarter of the schedule adjustment",
+    Math.abs(rampedTerm - fullTerm * 0.25) < 1e-9,
+    `${rampedTerm.toFixed(4)} vs ${(fullTerm * 0.25).toFixed(4)}`,
+  );
+  check(
+    "which is a real reduction, not a rounding difference",
+    fullTerm > 5 && rampedTerm < fullTerm * 0.3,
+    `full ${fullTerm.toFixed(2)}, ramped ${rampedTerm.toFixed(2)}`,
+  );
+
+  // Every team in the validated 2025 set played at least seven games, so the
+  // ramp is already at full strength there and cannot disturb it.
+  const full = [
+    game("Parker", 21, "Filler 0", 14, 0),
+    game("Parker", 20, "Filler 1", 17, 1),
+    game("Giant", 30, "Parker", 10, 2),
+    game("Parker", 24, "Filler 2", 21, 3),
+  ];
+  const a = computeRatings(roster(), full, { sos_ramp: 4 });
+  const b = computeRatings(roster(), full, { sos_ramp: 1 });
+  check(
+    "at four games played the ramp is inert",
+    Math.abs(parker(a) - parker(b)) < 1e-9,
+    `${parker(a)} vs ${parker(b)}`,
+  );
+}
+
 console.log(
   failures === 0
     ? "\nAll engine invariants hold.\n"

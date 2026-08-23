@@ -112,6 +112,8 @@ export interface EngineConfig {
    */
   early_anchor: number;
   sos_w: number;
+  /** Games before the schedule adjustment reaches full strength. */
+  sos_ramp: number;
   eff_w: number;
   wr_w: number;
   cap: number;
@@ -147,6 +149,7 @@ export const DEFAULT_CONFIG: EngineConfig = {
   // unaffected either way.
   early_anchor: 0.8,
   sos_w: 0.9,
+  sos_ramp: 4,
   eff_w: 0.07,
   wr_w: 6.0,
   cap: 28,

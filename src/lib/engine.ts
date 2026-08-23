@@ -291,12 +291,21 @@ export function computeRatings(
     // teams get no efficiency credit at all.
     const scale = medianSos > 0 ? clamp(sos / medianSos, 0, 1) : 0;
 
+    // A one-game SOS is not a schedule, it is a single opponent's rating.
+    // Across a finished season SOS is a mean of ten or more and sits in a
+    // band of roughly -5 to +20; after one game it spans the entire rating
+    // range, so the season-calibrated weight applied to it can swamp
+    // everything else — enough to raise a team's rating for losing badly.
+    // Ramps to full strength once a real schedule exists, which is why teams
+    // in the 2025 set (all of whom played 7+) are untouched.
+    const sosWeight = clamp(a.games / cfg.sos_ramp, 0, 1);
+
     let composite = m;
     // Gated on having played, NOT on sos > 0. SOS is a mean opponent rating
     // and is legitimately negative for a team on a genuinely weak schedule —
     // those teams must still take the adjustment. Gating on sos > 0 silently
     // exempted 61 of 387 teams in 2025 and broke the composite.
-    if (a.games > 0) composite += (sos - medianSos) * cfg.sos_w;
+    if (a.games > 0) composite += (sos - medianSos) * cfg.sos_w * sosWeight;
     composite += (oEff + dEff) * cfg.eff_w * scale;
     composite += (winRate - 0.5) * cfg.wr_w;
 

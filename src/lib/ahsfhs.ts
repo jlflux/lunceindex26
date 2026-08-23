@@ -212,6 +212,33 @@ export interface Outcome {
  * and streaks, and "1-0" parses as a score perfectly well — without the letter
  * an unplayed fixture would import as a 1-0 win.
  */
+/**
+ * Puts the pair the right way round using the result letter.
+ *
+ * A win reads identically whether the site lists the team's score first or the
+ * winner's, so one won game cannot tell the two conventions apart — and if it
+ * is winner-first, every loss would import reversed. The letter settles it
+ * without needing another sample: a W whose first number is the smaller one
+ * has to be the other convention.
+ *
+ * A tie is unaffected, and a scoreline that contradicts its own letter (a "W"
+ * that lost) is corrected the same way, since the letter is the more reliable
+ * of the two.
+ */
+function orient(
+  result: "W" | "L" | "T",
+  first: number,
+  second: number,
+): Outcome {
+  const flip =
+    (result === "W" && first < second) || (result === "L" && first > second);
+  return {
+    result,
+    teamScore: flip ? second : first,
+    oppScore: flip ? first : second,
+  };
+}
+
 export function readOutcome(cells: string[]): Outcome {
   const cleaned = cells.map((c) => c.replace(/\s+/g, " ").trim());
 
@@ -232,9 +259,7 @@ export function readOutcome(cells: string[]): Outcome {
     if (m) {
       const a = score(m[1]);
       const b = score(m[2]);
-      if (a !== null && b !== null) {
-        return { result, teamScore: a, oppScore: b };
-      }
+      if (a !== null && b !== null) return orient(result, a, b);
     }
   }
 
@@ -244,7 +269,7 @@ export function readOutcome(cells: string[]): Outcome {
     .map(score)
     .filter((n): n is number => n !== null);
   if (numbers.length >= 2) {
-    return { result, teamScore: numbers[0], oppScore: numbers[1] };
+    return orient(result, numbers[0], numbers[1]);
   }
 
   // A letter with no readable score is still worth reporting as played.

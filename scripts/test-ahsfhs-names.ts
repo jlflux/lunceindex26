@@ -329,6 +329,38 @@ console.log("\n11. Reading a played game's result");
 {
   // The page's header spans "Score" across two cells without saying whether
   // they hold "35" and "14" or "W" and "35-14", so both are accepted.
+  // The real layout, confirmed against Homewood's week 0 on the live site:
+  // two number cells, then the letter. Homewood beat John Carroll 31-14.
+  const real = readOutcome(["31", "14", "W"]);
+  check(
+    "the observed layout: 31, 14, W",
+    real.result === "W" && real.teamScore === 31 && real.oppScore === 14,
+    JSON.stringify(real),
+  );
+
+  // The letter puts the pair the right way round. A win looks the same under
+  // either convention, so if the site lists the winner first rather than the
+  // team, only a loss would reveal it — by which point every loss on the
+  // board is reversed.
+  const lossTeamFirst = readOutcome(["14", "31", "L"]);
+  check(
+    "a loss listed team-first stays that way",
+    lossTeamFirst.teamScore === 14 && lossTeamFirst.oppScore === 31,
+    JSON.stringify(lossTeamFirst),
+  );
+  const lossWinnerFirst = readOutcome(["31", "14", "L"]);
+  check(
+    "a loss listed winner-first is corrected",
+    lossWinnerFirst.teamScore === 14 && lossWinnerFirst.oppScore === 31,
+    JSON.stringify(lossWinnerFirst),
+  );
+  const tie = readOutcome(["21", "21", "T"]);
+  check(
+    "a tie is untouched",
+    tie.teamScore === 21 && tie.oppScore === 21,
+    JSON.stringify(tie),
+  );
+
   const combined = readOutcome(["W", "35-14", "", ""]);
   check(
     "W plus a combined 35-14",

@@ -49,3 +49,17 @@ export function ordinal(n: number): string {
       return `${n}th`;
   }
 }
+
+/**
+ * Games a team needs before its efficiency figures are worth showing.
+ *
+ * Efficiency compares you with everyone else who played your opponents, so it
+ * needs opponents who have played somebody else. After one week there is no
+ * such baseline at all and every figure is 0.00; after two, each one rests on
+ * a single other team's result. Three is where it starts averaging over
+ * enough to mean something.
+ *
+ * Display only — the engine still uses whatever it computes, which is worth
+ * well under a rating point either way.
+ */
+export const MIN_GAMES_FOR_EFFICIENCY = 3;

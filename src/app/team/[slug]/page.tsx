@@ -3,7 +3,15 @@ import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import Icon from "@/components/Icon";
 import { loadRatings } from "@/lib/data";
-import { fmt, fmtPct, fmtSigned, ordinal, record, weekLabel } from "@/lib/format";
+import {
+  MIN_GAMES_FOR_EFFICIENCY,
+  fmt,
+  fmtPct,
+  fmtSigned,
+  ordinal,
+  record,
+  weekLabel,
+} from "@/lib/format";
 import {
   buildTeamView,
   PERFORMANCE_LABELS,
@@ -41,6 +49,8 @@ export default async function TeamPage({
 
   const { rating: t, rpi, schedule } = view;
   const hasPlayed = t.wins + t.losses > 0;
+  // Efficiency needs opponents who have played somebody other than you.
+  const hasEff = t.wins + t.losses >= MIN_GAMES_FOR_EFFICIENCY;
 
   return (
     <AppShell generated={data.generated}>
@@ -165,15 +175,15 @@ export default async function TeamPage({
               />
               <Metric
                 label="Offensive efficiency"
-                value={hasPlayed ? fmtSigned(t.o_eff) : "—"}
+                value={hasEff ? fmtSigned(t.o_eff) : "—"}
                 hint="Scoring vs what opponents usually allow"
-                tone={hasPlayed ? t.o_eff : undefined}
+                tone={hasEff ? t.o_eff : undefined}
               />
               <Metric
                 label="Defensive efficiency"
-                value={hasPlayed ? fmtSigned(t.d_eff) : "—"}
+                value={hasEff ? fmtSigned(t.d_eff) : "—"}
                 hint="Points allowed vs what opponents usually score"
-                tone={hasPlayed ? t.d_eff : undefined}
+                tone={hasEff ? t.d_eff : undefined}
               />
               <Metric
                 label="Points per game"

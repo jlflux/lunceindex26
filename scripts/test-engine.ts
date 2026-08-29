@@ -453,6 +453,55 @@ console.log("\n14. Losing badly cannot raise a rating");
   );
 }
 
+console.log("\n15. Efficiency measures you against everyone ELSE");
+{
+  const roster = () => [
+    team("Saraland", "6A", 1, 30),
+    team("X", "6A", 1, 8),
+    team("Y", "6A", 1, 25),
+  ];
+
+  // Nobody has a common opponent yet, so there is no baseline to measure
+  // against and every figure must be zero — not a number derived from the
+  // team's own game against itself.
+  const wk0 = computeRatings(roster(), [game("Saraland", 31, "X", 14, 0)]);
+  const s0 = wk0.ratings.find((r) => r.name === "Saraland")!;
+  check(
+    "no common opponent yet → no efficiency figure",
+    s0.o_eff === 0 && s0.d_eff === 0,
+    `O ${s0.o_eff}, D ${s0.d_eff}`,
+  );
+
+  // Y beat X 35-0; Saraland beat the same X 21-14. Saraland scored 14 fewer
+  // than X gives up to everyone else, and allowed 14 more than X scores on
+  // them. The team's own game is excluded from X's averages, so these are
+  // the full gaps rather than half of them.
+  const res = computeRatings(roster(), [
+    game("Y", 35, "X", 0, 0),
+    game("Saraland", 21, "X", 14, 1),
+  ]);
+  const s = res.ratings.find((r) => r.name === "Saraland")!;
+  check(
+    "measured against X's record versus everyone else",
+    Math.abs(s.o_eff - (21 - 35)) < 1e-9 && Math.abs(s.d_eff - (0 - 14)) < 1e-9,
+    `O ${s.o_eff.toFixed(2)} (want -14), D ${s.d_eff.toFixed(2)} (want -14)`,
+  );
+
+  // Out-of-state opponents keep no record here, so they contribute no
+  // baseline at all rather than a zero that drags the average.
+  const oos = computeRatings(roster(), [
+    game("Y", 35, "X", 0, 0),
+    game("Saraland", 40, "Somewhere GA", 0, 1),
+    game("Saraland", 21, "X", 14, 2),
+  ]);
+  const so = oos.ratings.find((r) => r.name === "Saraland")!;
+  check(
+    "an out-of-state opponent adds no baseline",
+    Math.abs(so.o_eff - ((21 + 40) / 2 - 35)) < 1e-9,
+    `got ${so.o_eff.toFixed(2)}`,
+  );
+}
+
 console.log(
   failures === 0
     ? "\nAll engine invariants hold.\n"

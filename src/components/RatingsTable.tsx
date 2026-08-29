@@ -3,7 +3,13 @@
 import { Fragment, useMemo, useState } from "react";
 import Icon from "./Icon";
 import TeamPanel from "./TeamPanel";
-import { fmt, fmtPct, fmtSigned, record } from "@/lib/format";
+import {
+  MIN_GAMES_FOR_EFFICIENCY,
+  fmt,
+  fmtPct,
+  fmtSigned,
+  record,
+} from "@/lib/format";
 import {
   CLS_FILTER_ORDER,
   type Classification,
@@ -263,6 +269,8 @@ export default function RatingsTable({
               const ir = mode === "index" ? (r as RatingRow) : null;
               const rr = mode === "rpi" ? (r as RpiRow) : null;
               const games = r.wins + r.losses > 0;
+              // Efficiency needs opponents who have played somebody else.
+              const eff = r.wins + r.losses >= MIN_GAMES_FOR_EFFICIENCY;
 
               return (
                 <tr
@@ -328,15 +336,15 @@ export default function RatingsTable({
                       />
                       <Cell
                         className="hidden md:table-cell"
-                        value={games ? fmtSigned(ir.o_eff) : "—"}
-                        rank={games ? ranks.oEff.get(r.slug) : undefined}
-                        tone={games ? ir.o_eff : undefined}
+                        value={eff ? fmtSigned(ir.o_eff) : "—"}
+                        rank={eff ? ranks.oEff.get(r.slug) : undefined}
+                        tone={eff ? ir.o_eff : undefined}
                       />
                       <Cell
                         className="hidden md:table-cell"
-                        value={games ? fmtSigned(ir.d_eff) : "—"}
-                        rank={games ? ranks.dEff.get(r.slug) : undefined}
-                        tone={games ? ir.d_eff : undefined}
+                        value={eff ? fmtSigned(ir.d_eff) : "—"}
+                        rank={eff ? ranks.dEff.get(r.slug) : undefined}
+                        tone={eff ? ir.d_eff : undefined}
                       />
                       <Cell
                         className="hidden xl:table-cell"

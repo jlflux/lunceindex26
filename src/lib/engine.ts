@@ -143,6 +143,18 @@ export function computeRatings(
   });
   for (const t of teams) acc.set(t.name, blank());
 
+  // What each team did against each individual opponent, so a team can be
+  // taken back out of that opponent's averages later. Keyed "team|opponent".
+  const headToHead = new Map<string, { pf: number; pa: number; games: number }>();
+  const h2hAdd = (t: string, o: string, pf: number, pa: number) => {
+    const k = `${t}|${o}`;
+    const e = headToHead.get(k) ?? { pf: 0, pa: 0, games: 0 };
+    e.pf += pf;
+    e.pa += pa;
+    e.games++;
+    headToHead.set(k, e);
+  };
+
   for (const g of played) {
     const home = acc.get(g.t1);
     const away = acc.get(g.t2);
@@ -162,6 +174,8 @@ export function computeRatings(
       if (g.s2 > g.s1) away.wins++;
       else if (g.s2 < g.s1) away.losses++;
     }
+    h2hAdd(g.t1, g.t2, g.s1, g.s2);
+    h2hAdd(g.t2, g.t1, g.s2, g.s1);
   }
 
   // How tightly the carry-over binds during the solve. `priorBlend` runs from
@@ -258,12 +272,24 @@ export function computeRatings(
     sosOf.set(t.name, mean(a.opponents.map(ratingOfFinal)));
 
     // How much better than expected you scored / defended, where "expected"
-    // is what your opponents typically give up and typically score.
+    // is what your opponents give up and score AGAINST EVERYONE ELSE.
+    //
+    // Your own game is taken back out of that baseline. Leaving it in compares
+    // you partly against yourself: with one common opponent the two terms
+    // cancel by half, and the figure reported is really half the gap between
+    // you and whoever else played them. An opponent who has faced nobody but
+    // you leaves no baseline at all, so they are skipped rather than counted
+    // as zero.
     const oppPapg: number[] = [];
     const oppPpg: number[] = [];
-    for (const o of a.opponents) {
-      if (papgOf.has(o)) oppPapg.push(papgOf.get(o) as number);
-      if (ppgOf.has(o)) oppPpg.push(ppgOf.get(o) as number);
+    for (const o of new Set(a.opponents)) {
+      const oa = acc.get(o);
+      if (!oa) continue; // out-of-state: no record of their other games
+      const h = headToHead.get(`${t.name}|${o}`);
+      const others = oa.games - (h?.games ?? 0);
+      if (others <= 0) continue;
+      oppPapg.push((oa.pa - (h?.pf ?? 0)) / others);
+      oppPpg.push((oa.pf - (h?.pa ?? 0)) / others);
     }
     const ownPpg = ppgOf.get(t.name) as number;
     const ownPapg = papgOf.get(t.name) as number;

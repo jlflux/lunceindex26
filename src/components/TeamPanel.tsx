@@ -2,7 +2,14 @@
 
 import { useEffect } from "react";
 import Icon from "./Icon";
-import { fmt, fmtSigned, ordinal, record, weekLabel } from "@/lib/format";
+import {
+  MIN_GAMES_FOR_EFFICIENCY,
+  fmt,
+  fmtSigned,
+  ordinal,
+  record,
+  weekLabel,
+} from "@/lib/format";
 import {
   buildTeamView,
   PERFORMANCE_LABELS,
@@ -52,6 +59,7 @@ export default function TeamPanel({
 
   const { rating: t, schedule } = view;
   const played = t.wins + t.losses > 0;
+  const eff = t.wins + t.losses >= MIN_GAMES_FOR_EFFICIENCY;
   const classCount = payload.ratings.filter(
     (r) => r.classification === t.classification,
   ).length;
@@ -157,15 +165,15 @@ export default function TeamPanel({
           />
           <StatCell
             label="O-Eff"
-            value={played ? fmtSigned(t.o_eff) : "—"}
-            rank={played ? columnRanks.oEff.get(t.slug) : undefined}
-            tone={played ? t.o_eff : undefined}
+            value={eff ? fmtSigned(t.o_eff) : "—"}
+            rank={eff ? columnRanks.oEff.get(t.slug) : undefined}
+            tone={eff ? t.o_eff : undefined}
           />
           <StatCell
             label="D-Eff"
-            value={played ? fmtSigned(t.d_eff) : "—"}
-            rank={played ? columnRanks.dEff.get(t.slug) : undefined}
-            tone={played ? t.d_eff : undefined}
+            value={eff ? fmtSigned(t.d_eff) : "—"}
+            rank={eff ? columnRanks.dEff.get(t.slug) : undefined}
+            tone={eff ? t.d_eff : undefined}
           />
           <StatCell
             label="PF/G · PA/G"

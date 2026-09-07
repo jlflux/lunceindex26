@@ -5,6 +5,7 @@ import Icon from "@/components/Icon";
 import { loadRatings } from "@/lib/data";
 import {
   MIN_GAMES_FOR_EFFICIENCY,
+  SHOW_EFFICIENCY,
   fmt,
   fmtPct,
   fmtSigned,
@@ -173,18 +174,22 @@ export default async function TeamPage({
                 value={hasPlayed ? fmt(t.sos) : "—"}
                 hint="Mean rating of opponents faced"
               />
-              <Metric
-                label="Offensive efficiency"
-                value={hasEff ? fmtSigned(t.o_eff) : "—"}
-                hint="Scoring vs what opponents usually allow"
-                tone={hasEff ? t.o_eff : undefined}
-              />
-              <Metric
-                label="Defensive efficiency"
-                value={hasEff ? fmtSigned(t.d_eff) : "—"}
-                hint="Points allowed vs what opponents usually score"
-                tone={hasEff ? t.d_eff : undefined}
-              />
+              {SHOW_EFFICIENCY && (
+                <>
+                  <Metric
+                    label="Offensive efficiency"
+                    value={hasEff ? fmtSigned(t.o_eff) : "—"}
+                    hint="Scoring vs what opponents usually allow"
+                    tone={hasEff ? t.o_eff : undefined}
+                  />
+                  <Metric
+                    label="Defensive efficiency"
+                    value={hasEff ? fmtSigned(t.d_eff) : "—"}
+                    hint="Points allowed vs what opponents usually score"
+                    tone={hasEff ? t.d_eff : undefined}
+                  />
+                </>
+              )}
               <Metric
                 label="Points per game"
                 value={hasPlayed ? fmt(t.ppg, 1) : "—"}

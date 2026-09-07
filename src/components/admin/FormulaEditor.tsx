@@ -39,9 +39,9 @@ const GROUPS: { title: string; blurb: string; knobs: Knob[] }[] = [
     title: "Solver",
     blurb: "How the iterative solve treats margins and opponents.",
     knobs: [
-      { key: "cap", label: "Margin cap", min: 7, max: 70, step: 1, help: "Ceiling on margin, so blowouts cannot be farmed." },
+      { key: "cap", label: "Margin cap", min: 7, max: 70, step: 1, help: "Ceiling on margin, so blowouts cannot be farmed. 2025 ran at 28, which recorded a 49-0 loss and a 28-0 loss identically; 35 predicts week-to-week margins better." },
       { key: "iters", label: "Iterations", min: 10, max: 1000, step: 10, help: "Passes over the schedule. 300 is well past convergence." },
-      { key: "oos_mult", label: "Out-of-state multiplier", min: 0, max: 3, step: 0.05, help: "Non-AHSAA opponents are valued at the field mean times this." },
+      { key: "oos_mult", label: "Out-of-state multiplier", min: 0, max: 3, step: 0.05, help: "Starting point for the out-of-state pool, as a multiple of the field mean. Every non-AHSAA opponent shares one rating that is now solved from their actual results against Alabama teams, so this anchors it rather than setting it." },
       { key: "h2h_boost", label: "Head-to-head cap", min: 0, max: 20, step: 0.1, help: "Most a team can gain from having beaten a higher-rated team." },
       { key: "h2h_frac", label: "Head-to-head fraction", min: 0, max: 1, step: 0.01, help: "Share of the rating gap the correction closes." },
     ],

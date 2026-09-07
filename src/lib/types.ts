@@ -27,15 +27,19 @@ export type Classification = keyof typeof CLS_ORDER;
  * seeding them at the bottom would hand every A and AA school an unearned
  * penalty before a snap is played.
  *
- * So AA is seeded like 4A and A like 2A. Everything else keeps its own tier.
+ * AA sits between 4A and 5A, A between 2A and 3A — where the schools in them
+ * actually play. Briarwood would have been a 5A school but for the split, and
+ * being seeded a full tier below that is a penalty for a reclassification
+ * rather than for anything on the field. Fractional tiers are fine: the
+ * baseline interpolates.
  *
  * This only bites once results exist. With no games played the prior blend is
  * 1, meaning a team's carry-over rating is used whole and the class baseline
  * contributes nothing — so preseason ratings are unchanged by this map.
  */
 export const CLS_TIER: Record<Classification, number> = {
-  A: CLS_ORDER["2A"],
-  AA: CLS_ORDER["4A"],
+  A: (CLS_ORDER["2A"] + CLS_ORDER["3A"]) / 2,
+  AA: (CLS_ORDER["4A"] + CLS_ORDER["5A"]) / 2,
   "1A": CLS_ORDER["1A"],
   "2A": CLS_ORDER["2A"],
   "3A": CLS_ORDER["3A"],
@@ -144,7 +148,7 @@ export interface EngineConfig {
  * and must keep using the weights that season was rated under, or it stops
  * testing the port and starts testing the current preferences.
  */
-export const CONFIG_2025 = { sos_w: 0.9, wr_w: 6.0 } as const;
+export const CONFIG_2025 = { sos_w: 0.9, wr_w: 6.0, cap: 28 } as const;
 
 /**
  * Current defaults.
@@ -158,6 +162,14 @@ export const CONFIG_2025 = { sos_w: 0.9, wr_w: 6.0 } as const;
  * The improvement is real but modest — mean rank difference from the other
  * three falls from about 24 places to 23, against 7-14 between those three.
  * Most of what remains is not reachable by these knobs.
+ *
+ * `cap` is since fitted a different and better way: rate on the weeks before
+ * N, predict week N, score the predictions. Across 364 games of 2026 that
+ * holdout is flat on picking winners for anything in 28-38 (73.4% vs 73.1%,
+ * one game) but improves steadily on margin, so the tie is broken by margin
+ * error. Agreement with the other three systems is the weaker target of the
+ * two — they are fitting the same three weeks we are, and they lean on
+ * preseason reputation, which is exactly what a young season cannot check.
  */
 export const DEFAULT_CONFIG: EngineConfig = {
   prior_min: 0,
@@ -170,7 +182,20 @@ export const DEFAULT_CONFIG: EngineConfig = {
   sos_ramp: 4,
   eff_w: 0.07,
   wr_w: 3.0,
-  cap: 28,
+  // 28 recorded a 49-0 loss and a 28-0 loss as the same result, which is the
+  // one thing a margin cap must not do to a five-touchdown game.
+  //
+  // The holdout does not pick a value on its own: margin error falls smoothly
+  // all the way to 45 with no optimum inside the range, winner accuracy is
+  // flat noise (72.5-73.4%, three games), and agreement with the other three
+  // systems moves the other way. When two metrics disagree monotonically the
+  // number has to come from what the cap is FOR — stopping a running-up
+  // scoreline from being farmed, while still recording that five touchdowns
+  // is worse than four. 35 is five touchdowns. 45 scores slightly better on
+  // margin and would seat Hillcrest above Hewitt, but it is close enough to
+  // no cap that a single 70-0 result starts driving a season, and five
+  // disputed teams are not enough evidence to buy that.
+  cap: 35,
   iters: 300,
   oos_mult: 1.3,
   h2h_boost: 2.5,

@@ -159,15 +159,26 @@ console.log("\n4. The prior is re-applied every iteration, not just seeded");
 
 console.log("\n5. Margin cap limits blowout farming");
 {
+  // Reads the cap out of the config rather than hard-coding it, so tuning the
+  // cap does not read as a broken engine. What is being asserted is that the
+  // cap binds — not what it happens to be set to today.
+  const { cap } = DEFAULT_CONFIG;
   const teams = [team("A", "4A"), team("B", "4A"), team("C", "4A")];
-  const modest = computeRatings(teams, [game("A", 28, "B", 0, 1)]);
-  const absurd = computeRatings(teams, [game("A", 84, "B", 0, 1)]);
-  const a1 = modest.ratings.find((r) => r.name === "A")!.massey;
-  const a2 = absurd.ratings.find((r) => r.name === "A")!.massey;
+  const at = computeRatings(teams, [game("A", cap, "B", 0, 1)]);
+  const over = computeRatings(teams, [game("A", cap * 3, "B", 0, 1)]);
+  const under = computeRatings(teams, [game("A", cap - 7, "B", 0, 1)]);
+  const a1 = at.ratings.find((r) => r.name === "A")!.massey;
+  const a2 = over.ratings.find((r) => r.name === "A")!.massey;
+  const a3 = under.ratings.find((r) => r.name === "A")!.massey;
   check(
-    "winning by 84 rates the same as winning by 28 (cap = 28)",
+    `winning by ${cap * 3} rates the same as winning by the cap (${cap})`,
     Math.abs(a1 - a2) < 1e-9,
     `${a1.toFixed(4)} vs ${a2.toFixed(4)}`,
+  );
+  check(
+    "and margins below the cap are still told apart",
+    a3 < a1 - 1e-9,
+    `${(cap - 7)}-point win ${a3.toFixed(4)} vs ${cap}-point win ${a1.toFixed(4)}`,
   );
 }
 
@@ -286,15 +297,20 @@ console.log("\n11. The private bracket is not seeded below 1A");
   // AA and A are listed after 1A on the roster, but that is an ordering of
   // the list, not of playing strength. Seeding them at the bottom would
   // penalise every private school before a snap.
+  //
+  // AA sits between 4A and 5A rather than level with 4A: Briarwood would have
+  // been a 5A school but for the private/public split, and the bracket spans
+  // both. A likewise straddles 2A and 3A.
+  const p = (c: Parameters<typeof classPrior>[0]) => classPrior(c, DEFAULT_CONFIG);
   check(
-    "AA is seeded exactly like 4A",
-    classPrior("AA", DEFAULT_CONFIG) === classPrior("4A", DEFAULT_CONFIG),
-    `AA ${classPrior("AA", DEFAULT_CONFIG)} vs 4A ${classPrior("4A", DEFAULT_CONFIG)}`,
+    "AA is seeded between 4A and 5A",
+    p("AA") > p("4A") && p("AA") < p("5A"),
+    `AA ${p("AA")} vs 4A ${p("4A")} / 5A ${p("5A")}`,
   );
   check(
-    "A is seeded exactly like 2A",
-    classPrior("A", DEFAULT_CONFIG) === classPrior("2A", DEFAULT_CONFIG),
-    `A ${classPrior("A", DEFAULT_CONFIG)} vs 2A ${classPrior("2A", DEFAULT_CONFIG)}`,
+    "A is seeded between 2A and 3A",
+    p("A") > p("2A") && p("A") < p("3A"),
+    `A ${p("A")} vs 2A ${p("2A")} / 3A ${p("3A")}`,
   );
   check(
     "both sit above 1A",
@@ -499,6 +515,109 @@ console.log("\n15. Efficiency measures you against everyone ELSE");
     "an out-of-state opponent adds no baseline",
     Math.abs(so.o_eff - ((21 + 40) / 2 - 35)) < 1e-9,
     `got ${so.o_eff.toFixed(2)}`,
+  );
+}
+
+console.log("\n16. The out-of-state pool is solved, not decreed");
+{
+  // Every non-AHSAA opponent shares one rating. It used to be pinned at
+  // `fieldMean * oos_mult` no matter what happened on the field; now the pool
+  // is updated from its own results like any other team, so beating the pool
+  // badly and losing to it badly cannot possibly price it the same.
+  const roster = () => [
+    team("A", "6A", 1, 20),
+    team("B", "6A", 1, 20),
+    team("C", "6A", 1, 20),
+  ];
+  // A plays the pool and nobody else, so A's SOS IS the pool's rating. A's own
+  // result against it is held identical across both runs; only what the pool
+  // did to B and C changes.
+  const poolLost = computeRatings(roster(), [
+    game("A", 14, "Somewhere GA", 7, 1),
+    game("B", 45, "Elsewhere FL", 0, 1),
+    game("C", 38, "Another MS", 3, 1),
+  ]);
+  const poolWon = computeRatings(roster(), [
+    game("A", 14, "Somewhere GA", 7, 1),
+    game("B", 0, "Elsewhere FL", 45, 1),
+    game("C", 3, "Another MS", 38, 1),
+  ]);
+  const lost = poolLost.ratings.find((r) => r.name === "A")!.sos;
+  const won = poolWon.ratings.find((r) => r.name === "A")!.sos;
+  check(
+    "a pool that keeps losing rates below one that keeps winning",
+    lost < won - 1,
+    `pool ${lost.toFixed(2)} after losing, ${won.toFixed(2)} after winning`,
+  );
+  // The old behaviour keyed the pool off the field mean, which moves the
+  // OPPOSITE way here — B and C rate higher in the run where they won — so
+  // this cannot pass by accident on a constant.
+  const meanOf = (r: typeof poolLost) =>
+    r.ratings.reduce((s, x) => s + x.massey, 0) / r.ratings.length;
+  check(
+    "and not merely because the field mean moved",
+    meanOf(poolLost) > meanOf(poolWon),
+    `field mean ${meanOf(poolLost).toFixed(2)} vs ${meanOf(poolWon).toFixed(2)}`,
+  );
+
+  // The prior still binds it. With one lopsided result the pool must not run
+  // off to the rating that single game implies.
+  const thin = computeRatings(roster(), [game("A", 70, "Somewhere GA", 0, 1)]);
+  const a = thin.ratings.find((r) => r.name === "A")!;
+  const implied = a.massey - DEFAULT_CONFIG.cap; // what that one game alone says
+  check(
+    "one lopsided result cannot run away with the pool",
+    a.sos > implied + DEFAULT_CONFIG.cap / 2,
+    `pool solved to ${a.sos.toFixed(2)}, one game alone implies ${implied.toFixed(2)}`,
+  );
+}
+
+console.log("\n17. Your weakest opponent is dropped from schedule strength");
+{
+  // The Massey solve already charges you for a cupcake. Letting it drag the
+  // SOS mean as well charges you twice, which is what put a 3-0 team below a
+  // 2-1 team it had beaten by 22.
+  const teams = [
+    team("Good", "6A", 1, 30),
+    team("AlsoGood", "6A", 1, 30),
+    team("Awful", "1A", 1, -10),
+    team("Other", "6A", 1, 30),
+  ];
+  const res = computeRatings(teams, [
+    game("Good", 21, "AlsoGood", 20, 1),
+    game("Good", 63, "Awful", 0, 2),
+    game("Good", 24, "Other", 21, 3),
+    game("Other", 28, "AlsoGood", 27, 4),
+  ]);
+  const good = res.ratings.find((r) => r.name === "Good")!;
+  const alsoGood = res.ratings.find((r) => r.name === "AlsoGood")!;
+  const other = res.ratings.find((r) => r.name === "Other")!;
+  const awful = res.ratings.find((r) => r.name === "Awful")!;
+  check(
+    "the blowout victim is left out of the mean",
+    Math.abs(good.sos - (alsoGood.massey + other.massey) / 2) < 1e-9,
+    `sos ${good.sos.toFixed(4)}, untrimmed would be ${(
+      (alsoGood.massey + other.massey + awful.massey) / 3
+    ).toFixed(4)}`,
+  );
+  check(
+    "which is a real difference, not a rounding one",
+    good.sos - (alsoGood.massey + other.massey + awful.massey) / 3 > 1,
+  );
+
+  // Under three games there is nothing to trim: dropping one of two leaves a
+  // single opponent, which is not a schedule.
+  const two = computeRatings(teams, [
+    game("Good", 21, "AlsoGood", 20, 1),
+    game("Good", 63, "Awful", 0, 2),
+  ]);
+  const g2 = two.ratings.find((r) => r.name === "Good")!;
+  const ag2 = two.ratings.find((r) => r.name === "AlsoGood")!;
+  const aw2 = two.ratings.find((r) => r.name === "Awful")!;
+  check(
+    "at two games nothing is dropped",
+    Math.abs(g2.sos - (ag2.massey + aw2.massey) / 2) < 1e-9,
+    `got ${g2.sos.toFixed(4)}`,
   );
 }
 

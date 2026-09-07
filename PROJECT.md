@@ -92,8 +92,20 @@ home  += opponent_rating + margin
 away  += opponent_rating − margin
 ```
 
-Out-of-state opponents have no rating, so they're valued at
-`mean_rating × oos_mult`.
+Out-of-state opponents have no rating of their own, so they share one pooled
+rating that is **solved alongside the teams** — every game against a non-AHSAA
+school feeds the pool's bucket exactly as it would a team's. `oos_mult` sets
+the pool's prior (`seeded_mean × oos_mult`), not its value.
+
+The prior is computed once from the seeded field and never recomputed inside
+the loop. Recomputing it couples the pool to the field it is measured against,
+and the coupling runs backwards: a pool that loses every game raises the teams
+that beat it, raising the mean, raising the pool. Early in a season the prior
+carries most of the weight, so that feedback wins outright.
+
+One pooled rating rather than one per school, because an out-of-state opponent
+almost always plays a single AHSAA game — an individual rating would just be
+that team's own rating reflected back at it.
 
 Then each team's rating is recomputed as:
 
@@ -119,14 +131,26 @@ winner += min(h2h_boost, (loser_rating − winner_rating) × h2h_frac) × 0.5
 ### Step 4 — SOS and efficiency
 
 ```
-sos    = mean(rating of every opponent faced)
+sos    = mean(rating of every opponent faced, weakest one dropped at 3+ games)
 o_eff  = own_ppg  − mean(opponents' points allowed per game)
 d_eff  = mean(opponents' points scored per game) − own_papg
 ```
 
+**The weakest opponent is dropped from SOS.** Step 2 has already charged you
+for that game — beating a bad team earns `their_rating + cap`, which pulls a
+good team down — and letting the same opponent drag the SOS mean charges you a
+second time at `sos_w` a point. Every schedule in the state has a cupcake on
+it, so reading one as a soft slate is noise. Dropping exactly one is
+self-limiting by design: a third of the distortion at three games, a tenth by
+week ten, which is the right shape for a mean that gets more robust as it
+grows.
+
 `o_eff` is how much better than expected you scored; `d_eff` how much better
-than expected you defended. `median_sos` is the median of all teams with
-`sos > 0`.
+than expected you defended. Both are computed with your own game taken back
+out of the opponent's baseline, and both are **hidden from the public board**
+(`SHOW_EFFICIENCY` in `src/lib/format.ts`) — they still feed the composite via
+`eff_w`, and still appear in the published payload. `median_sos` is the median
+of all teams with `sos > 0`.
 
 ### Step 5 — composite
 
@@ -166,7 +190,7 @@ All tunable live from the admin sidebar; stored in `data.json`.
 | `eff_w` | Offensive/defensive efficiency weight. Deliberately small |
 | `wr_w` | Win-rate bonus, in rating points across the full 0–1 range |
 | `cap` | Margin ceiling — stops blowouts being farmed |
-| `oos_mult` | Out-of-state opponents valued at `mean × this` |
+| `oos_mult` | Prior for the pooled out-of-state rating, as `seeded_mean × this` |
 | `playoff_r1–r5` | Round multipliers on capped margin; `r5` = Championship |
 
 ---

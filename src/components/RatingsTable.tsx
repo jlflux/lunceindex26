@@ -5,6 +5,7 @@ import Icon from "./Icon";
 import TeamPanel from "./TeamPanel";
 import {
   MIN_GAMES_FOR_EFFICIENCY,
+  SHOW_EFFICIENCY,
   fmt,
   fmtPct,
   fmtSigned,
@@ -236,8 +237,16 @@ export default function RatingsTable({
               {mode === "index" ? (
                 <>
                   <th className="th hidden !text-right md:table-cell">SOS</th>
-                  <th className="th hidden !text-right md:table-cell">O-Eff</th>
-                  <th className="th hidden !text-right md:table-cell">D-Eff</th>
+                  {SHOW_EFFICIENCY && (
+                    <>
+                      <th className="th hidden !text-right md:table-cell">
+                        O-Eff
+                      </th>
+                      <th className="th hidden !text-right md:table-cell">
+                        D-Eff
+                      </th>
+                    </>
+                  )}
                   <th className="th hidden !text-right xl:table-cell">PF/G</th>
                   <th className="th hidden !text-right xl:table-cell">PA/G</th>
                   <th className="th !px-2 !text-right sm:w-32 sm:!pr-4">
@@ -257,7 +266,7 @@ export default function RatingsTable({
           <tbody>
             {rows.length > 0 && (
               <GroupRow
-                colSpan={mode === "index" ? 9 : 7}
+                colSpan={mode === "index" ? (SHOW_EFFICIENCY ? 9 : 7) : 7}
                 label={
                   scoped ? `Top ${HIGHLIGHT_IN_CLASS}` : `Top ${HIGHLIGHT_OVERALL}`
                 }
@@ -334,18 +343,22 @@ export default function RatingsTable({
                         value={games ? fmt(ir.sos, 1) : "—"}
                         rank={games ? ranks.sos.get(r.slug) : undefined}
                       />
-                      <Cell
-                        className="hidden md:table-cell"
-                        value={eff ? fmtSigned(ir.o_eff) : "—"}
-                        rank={eff ? ranks.oEff.get(r.slug) : undefined}
-                        tone={eff ? ir.o_eff : undefined}
-                      />
-                      <Cell
-                        className="hidden md:table-cell"
-                        value={eff ? fmtSigned(ir.d_eff) : "—"}
-                        rank={eff ? ranks.dEff.get(r.slug) : undefined}
-                        tone={eff ? ir.d_eff : undefined}
-                      />
+                      {SHOW_EFFICIENCY && (
+                        <>
+                          <Cell
+                            className="hidden md:table-cell"
+                            value={eff ? fmtSigned(ir.o_eff) : "—"}
+                            rank={eff ? ranks.oEff.get(r.slug) : undefined}
+                            tone={eff ? ir.o_eff : undefined}
+                          />
+                          <Cell
+                            className="hidden md:table-cell"
+                            value={eff ? fmtSigned(ir.d_eff) : "—"}
+                            rank={eff ? ranks.dEff.get(r.slug) : undefined}
+                            tone={eff ? ir.d_eff : undefined}
+                          />
+                        </>
+                      )}
                       <Cell
                         className="hidden xl:table-cell"
                         value={games ? fmt(ir.ppg, 1) : "—"}

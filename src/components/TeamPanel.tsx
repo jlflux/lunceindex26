@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Icon from "./Icon";
 import {
   MIN_GAMES_FOR_EFFICIENCY,
+  SHOW_EFFICIENCY,
   fmt,
   fmtSigned,
   ordinal,
@@ -163,18 +164,22 @@ export default function TeamPanel({
             value={played ? fmt(t.sos, 1) : "—"}
             rank={played ? columnRanks.sos.get(t.slug) : undefined}
           />
-          <StatCell
-            label="O-Eff"
-            value={eff ? fmtSigned(t.o_eff) : "—"}
-            rank={eff ? columnRanks.oEff.get(t.slug) : undefined}
-            tone={eff ? t.o_eff : undefined}
-          />
-          <StatCell
-            label="D-Eff"
-            value={eff ? fmtSigned(t.d_eff) : "—"}
-            rank={eff ? columnRanks.dEff.get(t.slug) : undefined}
-            tone={eff ? t.d_eff : undefined}
-          />
+          {SHOW_EFFICIENCY && (
+            <>
+              <StatCell
+                label="O-Eff"
+                value={eff ? fmtSigned(t.o_eff) : "—"}
+                rank={eff ? columnRanks.oEff.get(t.slug) : undefined}
+                tone={eff ? t.o_eff : undefined}
+              />
+              <StatCell
+                label="D-Eff"
+                value={eff ? fmtSigned(t.d_eff) : "—"}
+                rank={eff ? columnRanks.dEff.get(t.slug) : undefined}
+                tone={eff ? t.d_eff : undefined}
+              />
+            </>
+          )}
           <StatCell
             label="PF/G · PA/G"
             value={played ? `${fmt(t.ppg, 1)} / ${fmt(t.papg, 1)}` : "—"}

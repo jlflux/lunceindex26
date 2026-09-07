@@ -63,3 +63,18 @@ export function ordinal(n: number): string {
  * well under a rating point either way.
  */
 export const MIN_GAMES_FOR_EFFICIENCY = 3;
+
+/**
+ * Whether the public board shows offensive and defensive efficiency.
+ *
+ * Off. The two columns invite a reading they cannot support: they are a
+ * comparison against what your opponents did to everyone else, so early in a
+ * season they rest on one or two other teams' results and swing wildly, and
+ * they are worth well under a rating point in the composite either way. A
+ * number on the board looks authoritative whatever the note beside it says.
+ *
+ * A display switch only — the engine still computes efficiency and still uses
+ * it (`eff_w`), and it stays in the published payload and on the admin side,
+ * so flipping this back restores the columns with no other change.
+ */
+export const SHOW_EFFICIENCY = false;

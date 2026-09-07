@@ -189,15 +189,44 @@ export function computeRatings(
   const rating = new Map<string, number>();
   for (const t of teams) rating.set(t.name, effPrior.get(t.name) as number);
 
+  // Out-of-state schools have no rating of their own, so they are treated as
+  // one shared opponent and SOLVED like a team rather than fixed at a guess.
+  //
+  // The old behaviour pinned every non-AHSAA opponent at `meanRating *
+  // oos_mult` for the whole season. That is a decree about a pool we can
+  // actually measure: 27 games in 2026 through week two, with the AHSAA side
+  // 11-16 and losing the losses badly. A constant set from the field mean
+  // makes every one of those results say the same thing regardless of what
+  // happened, and it lands hardest on the teams that schedule out of state —
+  // Clay-Chalkville's win at Creekside GA read as a win over the 200th team
+  // in Alabama.
+  //
+  // One pooled rating, not one per school: an out-of-state opponent almost
+  // always plays a single AHSAA game, so an individual rating would just be
+  // that team's own rating reflected back at them. Pooling all 27 gives the
+  // level of the pool real support while staying honest that we cannot tell
+  // Creekside from anyone else in it.
+  //
+  // `oos_mult` survives as the pool's PRIOR rather than its value: the same
+  // anchoring every team gets, so a thin early sample cannot run away with it.
+  //
+  // Fixed once from the SEEDED field, exactly like every team's `effPrior`,
+  // and deliberately not recomputed from the evolving ratings each pass.
+  // Recomputing it couples the pool to the field it is being measured
+  // against, and the coupling runs the wrong way: a pool that loses every
+  // game raises the ratings of the teams that beat it, which raises the mean,
+  // which raises the pool. Early in a season the prior carries most of the
+  // weight, so that feedback wins outright — it rated a pool that lost
+  // everything ABOVE one that won everything.
+  const oosPrior = mean([...rating.values()]) * cfg.oos_mult;
+  let oosRating = oosPrior;
+
   for (let iter = 0; iter < cfg.iters; iter++) {
-    const meanRating = mean([...rating.values()]);
-    // Out-of-state schools have no rating of their own; value them off the
-    // field mean so a road win at an OOS opponent still means something.
-    const oosRating = meanRating * cfg.oos_mult;
     const ratingOf = (name: string) => rating.get(name) ?? oosRating;
 
     const bucket = new Map<string, number[]>();
     for (const t of teams) bucket.set(t.name, []);
+    const oosBucket: number[] = [];
 
     for (const g of played) {
       const mult = playoffMultiplier(g, cfg);
@@ -205,9 +234,11 @@ export function computeRatings(
 
       const homeBucket = bucket.get(g.t1);
       if (homeBucket) homeBucket.push(ratingOf(g.t2) + margin);
+      else oosBucket.push(ratingOf(g.t2) + margin);
 
       const awayBucket = bucket.get(g.t2);
       if (awayBucket) awayBucket.push(ratingOf(g.t1) - margin);
+      else oosBucket.push(ratingOf(g.t1) - margin);
     }
 
     const next = new Map<string, number>();
@@ -221,6 +252,9 @@ export function computeRatings(
       );
     }
     for (const [k, v] of next) rating.set(k, v);
+    oosRating = oosBucket.length
+      ? anchoredPriorW * oosPrior + (1 - anchoredPriorW) * mean(oosBucket)
+      : oosPrior;
   }
 
   // ---- Step 3: head-to-head correction (single pass) ---------------------
@@ -244,9 +278,9 @@ export function computeRatings(
   const massey = new Map<string, number>(rating);
 
   // ---- Step 4: SOS and efficiency ----------------------------------------
-  const meanRatingFinal = mean([...massey.values()]);
-  const oosFinal = meanRatingFinal * cfg.oos_mult;
-  const ratingOfFinal = (n: string) => massey.get(n) ?? oosFinal;
+  // The solved pool rating, so SOS prices an out-of-state opponent the same
+  // way the solve did rather than falling back on the multiplier.
+  const ratingOfFinal = (n: string) => massey.get(n) ?? oosRating;
 
   const ppgOf = new Map<string, number>();
   const papgOf = new Map<string, number>();
@@ -269,7 +303,22 @@ export function computeRatings(
       continue;
     }
 
-    sosOf.set(t.name, mean(a.opponents.map(ratingOfFinal)));
+    // Schedule strength, with the single weakest opponent dropped.
+    //
+    // The Massey solve has already charged you for that opponent — beating a
+    // bad team by 60 earns you `theirRating + cap`, which pulls a good team
+    // down. A plain mean here then charges you a second time, because adding a
+    // weak name to the list lowers the mean and the composite pays 0.6 a
+    // point for it. Every schedule in the state has a cupcake on it, so
+    // reading one as evidence of a soft slate is noise, not signal.
+    //
+    // Dropping exactly one is deliberately self-limiting: at three games it
+    // removes a third of the distortion, by week ten a tenth, which is the
+    // right shape — a mean of ten opponents barely needs the help. Fitted and
+    // checked at three games; there is no 2026 data yet to tune it deeper into
+    // the season, and no knob for it because there is nothing to tune against.
+    const oppR = a.opponents.map(ratingOfFinal).sort((x, y) => x - y);
+    sosOf.set(t.name, mean(oppR.length >= 3 ? oppR.slice(1) : oppR));
 
     // How much better than expected you scored / defended, where "expected"
     // is what your opponents give up and score AGAINST EVERYONE ELSE.

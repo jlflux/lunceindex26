@@ -16,11 +16,27 @@ export const POST = withAdmin(async (req: Request) => {
   if (!(file instanceof File)) throw new Error("Attach a schedule PDF.");
 
   const [teams, aliases] = await Promise.all([loadTeams(true), loadAliases()]);
-  const report = await parseSchedulePdf(
-    new Uint8Array(await file.arrayBuffer()),
-    teams,
-    aliases,
-  );
+
+  let report;
+  try {
+    report = await parseSchedulePdf(
+      new Uint8Array(await file.arrayBuffer()),
+      teams,
+      aliases,
+    );
+  } catch (e) {
+    const why = e instanceof Error ? e.message : String(e);
+    // pdf.js reaches for its worker by dynamic import, which a bundler can
+    // strip out. Say what that means rather than surfacing the raw error.
+    if (/fake worker|pdf\.worker/i.test(why)) {
+      throw new Error(
+        `The PDF reader could not start on the server. This is a deployment ` +
+          `problem rather than anything wrong with the file — pdfjs-dist has ` +
+          `to stay outside the server bundle (next.config.mjs). Original: ${why}`,
+      );
+    }
+    throw new Error(`Could not read that PDF: ${why}`);
+  }
 
   return NextResponse.json({
     ok: true,

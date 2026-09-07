@@ -37,6 +37,8 @@ export const POST = withAdmin(async (req: Request) => {
       homeRaw: g.home.raw,
       awayRaw: g.away.raw,
       outOfState: g.home.outOfState || g.away.outOfState,
+      homeScore: g.homeScore,
+      awayScore: g.awayScore,
       location: g.location,
     })),
   });
@@ -46,12 +48,18 @@ interface ConfirmGame {
   home: string;
   away: string;
   date?: string | null;
+  homeScore?: number | null;
+  awayScore?: number | null;
 }
 
 /**
- * Commits the parsed schedule. Scores are never written here, and existing
- * games are left alone — importing a schedule must not wipe results that are
- * already entered.
+ * Commits the parsed sheet.
+ *
+ * The same document serves as a forward schedule and as a results sheet — the
+ * later ones carry score columns — so scores are written when the sheet has
+ * them. A score already in the database is never overwritten: where the sheet
+ * disagrees it is reported instead, because replacing a corrected result with
+ * the one it was corrected from is the worse failure.
  */
 export const PUT = withAdmin(async (req: Request) => {
   const body = (await req.json()) as {
@@ -84,27 +92,49 @@ export const PUT = withAdmin(async (req: Request) => {
     .eq("type", type);
   if (readErr) throw new Error(readErr.message);
 
-  const played = new Set(
-    ((existing ?? []) as Game[])
-      .filter((g) => g.s1 !== null && g.s2 !== null)
-      .map((g) => `${g.t1}|${g.t2}`),
-  );
+  const onFile = new Map<string, Game>();
+  for (const g of (existing ?? []) as Game[]) {
+    onFile.set(`${g.t1}|${g.t2}`, g);
+  }
 
-  const toInsert = games
-    .filter((g) => g.home && g.away && !played.has(`${g.home}|${g.away}`))
-    .map((g) => ({
+  const conflicts: string[] = [];
+  let scored = 0;
+  let skippedPlayed = 0;
+
+  const toInsert: Record<string, unknown>[] = [];
+  for (const g of games) {
+    if (!g.home || !g.away) continue;
+    const current = onFile.get(`${g.home}|${g.away}`);
+    const held = current && current.s1 !== null && current.s2 !== null;
+    const hasScore =
+      g.homeScore !== null &&
+      g.homeScore !== undefined &&
+      g.awayScore !== null &&
+      g.awayScore !== undefined;
+
+    if (held) {
+      skippedPlayed++;
+      if (hasScore && (current.s1 !== g.homeScore || current.s2 !== g.awayScore)) {
+        conflicts.push(
+          `${g.home} ${current.s1}–${current.s2} ${g.away} on file, sheet says ${g.homeScore}–${g.awayScore}`,
+        );
+      }
+      continue;
+    }
+
+    if (hasScore) scored++;
+    toInsert.push({
       t1: g.home,
       t2: g.away,
-      s1: null,
-      s2: null,
+      s1: hasScore ? g.homeScore : null,
+      s2: hasScore ? g.awayScore : null,
       week,
       type,
       round,
       date: g.date ?? null,
-      status: "scheduled",
-    }));
-
-  const skippedPlayed = games.length - toInsert.length;
+      status: hasScore ? "final" : "scheduled",
+    });
+  }
 
   if (toInsert.length) {
     const { error } = await db
@@ -116,6 +146,8 @@ export const PUT = withAdmin(async (req: Request) => {
   return NextResponse.json({
     ok: true,
     imported: toInsert.length,
+    scored,
     skippedAlreadyPlayed: skippedPlayed,
+    conflicts,
   });
 });

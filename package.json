@@ -20,7 +20,8 @@
     "parse-ahsfhs": "tsx scripts/test-ahsfhs.ts",
     "test:duplicates": "tsx scripts/test-duplicates.ts",
     "test:names": "tsx scripts/test-ahsfhs-names.ts",
-    "test:week0": "tsx scripts/test-week0.ts"
+    "test:week0": "tsx scripts/test-week0.ts",
+    "test:pdf": "tsx scripts/test-schedule-pdf.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

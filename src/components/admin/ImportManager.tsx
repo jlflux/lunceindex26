@@ -40,7 +40,7 @@ export default function ImportManager() {
     <div className="space-y-6">
       <AdminHeader
         title="Import"
-        subtitle="Bulk-load a week of scores, or pull a schedule straight from the AHSAA PDF."
+        subtitle="Load a week from the AHSAA PDF, a CSV, or ahsfhs.org. Scores are read when the sheet carries them."
       />
 
       <div
@@ -50,7 +50,7 @@ export default function ImportManager() {
         {(
           [
             ["scores", "Weekly scores (CSV)"],
-            ["schedule", "Schedule (AHSAA PDF)"],
+            ["schedule", "Schedule & scores (AHSAA PDF)"],
             ["ahsfhs", "Full schedules (ahsfhs.org)"],
           ] as [Mode, string][]
         ).map(([id, label]) => (
@@ -354,6 +354,9 @@ interface ParsedGame {
   homeMethod: string;
   awayMethod: string;
   outOfState: boolean;
+  /** Present on the results sheets; null on a forward schedule. */
+  homeScore: number | null;
+  awayScore: number | null;
 }
 
 function ScheduleImport() {
@@ -389,7 +392,13 @@ function ScheduleImport() {
       setReport(body);
       setMessage({
         tone: body.skipped.length ? "warn" : "good",
-        text: `Read ${body.totalRows} rows → ${body.games.length} games. ${body.duplicates.length} duplicate listing(s) collapsed, ${body.skipped.length} row(s) skipped.`,
+        text:
+          `Read ${body.totalRows} rows → ${body.games.length} games` +
+          `${
+            body.games.filter((g: ParsedGame) => g.homeScore !== null).length
+              ? `, ${body.games.filter((g: ParsedGame) => g.homeScore !== null).length} with scores`
+              : ""
+          }. ${body.duplicates.length} duplicate listing(s) collapsed, ${body.skipped.length} row(s) skipped.`,
       });
     } catch (e) {
       setMessage({
@@ -413,6 +422,8 @@ function ScheduleImport() {
             home: g.home,
             away: g.away,
             date: g.date,
+            homeScore: g.homeScore,
+            awayScore: g.awayScore,
           })),
           week: Number(week),
           type,
@@ -421,13 +432,15 @@ function ScheduleImport() {
       });
       const body = await readJson(res);
       if (!res.ok) throw new Error(body.error ?? "Import failed.");
+      const clash = (body.conflicts ?? []) as string[];
       setMessage({
-        tone: "good",
-        text: `Imported ${body.imported} games${
-          body.skippedAlreadyPlayed
-            ? `, left ${body.skippedAlreadyPlayed} alone because they already have scores`
-            : ""
-        }.`,
+        tone: clash.length ? "warn" : "good",
+        text:
+          `Imported ${body.imported} games` +
+          `${body.scored ? `, ${body.scored} of them with scores` : ""}` +
+          `${body.skippedAlreadyPlayed ? `, left ${body.skippedAlreadyPlayed} alone because they already have scores` : ""}` +
+          `.${clash.length ? ` ${clash.length} differ from what is on file and were NOT overwritten: ${clash.slice(0, 5).join("; ")}${clash.length > 5 ? " …" : ""}` : ""}` +
+          ` Publish from the dashboard to update the site.`,
       });
       setReport(null);
     } catch (e) {
@@ -574,6 +587,7 @@ function ScheduleImport() {
                 >
                   <th className="px-3 py-2 text-left">Date</th>
                   <th className="px-3 py-2 text-left">Matchup</th>
+                  <th className="px-3 py-2 text-right">Score</th>
                   <th className="px-3 py-2 text-left">Matched by</th>
                 </tr>
               </thead>
@@ -604,6 +618,15 @@ function ScheduleImport() {
                         >
                           non-AHSAA
                         </span>
+                      )}
+                    </td>
+                    {/* Visible before anything is written, so a misread score
+                        is caught here rather than in the published ratings. */}
+                    <td className="whitespace-nowrap px-3 py-2 text-right text-sm font-bold tnum">
+                      {g.homeScore !== null && g.awayScore !== null ? (
+                        `${g.homeScore}–${g.awayScore}`
+                      ) : (
+                        <span style={{ color: "rgb(var(--text-faint))" }}>—</span>
                       )}
                     </td>
                     <td

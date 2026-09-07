@@ -100,8 +100,11 @@ export function hasOutOfStateSuffix(raw: string): boolean {
 export function normalizeClassToken(cl: string): Classification | null {
   // Tolerates the `4a`` style typos the PDFs contain.
   const t = cl.trim().replace(/[^A-Za-z0-9-]/g, "").toUpperCase();
-  if (t === "IND-A") return "A";
-  if (t === "IND-AA") return "AA";
+  // The private bracket is written three ways across AHSAA documents:
+  // "Ind-AA" on the schedule sheets, "Double AA" on the results sheets, "AA"
+  // on the roster.
+  if (t === "IND-A" || t === "SINGLEA" || t === "SINGLE-A") return "A";
+  if (t === "IND-AA" || t === "DOUBLEAA" || t === "DOUBLE-AA") return "AA";
   const m = t.match(/^([1-6])A$/);
   if (m) return `${m[1]}A` as Classification;
   if (t === "7A") return "6A"; // stale 2025 label — old 7A is now 6A
@@ -214,6 +217,12 @@ export const ALIASES: Record<string, string> = {
   "Randolph School": "Randolph",
   "Bayside Academy": "Bayside Academy",
   "Faith Academy": "Faith Academy",
+  "Kate Duncan Smith DAR": "DAR",
+  "Mattie T. Blount": "Blount",
+  "Booker T. Washington": "BT Washington",
+  "LeFlore Magnet": "LeFlore",
+  Pennington: "JB Pennington",
+  "Gordo HSF": "Gordo",
   "Monroe County High School": "Monroe County",
   "Escambia County High School": "Escambia County",
 };
@@ -262,14 +271,20 @@ const SUFFIX_PATTERNS = [
 
 /** Lowercase, strip punctuation and state tags, collapse whitespace. */
 export function normalize(raw: string): string {
-  return raw
-    .toLowerCase()
-    .replace(/\((?:fl|ga|ms|tn|la|al)\)/g, " ") // state tags
-    .replace(/&/g, " and ")
-    .replace(/[.'’,]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    raw
+      .toLowerCase()
+      .replace(/\((?:fl|ga|ms|tn|la|al)\)/g, " ") // state tags
+      .replace(/&/g, " and ")
+      .replace(/[.'’,]/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      // "HS" anywhere, not just trailing. The results sheets write
+      // "Central HS, Phenix City", where suffix stripping cannot reach it.
+      // No roster name contains "hs" as a word.
+      .replace(/\bhs\b/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 /**
@@ -415,7 +430,16 @@ export function matchTeam(
   }
 
   // 1. explicit aliases (admin-resolved ones take precedence)
-  const alias = input.extraAliases?.[raw] ?? ALIASES[raw];
+  //
+  // Matched on the normalised form as well as verbatim: the alias table was
+  // written against the schedule sheets ("Johnson-Abernathy-Graetz HS") and
+  // the results sheets spell the same school differently ("Johnson Abernathy
+  // Graetz"). Both reduce to the same normalised string.
+  const alias =
+    input.extraAliases?.[raw] ??
+    ALIASES[raw] ??
+    normalizedAlias(input.extraAliases)[normalize(raw)] ??
+    NORMALIZED_ALIASES[normalize(raw)];
   if (alias && index.byName.has(alias)) {
     return { ...base, name: alias, method: "alias", confidence: 1 };
   }
@@ -568,4 +592,45 @@ export function cleanOosName(raw: string): string {
     s = s.replace(/\)/, "");
   }
   return s.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * The alias table keyed by normalised name.
+ *
+ * Built once. The same school reaches us spelled several ways across the
+ * AHSAA's own documents, and every one of them reduces to the same normalised
+ * string — so one entry covers all of them rather than needing a row each.
+ */
+const NORMALIZED_ALIASES: Record<string, string> = (() => {
+  const out: Record<string, string> = {};
+  const ambiguous = new Set<string>();
+  for (const [source, canonical] of Object.entries(ALIASES)) {
+    // Every shortened form, so "A.P. Brewer HS" reaches an entry written as
+    // "A.P. Brewer High School" — the two only meet once suffixes are gone.
+    for (const form of variants(source)) {
+      if (out[form] && out[form] !== canonical) ambiguous.add(form);
+      out[form] = canonical;
+    }
+  }
+  // "Central High School, Hayneville" shortens to plain "central", which
+  // several schools share. A form that maps to more than one canonical name
+  // is no evidence at all, so it is dropped and left to class+region.
+  for (const form of ambiguous) delete out[form];
+  return out;
+})();
+
+/** The same treatment for aliases an admin resolved, memoised per object. */
+const normalizedCache = new WeakMap<object, Record<string, string>>();
+function normalizedAlias(
+  extra: Record<string, string> | undefined,
+): Record<string, string> {
+  if (!extra) return {};
+  const hit = normalizedCache.get(extra);
+  if (hit) return hit;
+  const out: Record<string, string> = {};
+  for (const [source, canonical] of Object.entries(extra)) {
+    out[normalize(source)] = canonical;
+  }
+  normalizedCache.set(extra, out);
+  return out;
 }

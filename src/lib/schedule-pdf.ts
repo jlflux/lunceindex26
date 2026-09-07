@@ -46,6 +46,9 @@ export interface ParsedGame {
   away: MatchResult;
   homeClassToken: string;
   awayClassToken: string;
+  /** Null on a forward schedule, and on a game that did not finish. */
+  homeScore: number | null;
+  awayScore: number | null;
   location: string;
   /** Line the row came from, for troubleshooting. */
   sourceLine: string;
@@ -128,13 +131,22 @@ function toCells(row: Row): string[] {
  * those sections — the Week 0 Saturday block went missing this way.
  */
 const DATE_RE =
-  /^(?:[A-Z][a-z]{2}\.?\s+\d{1,2},\s*\d{4}|\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)$/;
+  /^(?:[A-Z][a-z]{2}\.?\s+\d{1,2},\s*\d{4}|\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?|\d{2}-\d{2}-\d{4})$/;
 
 /** Normalises either form to the display format used everywhere else. */
 function displayDate(raw: string): string {
-  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!iso) return raw;
-  const d = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00Z`);
+  // Two orderings in circulation: the schedule sheets write YYYY-MM-DD, the
+  // results sheets MM-DD-YYYY. Both reach here.
+  const usa = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  const ymd = usa
+    ? { y: usa[3], m: usa[1], d: usa[2] }
+    : (() => {
+        const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        return m ? { y: m[1], m: m[2], d: m[3] } : null;
+      })();
+  if (!ymd) return raw;
+
+  const d = new Date(`${ymd.y}-${ymd.m}-${ymd.d}T00:00:00Z`);
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -148,7 +160,7 @@ function displayDate(raw: string): string {
  * stale `7A` label) or another state's association.
  */
 const CLASS_RE =
-  /^(Ind-AA|Ind-A|[1-7][Aa][`'’]?|FHSAA?|GHSAA?|MHSAA?|TSSAA|LHSAA|MAIS|GISA)$/;
+  /^(Double\s*-?\s*AA|Single\s*-?\s*A|Ind-AA|Ind-A|[1-7][Aa][`'’]?|FHSAA?|GHSAA?|MHSAA?|TSSAA|LHSAA|MAIS|GISA)$/i;
 
 /** A region cell. Out-of-state rows carry "NA". */
 const REGION_RE = /^(R-?\s?\d|NA)$/i;
@@ -158,11 +170,22 @@ interface RowFields {
   home: string;
   cl1: string;
   reg1: string;
+  /** Present on the results sheets, absent on a forward schedule. */
+  homeScore: number | null;
   away: string;
   cl2: string;
   reg2: string;
+  awayScore: number | null;
   location: string;
 }
+
+/** A score cell: a bare number a football team could plausibly have scored. */
+const SCORE_RE = /^\d{1,3}$/;
+const asScore = (cell: string | undefined): number | null => {
+  if (!cell || !SCORE_RE.test(cell)) return null;
+  const n = Number(cell);
+  return n <= 200 ? n : null;
+};
 
 /**
  * Splits a row's cells into fields. The two classification cells are the
@@ -172,9 +195,10 @@ interface RowFields {
 function readRow(cells: string[]): RowFields | null {
   if (cells.length < 5 || !DATE_RE.test(cells[0])) return null;
 
-  // "2026-08-22 0:00:00" can arrive as two cells; drop the time part so it
-  // is not mistaken for the start of the home team's name.
-  if (/^\d{4}-\d{2}-\d{2}$/.test(cells[0]) && /^\d{1,2}:\d{2}/.test(cells[1] ?? "")) {
+  // A time can follow the date as its own cell — "0:00:00" on the schedule
+  // sheets, "7:00 PM" on the results sheets. Either way it is not part of the
+  // home team's name.
+  if (/^\d{1,2}:\d{2}(:\d{2})?(\s*[AP]M)?$/i.test(cells[1] ?? "")) {
     cells = [cells[0], ...cells.slice(2)];
   }
 
@@ -182,7 +206,32 @@ function readRow(cells: string[]): RowFields | null {
   for (let i = 1; i < cells.length; i++) {
     if (CLASS_RE.test(cells[i])) classIdx.push(i);
   }
-  if (classIdx.length < 2) return null;
+
+  // Some result rows arrive with the class and region cells simply left
+  // blank, leaving date, name, score, name, score. The names and the result
+  // are all there, so the row is still worth reading — it just has to be
+  // matched without a classification to disambiguate with.
+  if (classIdx.length < 2) {
+    const bare =
+      cells.length === 5 &&
+      asScore(cells[2]) !== null &&
+      asScore(cells[4]) !== null &&
+      !SCORE_RE.test(cells[1]) &&
+      !SCORE_RE.test(cells[3]);
+    if (!bare) return null;
+    return {
+      date: displayDate(cells[0]),
+      home: cells[1],
+      cl1: "",
+      reg1: "",
+      homeScore: asScore(cells[2]),
+      away: cells[3],
+      cl2: "",
+      reg2: "",
+      awayScore: asScore(cells[4]),
+      location: "",
+    };
+  }
 
   const [i1, i2] = classIdx;
   // The region cell is optional — one 2026 row reads "not in championship
@@ -191,18 +240,29 @@ function readRow(cells: string[]): RowFields | null {
   const hasReg2 = i2 + 1 < cells.length && REGION_RE.test(cells[i2 + 1]);
 
   const homeStart = 1;
-  const awayStart = i1 + (hasReg1 ? 2 : 1);
+  // On a results sheet the home score sits between the home region and the
+  // visitor's name. Taken only when it is a bare number, so "Washington
+  // County HS" does not lose its first word to a missing score.
+  const afterReg1 = i1 + (hasReg1 ? 2 : 1);
+  const homeScore = asScore(cells[afterReg1]);
+  const awayStart = afterReg1 + (homeScore === null ? 0 : 1);
   if (i1 <= homeStart - 1 || i2 <= awayStart - 1) return null;
+
+  const afterReg2 = i2 + (hasReg2 ? 2 : 1);
+  const awayScore = asScore(cells[afterReg2]);
 
   return {
     date: displayDate(cells[0]),
     home: cells.slice(homeStart, i1).join(" ").trim(),
     cl1: cells[i1],
     reg1: hasReg1 ? cells[i1 + 1] : "",
+    homeScore,
     away: cells.slice(awayStart, i2).join(" ").trim(),
     cl2: cells[i2],
     reg2: hasReg2 ? cells[i2 + 1] : "",
-    location: cells.slice(i2 + (hasReg2 ? 2 : 1)).join(" ").trim(),
+    awayScore,
+    // Anything left is a note — "GAME SUSPENDED UNTIL 9AM SATURDAY".
+    location: cells.slice(afterReg2 + (awayScore === null ? 0 : 1)).join(" ").trim(),
   };
 }
 
@@ -278,6 +338,8 @@ export async function parseSchedulePdf(
         away,
         homeClassToken: cl1,
         awayClassToken: cl2,
+        homeScore: fields.homeScore,
+        awayScore: fields.awayScore,
         location: fields.location,
         sourceLine: line,
       });
@@ -320,16 +382,21 @@ export function toGames(
   type: "regular" | "playoff" = "regular",
   round: Game["round"] = null,
 ): Game[] {
-  return report.games.map((g) => ({
-    t1: g.home.name as string,
-    s1: null,
-    t2: g.away.name as string,
-    s2: null,
-    week,
-    type,
-    round,
-    date: g.date,
-    status: "scheduled",
-    neutral_site: false,
-  }));
+  return report.games.map((g) => {
+    // Both or neither. A row where only one score parsed is a game that did
+    // not finish, and half a scoreline would read as a shutout.
+    const played = g.homeScore !== null && g.awayScore !== null;
+    return {
+      t1: g.home.name as string,
+      s1: played ? g.homeScore : null,
+      t2: g.away.name as string,
+      s2: played ? g.awayScore : null,
+      week,
+      type,
+      round,
+      date: g.date,
+      status: played ? "final" : "scheduled",
+      neutral_site: false,
+    };
+  });
 }

@@ -675,6 +675,7 @@ function AhsfhsImport() {
     done: number;
     total: number;
   } | null>(null);
+  const [week, setWeek] = useState("0");
   const [diag, setDiag] = useState<string | null>(null);
   const [message, setMessage] = useState<{
     tone: "good" | "bad" | "warn";
@@ -710,7 +711,7 @@ function AhsfhsImport() {
     }
   }
 
-  async function fetchAll() {
+  async function fetchAll(week?: number) {
     setBusy(true);
     setMessage(null);
     setRows(null);
@@ -729,7 +730,11 @@ function AhsfhsImport() {
         const res = await fetch("/api/admin/import/ahsfhs", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ offset, batch: 20 }),
+          body: JSON.stringify({
+            offset,
+            batch: 20,
+            ...(week === undefined ? {} : { week }),
+          }),
         });
         const body = await readJson(res);
         if (!res.ok) throw new Error(String(body.error ?? "Fetch failed."));
@@ -869,10 +874,39 @@ function AhsfhsImport() {
           That site also lists AISA and defunct programs. Anything that does not
           match your roster is reported rather than imported.
         </p>
+        <p className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
+          Fetching a week asks only for the teams whose games that week are
+          still unscored, and since both sides list the same fixture that is
+          about one page per missing game &mdash; roughly half a full sweep,
+          and far less once most results are in. Use &ldquo;all teams&rdquo;
+          only when schedules themselves have changed.
+        </p>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button className="btn btn-primary" onClick={fetchAll} disabled={busy}>
-            {busy ? "Fetching…" : "Fetch all teams"}
+          <button
+            className="btn btn-primary"
+            onClick={() => fetchAll(Number(week))}
+            disabled={busy}
+          >
+            {busy ? "Fetching…" : `Fetch week ${week} scores`}
+          </button>
+          <input
+            className="input !w-16"
+            type="number"
+            min={0}
+            max={20}
+            value={week}
+            disabled={busy}
+            onChange={(e) => setWeek(e.target.value)}
+            aria-label="Week to fetch"
+          />
+          <button
+            className="btn"
+            onClick={() => fetchAll()}
+            disabled={busy}
+            title="Every team on the roster — only needed when schedules change"
+          >
+            Fetch all teams
           </button>
           {progress && (
             <span

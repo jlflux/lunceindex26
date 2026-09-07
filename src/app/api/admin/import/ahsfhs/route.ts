@@ -28,8 +28,15 @@ const REGULAR_SEASON_LAST_WEEK = 10;
  */
 const FAILURE_STREAK = 8;
 
-/** Pause between page requests, so a sweep is not 393 rapid-fire hits. */
-const REQUEST_GAP_MS = 120;
+/**
+ * Pause between page requests.
+ *
+ * ahsfhs.org started returning 403 to every request after several unpaced
+ * sweeps of the whole roster. Whatever the trigger, ~400 hits back-to-back at
+ * a small site is more than it should be asked to absorb, and a weekly update
+ * is not urgent enough to justify it.
+ */
+const REQUEST_GAP_MS = 400;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -341,11 +348,13 @@ export const PATCH = withAdmin(async (req: Request) => {
     offset = 0,
     batch = 20,
     onlyMissing = false,
+    week,
     diagnose,
   } = (await req.json()) as {
     offset?: number;
     batch?: number;
     onlyMissing?: boolean;
+    week?: number;
     diagnose?: string;
   };
 
@@ -406,7 +415,37 @@ export const PATCH = withAdmin(async (req: Request) => {
   const index = buildIndex(teams);
 
   let roster = teams;
-  if (onlyMissing) {
+
+  // Scores for one week: fetch only what is actually missing.
+  //
+  // A whole-roster sweep is ~400 requests at a small site, and a weekly score
+  // update does not need it. Every fixture appears on BOTH teams' pages, so
+  // one page per unscored game is enough — which for a full slate is roughly
+  // half the roster, and after most results are in, a handful.
+  if (typeof week === "number") {
+    const db = serviceClient();
+    const { data, error } = await db
+      .from("games")
+      .select("t1, t2, s1, s2, week")
+      .eq("week", week);
+    if (error) throw new Error(error.message);
+
+    const byName = new Map(teams.map((t) => [t.name, t]));
+    const needed = new Map<string, Team>();
+    for (const g of (data ?? []) as Game[]) {
+      if (g.s1 !== null && g.s2 !== null) continue; // already scored
+      // Either side's page carries this fixture; take whichever is on the
+      // roster, preferring one already queued so the set stays small.
+      const home = byName.get(g.t1);
+      const away = byName.get(g.t2);
+      if ((home && needed.has(home.name)) || (away && needed.has(away.name))) {
+        continue;
+      }
+      const pick = home ?? away;
+      if (pick) needed.set(pick.name, pick);
+    }
+    roster = [...needed.values()];
+  } else if (onlyMissing) {
     const db = serviceClient();
     const { data: existingGames } = await db.from("games").select("t1, t2");
     const have = new Set<string>();

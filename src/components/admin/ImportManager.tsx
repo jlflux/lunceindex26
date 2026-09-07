@@ -741,6 +741,15 @@ function AhsfhsImport() {
         offset = Number(body.nextOffset ?? offset);
 
         setProgress({ done: offset, total });
+        // The server gave up because the site stopped answering. Say so
+        // plainly rather than presenting a near-empty result as a finished
+        // run — importing that would look like every team lost its schedule.
+        if (body.aborted) {
+          setRows(null);
+          setProblems([...new Set(issues)]);
+          setMessage({ tone: "bad", text: String(body.aborted) });
+          return;
+        }
         if (body.done) break;
       }
 

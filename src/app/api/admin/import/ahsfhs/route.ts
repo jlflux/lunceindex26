@@ -19,6 +19,20 @@ export const maxDuration = 60;
 /** Weeks 0–10 are the regular season; anything later is a playoff round. */
 const REGULAR_SEASON_LAST_WEEK = 10;
 
+/**
+ * Consecutive teams that can fail before the run gives up.
+ *
+ * A streak this long is the site refusing or timing out, not the roster
+ * suddenly being misspelled. Grinding through the remaining 380 to say so 380
+ * more times helps nobody and hammers a site that is already struggling.
+ */
+const FAILURE_STREAK = 8;
+
+/** Pause between page requests, so a sweep is not 393 rapid-fire hits. */
+const REQUEST_GAP_MS = 120;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 interface Row {
   home: string;
   away: string;
@@ -408,6 +422,9 @@ export const PATCH = withAdmin(async (req: Request) => {
   const problems: string[] = [];
   let fetched = 0;
   let processed = 0;
+  let streak = 0;
+  let lastFailure = "";
+  let aborted: string | null = null;
 
   // Leaves room inside maxDuration to serialise and return what we have. The
   // client walks by nextOffset, so stopping early costs a round trip, not data.
@@ -425,10 +442,17 @@ export const PATCH = withAdmin(async (req: Request) => {
     let page: AhsfhsPage | null = null;
 
     for (const candidate of candidates) {
-      tried.push(candidate);
+      if (REQUEST_GAP_MS) await sleep(REQUEST_GAP_MS);
       try {
         const res = await fetchPage(ahsfhsUrl(candidate));
-        if (!res.ok) continue;
+        if (!res.ok) {
+          // Record WHY. "No page found for Homewood" reads as a naming
+          // problem; "HTTP 403" across the whole roster reads as the site
+          // refusing us, which is a completely different thing to go and fix.
+          tried.push(`"${candidate}" → HTTP ${res.status}`);
+          lastFailure = `HTTP ${res.status}`;
+          continue;
+        }
 
         const parsed = parseAhsfhsTeamPage(await res.text(), DEFAULT_ANCHOR);
         // Keep the first page that answered, so a spelling that resolves to a
@@ -439,21 +463,27 @@ export const PATCH = withAdmin(async (req: Request) => {
           page = parsed;
           break;
         }
+        tried.push(`"${candidate}" → page has no ${DEFAULT_ANCHOR.year} games`);
       } catch (e) {
-        problems.push(
-          `${t.name}: ${e instanceof Error ? e.message : "fetch failed"}`,
-        );
+        const why = e instanceof Error ? e.message : "fetch failed";
+        tried.push(`"${candidate}" → ${why}`);
+        lastFailure = /abort/i.test(why) ? "timed out" : why;
       }
     }
 
     if (!page) {
-      problems.push(
-        `${t.name}: no page found — tried ${tried
-          .map((c) => `"${c}"`)
-          .join(", ")}`,
-      );
+      streak++;
+      problems.push(`${t.name}: no page — tried ${tried.join(", ")}`);
+      if (streak >= FAILURE_STREAK) {
+        aborted =
+          `Stopped after ${streak} teams in a row failed (last: ${lastFailure}). ` +
+          `That is ahsfhs.org refusing or timing out rather than a naming ` +
+          `problem — nothing has been imported. Wait a while and run it again.`;
+        break;
+      }
       continue;
     }
+    streak = 0;
 
     const out = rowsFromPage(page, t, index, aliases, nonMembers);
     rows.push(...out.rows);
@@ -469,7 +499,9 @@ export const PATCH = withAdmin(async (req: Request) => {
     offset,
     nextOffset,
     total: roster.length,
-    done: nextOffset >= roster.length,
+    aborted,
+    // Giving up early must not be reported to the client as "finished".
+    done: !aborted && nextOffset >= roster.length,
     games: rows,
     problems: [...new Set(problems)],
   });

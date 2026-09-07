@@ -307,10 +307,17 @@ export default function GamesManager({
           </label>
         </div>
 
-        <p className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
-          Showing {visible.length} of {games.length} games
-          {visible.length === 300 && " (first 300 — narrow the filters)"}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
+            Showing {visible.length} of {games.length} games
+            {visible.length === 300 && " (first 300 — narrow the filters)"}
+          </p>
+          {/* The whole season as one file: a backup, and what is needed to
+              reproduce the board outside the database. */}
+          <a className="btn !py-1.5 !text-xs" href="/api/admin/games/export">
+            Export all games (CSV)
+          </a>
+        </div>
 
         <div className="card table-scroll">
           <table className="w-full">

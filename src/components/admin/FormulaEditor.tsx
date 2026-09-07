@@ -30,9 +30,9 @@ const GROUPS: { title: string; blurb: string; knobs: Knob[] }[] = [
     blurb:
       "Applied after the Massey solve. Schedule strength is meant to dominate raw record; efficiency is deliberately small.",
     knobs: [
-      { key: "sos_w", label: "Strength of schedule", min: 0, max: 3, step: 0.01, help: "The dominant adjustment." },
+      { key: "sos_w", label: "Strength of schedule", min: 0, max: 3, step: 0.01, help: "Added on top of the Massey solve, which already values you by your opponents. 2025 ran at 0.90; 0.60 tracks MaxPreps, Massey and HSRatings more closely." },
       { key: "eff_w", label: "Efficiency", min: 0, max: 0.5, step: 0.005, help: "Offensive plus defensive efficiency, damped on weak schedules." },
-      { key: "wr_w", label: "Win rate bonus", min: 0, max: 20, step: 0.1, help: "Rating points across the full 0–1 win-rate range." },
+      { key: "wr_w", label: "Win rate bonus", min: 0, max: 20, step: 0.1, help: "Rating points across the full 0–1 win-rate range. 2025 ran at 6.0; 3.0 fits the other systems better." },
     ],
   },
   {

@@ -135,11 +135,29 @@ export interface EngineConfig {
 }
 
 /**
- * Defaults recovered from the 2025 season output, not from PROJECT.md — its
- * config block lists sos_w 0.75 and wr_w 3.0, which do not reproduce the
- * ratings that shipped. Fitting the composite against all 387 teams in the
- * 2025 export gives sos_w 0.90 and wr_w 6.0 to within rounding error.
- * See scripts/validate-2025.ts.
+ * The weights that produced the 2025 season, recovered by fitting the
+ * composite against all 387 teams in that export — PROJECT.md's own config
+ * block lists sos_w 0.75 and wr_w 3.0, which do not reproduce what shipped.
+ *
+ * Kept as its own constant because DEFAULT_CONFIG has since moved away from
+ * it. scripts/validate-2025.ts checks the engine against a finished season
+ * and must keep using the weights that season was rated under, or it stops
+ * testing the port and starts testing the current preferences.
+ */
+export const CONFIG_2025 = { sos_w: 0.9, wr_w: 6.0 } as const;
+
+/**
+ * Current defaults.
+ *
+ * sos_w and wr_w are lower than 2025's. Both were fitted against MaxPreps,
+ * Massey and HSRatings on the 63 teams all four systems rank: each half of
+ * that sample, fitted independently, picked lower values for both and the
+ * gain held on the other half. The chosen point sits inside the range the two
+ * halves agreed on rather than at either optimum, which were 0.5/2 and 0.4/1.
+ *
+ * The improvement is real but modest — mean rank difference from the other
+ * three falls from about 24 places to 23, against 7-14 between those three.
+ * Most of what remains is not reachable by these knobs.
  */
 export const DEFAULT_CONFIG: EngineConfig = {
   prior_min: 0,
@@ -148,10 +166,10 @@ export const DEFAULT_CONFIG: EngineConfig = {
   // Weeks 0–3 only; identical to 0 from week four, so the 2025 validation is
   // unaffected either way.
   early_anchor: 0.8,
-  sos_w: 0.9,
+  sos_w: 0.6,
   sos_ramp: 4,
   eff_w: 0.07,
-  wr_w: 6.0,
+  wr_w: 3.0,
   cap: 28,
   iters: 300,
   oos_mult: 1.3,

@@ -15,7 +15,7 @@
  */
 import { readFileSync } from "node:fs";
 import { parseCsvText } from "../src/lib/csv";
-import { DEFAULT_CONFIG } from "../src/lib/types";
+import { CONFIG_2025, DEFAULT_CONFIG } from "../src/lib/types";
 
 const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
@@ -58,7 +58,10 @@ const data: Row[] = rows.slice(1).map((r) => ({
 
 console.log(`2025 teams: ${data.length}`);
 
-const cfg = DEFAULT_CONFIG;
+// The weights that season was actually rated under. Using the current
+// defaults would mean this check quietly stopped verifying the port the day
+// the defaults were tuned.
+const cfg = { ...DEFAULT_CONFIG, ...CONFIG_2025 };
 const medianSos = median(data.filter((d) => d.sos > 0).map((d) => d.sos));
 console.log(
   `median SOS (teams with sos > 0): ${medianSos.toFixed(4)}  ` +

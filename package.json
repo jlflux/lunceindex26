@@ -17,9 +17,8 @@
     "preview:serve": "ALPREPS_PREVIEW_DATA=$PWD/scripts/out/preview.json next dev",
     "setup": "tsx scripts/setup.ts",
     "seed:sql": "tsx scripts/make-seed-sql.ts",
-    "parse-ahsfhs": "tsx scripts/test-ahsfhs.ts",
     "test:duplicates": "tsx scripts/test-duplicates.ts",
-    "test:names": "tsx scripts/test-ahsfhs-names.ts",
+    "test:names": "tsx scripts/test-names.ts",
     "test:week0": "tsx scripts/test-week0.ts",
     "test:pdf": "tsx scripts/test-schedule-pdf.ts"
   },

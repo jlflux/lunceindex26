@@ -27,8 +27,8 @@ import {
  * strongest eight teams in each classification.
  *
  * Preview only, and never near the database — the real schedule comes from
- * ahsfhs.org. This exists because a panel showing one game says nothing about
- * how a panel showing fourteen reads.
+ * the AHSAA sheets. This exists because a panel showing one game says nothing
+ * about how a panel showing fourteen reads.
  */
 function inventSeason(teams: Team[], existing: Game[]): Game[] {
   const taken = new Set(

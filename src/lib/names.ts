@@ -16,7 +16,6 @@
  * match is reported with its confidence for a human to check.
  */
 
-import { AHSFHS_NAMES, ahsfhsNamesFor } from "./ahsfhs";
 import type { Classification, Team } from "./types";
 
 export function slugify(name: string): string {
@@ -87,9 +86,9 @@ const OTHER_STATE_CODES = new Set(
 );
 
 /**
- * ahsfhs.org writes out-of-state opponents as "Pace FL" — the name followed by
- * a state code. Checked against a real state list so Roman numerals and
- * initialisms ("St. John Paul II") are not mistaken for one.
+ * Out-of-state opponents are written "Pace FL" — the name followed by a state
+ * code. Checked against a real state list so Roman numerals and initialisms
+ * ("St. John Paul II") are not mistaken for one.
  */
 export function hasOutOfStateSuffix(raw: string): boolean {
   const m = raw.trim().match(/\b([A-Za-z]{2})\.?$/);
@@ -119,9 +118,6 @@ export function parseRegionToken(reg: string): number | null {
 /**
  * Explicit aliases: source spelling → roster name. Everything here is a case
  * the generic rules cannot get right on their own.
- *
- * The ahsfhs.org spellings are folded in from AHSFHS_NAMES at the bottom of
- * this file, so that mapping is written once.
  */
 export const ALIASES: Record<string, string> = {
   // Initials dropped by the roster
@@ -225,13 +221,20 @@ export const ALIASES: Record<string, string> = {
   "Gordo HSF": "Gordo",
   "Monroe County High School": "Monroe County",
   "Escambia County High School": "Escambia County",
-};
 
-// ahsfhs.org files several schools under a different name. Deriving the
-// reverse here means the mapping lives in exactly one place.
-for (const roster of Object.keys(AHSFHS_NAMES)) {
-  for (const source of ahsfhsNamesFor(roster)) ALIASES[source] = roster;
-}
+  // Formal names the roster shortens. These arrived with an earlier importer
+  // and outlived it: they are just the schools' full names, which is exactly
+  // what a state sheet is liable to print. The ones already spelled out above
+  // are not repeated.
+  "Dothan High": "Dothan",
+  "Phillips Bear Creek": "Phillips",
+  "Lindsay Lane Christian": "Lindsay Lane",
+  "West End Walnut Grove": "West End",
+  "Catholic Montgomery": "Montgomery Catholic",
+  "Berry Fayette": "Berry",
+  "Hope Christian Academy": "Hope Christian",
+  "Decatur Heritage Christian": "Decatur Heritage",
+};
 
 /**
  * Names that appear in more than one form and must be disambiguated by
@@ -342,15 +345,11 @@ export function similarity(a: string, b: string): number {
 
 // ---- the matcher ----------------------------------------------------------
 
-/** Width of the opponent column on ahsfhs.org; longer names arrive cut off. */
-export const TRUNCATION_LENGTH = 20;
-
 export type MatchMethod =
   | "alias"
   | "exact"
   | "suffix"
   | "class-region"
-  | "truncated"
   | "fuzzy"
   | "out-of-state"
   | "unmatched";
@@ -501,33 +500,6 @@ export function matchTeam(
         method: "class-region",
         confidence: 0.8,
         note: `"${raw}" is ambiguous; picked by class+region. Verify.`,
-      };
-    }
-  }
-
-  // 4c. ahsfhs.org cuts opponent names off at 20 characters, so the roster
-  // name arrives as a prefix of the real one ("Lindsay Lane Christi") or the
-  // real one arrives as a prefix of the roster name ("Hope Christian Acade"
-  // against "Hope Christian"). Fuzzy matching cannot reach these — six
-  // missing characters out of twenty scores 0.70, well under the cutoff.
-  if (raw.length >= TRUNCATION_LENGTH) {
-    const t = normalize(raw);
-    const hits = new Map<string, Team>();
-    for (const team of index.teams) {
-      for (const v of variants(team.name)) {
-        // A short variant is a prefix of far too much to be evidence.
-        if (v.length < 5) continue;
-        if (v.startsWith(t) || t.startsWith(v)) hits.set(team.name, team);
-      }
-    }
-    if (hits.size === 1) {
-      const team = [...hits.values()][0];
-      return {
-        ...base,
-        name: team.name,
-        method: "truncated",
-        confidence: 0.9,
-        note: `"${raw}" looks cut off at ${TRUNCATION_LENGTH} characters; read as ${team.name}.`,
       };
     }
   }

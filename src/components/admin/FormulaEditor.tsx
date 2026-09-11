@@ -57,6 +57,15 @@ const TWOWAY_GROUPS: { title: string; blurb: string; knobs: TwoWayKnob[] }[] = [
       { key: "sor_scale", label: "Win-probability scale", min: 3, max: 60, step: 0.5, help: "Converts a rating gap into a win chance. Fitted out-of-sample at 15 and calibrated across the range." },
     ],
   },
+  {
+    title: "Scoring ceiling",
+    blurb:
+      "A multiplicative model has no upper bound and football does — 48 minutes, starters pulled, a clock that keeps running. Without this the best offence in the state read as 94 points a game.",
+    knobs: [
+      { key: "ceiling_from", label: "Ceiling starts at", min: 10, max: 200, step: 1, help: "Adjusted figures below this are left exactly as solved." },
+      { key: "ceiling", label: "Ceiling", min: 10, max: 400, step: 1, help: "No adjusted figure can exceed this. Chosen off the 2025 holdout: the tail over-prediction falls from 13% to 5% while margin error moves only 13.74 to 13.81. Tighter values calibrate the tail further but start costing real accuracy." },
+    ],
+  },
 ];
 
 const GROUPS: { title: string; blurb: string; knobs: Knob[] }[] = [

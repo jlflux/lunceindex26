@@ -216,6 +216,77 @@ check(
 );
 check("and the baseline is what stops it", without < withBase, `${without} vs ${withBase}`);
 
+console.log("\n5. AdjO means what it says");
+{
+  // The check that was missing. Margins were validated from the start; the
+  // per-team POINTS were not, and AdjO is a claim about points — "this team
+  // would score X against an average AHSAA defence". Unbounded, the model was
+  // claiming 94 for the best offence in the state.
+  //
+  // Tested against the claim rather than against a game-level product: take
+  // only the games where the opponent's defence really was close to average,
+  // and see whether teams scored near their AdjO in them.
+  //
+  // This is a sanity check, NOT a tripwire for the 94-point bug. Checked: with
+  // the ceiling disabled these same bands read 48.0 against 44.1, which still
+  // passes. A full 2025 season with no carry-over never reaches the extremes
+  // that three weeks of 2026 with a strong carry-over does. The guard that
+  // actually catches it is the unit test on applyCeiling in test-twoway.ts.
+  const near: { adjO: number; act: number }[] = [];
+  for (const wk of TEST) {
+    const r = computeTwoWay(teams, games.filter((g) => g.week < wk), CFG);
+    const O = new Map(r.ratings.map((x) => [x.name, x.adj_o as number]));
+    const D = new Map(r.ratings.map((x) => [x.name, x.adj_d as number]));
+    for (const g of games) {
+      if (g.week !== wk) continue;
+      if (!known.has(g.t1) || !known.has(g.t2)) continue;
+      for (const [me, opp, pts] of [
+        [g.t1, g.t2, g.s1],
+        [g.t2, g.t1, g.s2],
+      ] as [string, string, number][]) {
+        const oppD = D.get(opp) as number;
+        if (oppD < r.mu * 0.85 || oppD > r.mu * 1.15) continue;
+        near.push({ adjO: O.get(me) as number, act: pts });
+      }
+    }
+  }
+  const band = (lo: number, hi: number) => {
+    const s = near.filter((o) => o.adjO >= lo && o.adjO < hi);
+    return {
+      n: s.length,
+      claim: s.reduce((a, b) => a + b.adjO, 0) / (s.length || 1),
+      act: s.reduce((a, b) => a + b.act, 0) / (s.length || 1),
+    };
+  };
+  console.log(
+    `  ${near.length} team-games against a genuinely average defence`,
+  );
+  for (const [lo, hi] of [
+    [0, 20],
+    [20, 30],
+    [30, 40],
+    [40, 500],
+  ] as [number, number][]) {
+    const b = band(lo, hi);
+    if (b.n < 15) continue;
+    console.log(
+      `    AdjO ${String(lo).padStart(2)}-${hi === 500 ? "+ " : String(hi).padEnd(2)}  n=${String(b.n).padStart(4)}  claims ${b.claim.toFixed(1)}  actually scored ${b.act.toFixed(1)}`,
+    );
+  }
+  const top = band(40, 500);
+  check(
+    "high-scoring teams score near their AdjO against average defences",
+    top.n >= 15 && top.claim / top.act < 1.15,
+    `claims ${top.claim.toFixed(1)}, scored ${top.act.toFixed(1)} over ${top.n} games`,
+  );
+  const maxO = Math.max(...rows.map((r) => r.adj_o as number));
+  check(
+    "no adjusted offence exceeds the ceiling",
+    maxO <= CFG.ceiling,
+    `max ${maxO.toFixed(1)}, ceiling ${CFG.ceiling}`,
+  );
+}
+
 console.log(
   failures === 0
     ? "\nThe two-way engine holds up against a finished season.\n"

@@ -17,11 +17,18 @@
  * about what a score is. A good defence holds you to a FRACTION of your usual
  * output rather than subtracting a fixed number from it.
  *
+ * Solved figures pass through a scoring CEILING before being published, because
+ * a multiplicative model is unbounded above and football is not. See
+ * `applyCeiling`.
+ *
  * Fitted and validated against the FULL 2025 season — 2,050 games, 387 teams —
  * by rating on the weeks before N and predicting week N. Over 1,097 held-out
- * games that scores 82.7% on winners with a calibration slope of 1.01, and the
- * board it produces correlates 0.982 with the 2025 board that actually
- * shipped. See scripts/validate-2025-season.ts, which asserts all of it.
+ * games that scores 82.6% on winners with a margin calibration slope of 1.09,
+ * and the board it produces correlates 0.983 with the 2025 board that actually
+ * shipped. See scripts/validate-2025-season.ts, which asserts all of it —
+ * including that the POINTS predictions calibrate, not only the margins. That
+ * check was missing at first, and its absence is exactly how an adjusted
+ * offence of 94 points a game reached the public site.
  */
 
 import {
@@ -35,6 +42,22 @@ import { computeRpi, isPlayed } from "./engine";
 
 const mean = (xs: number[]) =>
   xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
+
+/**
+ * The scoring ceiling.
+ *
+ * Identity up to `from`, then bending over to approach `ceiling` and never
+ * reaching it. A multiplicative model is unbounded above and football is not,
+ * so without this the best offence in the state reads as 94 points a game.
+ *
+ * Applied to the solved figures rather than inside the solve: that is the
+ * form the 2025 season validates, and it leaves the ranking essentially
+ * intact while making the published numbers mean what they say.
+ */
+export function applyCeiling(x: number, from: number, ceiling: number): number {
+  if (!(ceiling > from) || x <= from) return x;
+  return from + (ceiling - from) * (1 - Math.exp(-(x - from) / (ceiling - from)));
+}
 
 /** The pooled out-of-state opponent. Leading space cannot collide with a school. */
 const OOS = " out-of-state";
@@ -210,8 +233,9 @@ export function computeTwoWay(
     for (const [k, v] of nD) d.set(k, v);
   }
 
-  const adjO = (n: string) => mu * Math.exp(o.get(n) ?? 0);
-  const adjD = (n: string) => mu * Math.exp(d.get(n) ?? 0);
+  const cap = (x: number) => applyCeiling(x, cfg.ceiling_from, cfg.ceiling);
+  const adjO = (n: string) => cap(mu * Math.exp(o.get(n) ?? 0));
+  const adjD = (n: string) => cap(mu * Math.exp(d.get(n) ?? 0));
   const netOf = (n: string) => adjO(n) - adjD(n);
 
   // ---- record, scoring, schedule -----------------------------------------

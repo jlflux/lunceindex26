@@ -301,6 +301,26 @@ export interface TwoWayConfig {
   recency: number;
   /** Home edge in points. Measured at 1.7 across 519 in-state 2026 games. */
   hfa: number;
+  /**
+   * Where the scoring ceiling starts to bite, in points. Below this, adjusted
+   * figures are left alone.
+   */
+  ceiling_from: number;
+  /**
+   * The ceiling itself: no adjusted figure can exceed it.
+   *
+   * A purely multiplicative model has no upper bound, and football does — 48
+   * minutes, starters pulled, a clock that keeps running. Left unbounded it
+   * put Thompson's adjusted offence at 94 points a game. Out of sample on the
+   * 2025 season, when the model predicted 70+ the teams actually scored 56,
+   * and predictions at 50+ ran about 13% hot. With the ceiling the same tail
+   * predicts 51.5 against 49.0 actual.
+   *
+   * Applied to the SOLVED figures, not inside the solve — that is the form
+   * that was validated, and it leaves the ranking almost untouched (40 of 275
+   * teams move at all, none by more than four places).
+   */
+  ceiling: number;
   iters: number;
   /** Strength of Record: whose schedule-difficulty you are measured against. */
   sor_benchmark_rank: number;
@@ -325,6 +345,11 @@ export const TWOWAY_DEFAULTS: TwoWayConfig = {
   class_spread: 55,
   recency: 0.95,
   hfa: 1.7,
+  // Chosen off the 2025 holdout: the tail over-prediction falls from 13% to
+  // 5% while margin error moves only 13.74 -> 13.81. Tighter values calibrate
+  // the tail better still but start costing real margin accuracy.
+  ceiling_from: 40,
+  ceiling: 70,
   iters: 200,
   sor_benchmark_rank: 10,
   sor_scale: 15,

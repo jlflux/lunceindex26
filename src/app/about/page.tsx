@@ -103,6 +103,15 @@ export default function AboutPage() {
               14 counts for more than holding a poor one to 7.
             </p>
             <p>
+              Both are capped. A model that works in ratios has no upper limit
+              and football does &mdash; 48 minutes, starters pulled once a game
+              is gone &mdash; so left alone the arithmetic claimed 94 points a
+              game for the best offence in the state. Checked against every
+              game of last season, teams the model expected to score 70 actually
+              scored 56. The cap is set where those predictions come back into
+              line.
+            </p>
+            <p>
               They stay blank until a team has played three games. Until then
               the split between offence and defence leans mostly on last
               season&rsquo;s carry-over rather than on this season&rsquo;s

@@ -5,7 +5,7 @@
  * properties that hold on any data at all — the ones that, when broken,
  * produce a board that looks fine and is wrong.
  */
-import { computeTwoWay, tierOf } from "../src/lib/engine-twoway";
+import { applyCeiling, computeTwoWay, tierOf } from "../src/lib/engine-twoway";
 import { computeBoard, modelOf } from "../src/lib/board";
 import {
   TWOWAY_DEFAULTS,
@@ -200,6 +200,53 @@ console.log("\n8. The dispatcher honours the model field");
   check(
     "both rank the winner first",
     classic.ratings[0].name === "A" && two.ratings[0].name === "A",
+  );
+}
+
+console.log("\n9. Scoring has a ceiling");
+{
+  const { ceiling_from: F, ceiling: C } = TWOWAY_DEFAULTS;
+  check("the defaults set a real ceiling", C > F && C < 200, `${F}..${C}`);
+  check("below the bend nothing is touched", applyCeiling(F - 5, F, C) === F - 5);
+  check("at the bend nothing is touched", applyCeiling(F, F, C) === F);
+  check(
+    "above it, figures are pulled down",
+    applyCeiling(F + 30, F, C) < F + 30 && applyCeiling(F + 30, F, C) > F,
+  );
+  check("it is monotone, so the ordering survives", (() => {
+    let prev = -Infinity;
+    for (let x = 0; x < 400; x += 0.5) {
+      const v = applyCeiling(x, F, C);
+      if (v < prev) return false;
+      prev = v;
+    }
+    return true;
+  })());
+  // The actual guard on the bug: unbounded, an extreme team read 94 points a
+  // game. Nothing may cross the ceiling however extreme the inputs.
+  //
+  // `<=` rather than `<`: the curve only approaches the ceiling in algebra, but
+  // the exponential underflows to zero somewhere past x ≈ 2,000 and it lands
+  // exactly on it. Sitting on the ceiling is correct; crossing it is the bug.
+  check(
+    "nothing can cross the ceiling, however extreme",
+    [100, 500, 5000, 1e6].every((x) => applyCeiling(x, F, C) <= C),
+    `${applyCeiling(1e6, F, C).toFixed(2)} at one million`,
+  );
+
+  // And end to end: a monstrous team on a thin schedule, the shape that
+  // produced 94 in the first place.
+  const teams = [team("Monster", "6A", 40), team("Weak", "1A", -25), team("Mid", "3A", 0)];
+  const res = solve(teams, [
+    game("Monster", 84, "Weak", 0, 0),
+    game("Monster", 77, "Mid", 0, 1),
+    game("Monster", 90, "Weak", 0, 2),
+  ]);
+  const worst = Math.max(...res.ratings.map((r) => r.adj_o as number));
+  check(
+    "even a 3-0 side winning by 80 a week stays under it",
+    worst < C,
+    `AdjO ${worst.toFixed(1)} against ceiling ${C}`,
   );
 }
 

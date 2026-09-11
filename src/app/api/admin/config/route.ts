@@ -50,6 +50,8 @@ const TWOWAY_BOUNDS: Record<keyof TwoWayConfig, [number, number]> = {
   class_spread: [0, 120],
   recency: [0.5, 1],
   hfa: [0, 10],
+  ceiling_from: [10, 200],
+  ceiling: [10, 400],
   iters: [10, 1000],
   sor_benchmark_rank: [1, 100],
   sor_scale: [3, 60],

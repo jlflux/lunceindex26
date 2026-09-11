@@ -4,7 +4,7 @@ import TeamDirectory from "@/components/TeamDirectory";
 import { loadRatings } from "@/lib/data";
 
 export const revalidate = 300;
-export const metadata = { title: "All Teams" };
+export const metadata = { title: "Standings" };
 
 export default async function TeamsPage() {
   const data = await loadRatings();
@@ -12,7 +12,7 @@ export default async function TeamsPage() {
   return (
     <AppShell generated={data.generated}>
       <PageHeader
-        title="All Teams"
+        title="Standings"
         subtitle="Every AHSAA football program, grouped by classification and region. Records read overall first, then region — and region order is what decides the playoffs."
       />
       {data.ratings.length === 0 ? (

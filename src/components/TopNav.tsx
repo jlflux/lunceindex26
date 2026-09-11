@@ -16,7 +16,7 @@ import ThemeToggle from "./ThemeToggle";
 const LINKS = [
   { href: "/", label: "Power Index" },
   { href: "/resume", label: "Résumé" },
-  { href: "/teams", label: "Teams" },
+  { href: "/teams", label: "Standings" },
   { href: "/schedule", label: "Schedule" },
   { href: "/about", label: "How It Works" },
 ] as const;

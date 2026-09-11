@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { Banner } from "./PublishButton";
-import { DEFAULT_CONFIG, type EngineConfig } from "@/lib/types";
+import {
+  DEFAULT_CONFIG,
+  TWOWAY_DEFAULTS,
+  type EngineConfig,
+  type RatingModel,
+  type TwoWayConfig,
+} from "@/lib/types";
 
 interface Knob {
   key: keyof EngineConfig;
@@ -12,6 +18,46 @@ interface Knob {
   step: number;
   help: string;
 }
+
+interface TwoWayKnob {
+  key: keyof TwoWayConfig;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  help: string;
+}
+
+const TWOWAY_GROUPS: { title: string; blurb: string; knobs: TwoWayKnob[] }[] = [
+  {
+    title: "Shrinkage",
+    blurb:
+      "How far a team is allowed to move off its prior. Both are in pseudo-games: at lambda 2, two games of evidence weigh the same as the prior.",
+    knobs: [
+      { key: "lambda", label: "Level shrinkage", min: 0.1, max: 20, step: 0.1, help: "Applies to the overall rating. About 2 against a real carry-over rating, about 1 against a bare class baseline — a stronger prior earns more weight." },
+      { key: "split_lambda", label: "Offence/defence split shrinkage", min: 0, max: 60, step: 0.5, help: "Deliberately much harder than the level. Split-half reliability puts net at r=0.36 but the offence/defence split at only r=0.16: margins say how good you are, far less about which unit is doing it. Leaving this low let one 56-point night carry a team to second overall." },
+    ],
+  },
+  {
+    title: "Priors",
+    blurb: "What a team is worth before its own results speak.",
+    knobs: [
+      { key: "prior_scale", label: "Carry-over scale", min: 0, max: 5, step: 0.05, help: "Converts last season's rating into net points. A full 2025 season puts this at 2.07; 1.75 keeps early-season projections calibrated." },
+      { key: "class_spread", label: "Classification spread", min: 0, max: 120, step: 1, help: "Net points from the weakest classification to the strongest, used when a team has no carry-over. Load-bearing: AHSAA schedules are almost all within-class, so without it an undefeated 1A team floats into the top five." },
+      { key: "recency", label: "Recency", min: 0.5, max: 1, step: 0.01, help: "Weight multiplier per week of age. 1 treats week 0 and week 10 alike." },
+    ],
+  },
+  {
+    title: "Site and résumé",
+    blurb:
+      "Home edge, and the separate Strength of Record figure — your wins minus what a benchmark team would take from your schedule.",
+    knobs: [
+      { key: "hfa", label: "Home-field advantage", min: 0, max: 10, step: 0.1, help: "Measured at 1.7 points across 519 in-state games. Unlike the classic engine, this one uses it inside the solve, not only for projections." },
+      { key: "sor_benchmark_rank", label: "Résumé benchmark rank", min: 1, max: 100, step: 1, help: "Whose schedule difficulty you are measured against. 10 means “what would a top-ten team have done with this slate”." },
+      { key: "sor_scale", label: "Win-probability scale", min: 3, max: 60, step: 0.5, help: "Converts a rating gap into a win chance. Fitted out-of-sample at 15 and calibrated across the range." },
+    ],
+  },
+];
 
 const GROUPS: { title: string; blurb: string; knobs: Knob[] }[] = [
   {
@@ -87,9 +133,31 @@ export default function FormulaEditor({ initial }: { initial: EngineConfig }) {
   } | null>(null);
 
   const dirty = JSON.stringify(cfg) !== JSON.stringify(initial);
+  const model: RatingModel = cfg.model === "twoway" ? "twoway" : "classic";
+  const tw: TwoWayConfig = { ...TWOWAY_DEFAULTS, ...(cfg.twoway ?? {}) };
 
   function set(key: keyof EngineConfig, value: number) {
     setCfg((c) => ({ ...c, [key]: value }));
+    setPreview(null);
+  }
+
+  function setModel(m: RatingModel) {
+    // Carry a full two-way block along the moment the engine is selected, so
+    // the sliders have something concrete to edit and the saved config is
+    // explicit rather than relying on defaults filled in server-side.
+    setCfg((c) => ({
+      ...c,
+      model: m,
+      twoway: m === "twoway" ? { ...TWOWAY_DEFAULTS, ...(c.twoway ?? {}) } : c.twoway,
+    }));
+    setPreview(null);
+  }
+
+  function setTwoWay(key: keyof TwoWayConfig, value: number) {
+    setCfg((c) => ({
+      ...c,
+      twoway: { ...TWOWAY_DEFAULTS, ...(c.twoway ?? {}), [key]: value },
+    }));
     setPreview(null);
   }
 
@@ -157,8 +225,88 @@ export default function FormulaEditor({ initial }: { initial: EngineConfig }) {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-6">
-          {GROUPS.map((g) => (
-            <section key={g.title} className="card p-4">
+          <section className="card p-4">
+            <h2 className="text-sm font-bold uppercase tracking-wider">Engine</h2>
+            <p
+              className="mt-1 text-xs leading-relaxed"
+              style={{ color: "rgb(var(--text-muted))" }}
+            >
+              Two engines ship side by side so they can be compared on real
+              data. Preview switches with this, so you can see the whole board
+              move before anything is saved or published.
+            </p>
+            <div className="mt-3 space-y-2">
+              {(
+                [
+                  [
+                    "classic",
+                    "Classic (Massey)",
+                    "One rating per team, solved from margins, with schedule strength and win rate added afterwards. What the site runs today.",
+                  ],
+                  [
+                    "twoway",
+                    "Two-way (adjusted offence & defence)",
+                    "Solves what you score and what you allow separately, each adjusted for the opponent. Over the full 2025 season it picks 82.7% of winners out of sample with a calibration slope of 1.01, and its 2025 board correlates 0.982 with the one that shipped.",
+                  ],
+                ] as [RatingModel, string, string][]
+              ).map(([id, label, blurb]) => (
+                <label
+                  key={id}
+                  className="flex cursor-pointer gap-2.5 rounded-lg p-2.5"
+                  style={{
+                    background:
+                      model === id ? "rgb(var(--surface-2))" : "transparent",
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="rating-model"
+                    className="mt-0.5"
+                    checked={model === id}
+                    onChange={() => setModel(id)}
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold">{label}</span>
+                    <span
+                      className="block text-[11px] leading-tight"
+                      style={{ color: "rgb(var(--text-faint))" }}
+                    >
+                      {blurb}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </section>
+
+          {model === "twoway" &&
+            TWOWAY_GROUPS.map((g) => (
+              <section key={g.title} className="card p-4">
+                <h2 className="text-sm font-bold uppercase tracking-wider">
+                  {g.title}
+                </h2>
+                <p
+                  className="mt-1 text-xs leading-relaxed"
+                  style={{ color: "rgb(var(--text-muted))" }}
+                >
+                  {g.blurb}
+                </p>
+                <div className="mt-4 space-y-4">
+                  {g.knobs.map((k) => (
+                    <Slider
+                      key={k.key}
+                      knob={{ ...k, key: k.key as unknown as keyof EngineConfig }}
+                      value={tw[k.key]}
+                      onChange={(v) => setTwoWay(k.key, v)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+
+          {model === "classic" &&
+            GROUPS.map((g) => (
+              <section key={g.title} className="card p-4">
               <h2 className="text-sm font-bold uppercase tracking-wider">
                 {g.title}
               </h2>
@@ -168,18 +316,18 @@ export default function FormulaEditor({ initial }: { initial: EngineConfig }) {
               >
                 {g.blurb}
               </p>
-              <div className="mt-4 space-y-4">
-                {g.knobs.map((k) => (
-                  <Slider
-                    key={k.key}
-                    knob={k}
-                    value={cfg[k.key] as number}
-                    onChange={(v) => set(k.key, v)}
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
+                <div className="mt-4 space-y-4">
+                  {g.knobs.map((k) => (
+                    <Slider
+                      key={k.key}
+                      knob={k}
+                      value={cfg[k.key] as number}
+                      onChange={(v) => set(k.key, v)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
         </div>
 
         {/* Preview panel */}

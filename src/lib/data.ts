@@ -7,7 +7,7 @@
  */
 import "server-only";
 
-import { computeRatings } from "./engine";
+import { computeBoard } from "./board";
 import { publicClient, serviceClient } from "./db";
 import {
   DEFAULT_CONFIG,
@@ -71,7 +71,7 @@ export async function publishRatings(): Promise<RatingsPayload> {
     loadConfig(true),
   ]);
 
-  const result = computeRatings(teams, games, config);
+  const result = computeBoard(teams, games, config);
   const payload: RatingsPayload = {
     generated: new Date().toISOString(),
     config,
@@ -139,7 +139,7 @@ export async function loadRatings(): Promise<RatingsPayload> {
       loadGames(),
       loadConfig(),
     ]);
-    const result = computeRatings(teams, games, config);
+    const result = computeBoard(teams, games, config);
     return {
       generated: new Date().toISOString(),
       config,

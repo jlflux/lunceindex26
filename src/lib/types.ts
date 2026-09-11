@@ -136,6 +136,13 @@ export interface EngineConfig {
   perf_expected_band: number;
   /** Beating the projection by more than this is "dominant". */
   perf_dominant_band: number;
+  /**
+   * Which engine builds the board. Absent means "classic", so every config
+   * already saved keeps behaving exactly as it did.
+   */
+  model?: RatingModel;
+  /** Knobs for the two-way engine. Ignored while `model` is "classic". */
+  twoway?: TwoWayConfig;
 }
 
 /**
@@ -222,6 +229,14 @@ export interface RatingRow {
   sos: number;
   o_eff: number;
   d_eff: number;
+  /**
+   * Two-way engine only. Points this team would score on, and allow to, an
+   * average AHSAA side. Absent on boards built by the classic engine.
+   */
+  adj_o?: number;
+  adj_d?: number;
+  /** Two-way engine only. Wins above what a top-ten team would take from this schedule. */
+  sor?: number;
   ppg: number;
   papg: number;
   prior_blend: number;
@@ -244,6 +259,66 @@ export interface RpiRow {
   rank: number;
   class_rank: number;
 }
+
+/** Which engine builds the board. */
+export type RatingModel = "classic" | "twoway";
+
+/**
+ * Knobs for the two-way engine.
+ *
+ * Every default here was fitted against the FULL 2025 season — 2,050 games,
+ * 387 teams — not against the handful of weeks 2026 has so far. The procedure
+ * was to rate on the weeks before N, predict week N, and score it: 1,097
+ * held-out games, 82.7% on winners, calibration slope 1.01. Settings that won
+ * on weeks 4-7 still won on the held-back 8-10.
+ */
+export interface TwoWayConfig {
+  /**
+   * Shrinkage toward the prior, in pseudo-games.
+   *
+   * Near 1 against a bare class baseline, near 2 against a real carry-over
+   * rating — a stronger prior earns more weight. 2025 was fitted with the
+   * former because its carry-over would have been derived from the very
+   * results being predicted.
+   */
+  lambda: number;
+  /**
+   * Shrinkage on the offence/defence split. Deliberately far harder than
+   * `lambda`: net is reliable (split-half r = 0.36), the split much less so
+   * (r = 0.16).
+   */
+  split_lambda: number;
+  /** Carry-over rating converted to net points. 2.07 from a full season. */
+  prior_scale: number;
+  /**
+   * Net points from the weakest classification to the strongest, for teams
+   * with no carry-over. 2025's 472 cross-class games put the raw gap near 5-6
+   * points a step; fitting lands higher, around 9, which is what you would
+   * expect when the small schools who schedule up are the good ones.
+   */
+  class_spread: number;
+  /** Weight decay per week of age. 1 disables recency entirely. */
+  recency: number;
+  /** Home edge in points. Measured at 1.7 across 519 in-state 2026 games. */
+  hfa: number;
+  iters: number;
+  /** Strength of Record: whose schedule-difficulty you are measured against. */
+  sor_benchmark_rank: number;
+  /** Logistic scale converting a rating gap to a win probability. */
+  sor_scale: number;
+}
+
+export const TWOWAY_DEFAULTS: TwoWayConfig = {
+  lambda: 2,
+  split_lambda: 4,
+  prior_scale: 1.75,
+  class_spread: 55,
+  recency: 0.95,
+  hfa: 1.7,
+  iters: 200,
+  sor_benchmark_rank: 10,
+  sor_scale: 15,
+};
 
 export interface RatingsPayload {
   generated: string;

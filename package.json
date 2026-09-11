@@ -14,13 +14,15 @@
     "smoke": "tsx scripts/smoke.ts",
     "preview": "tsx scripts/make-preview.ts",
     "validate": "tsx scripts/validate-2025.ts",
+    "validate:season": "tsx scripts/validate-2025-season.ts",
     "preview:serve": "ALPREPS_PREVIEW_DATA=$PWD/scripts/out/preview.json next dev",
     "setup": "tsx scripts/setup.ts",
     "seed:sql": "tsx scripts/make-seed-sql.ts",
     "test:duplicates": "tsx scripts/test-duplicates.ts",
     "test:names": "tsx scripts/test-names.ts",
     "test:week0": "tsx scripts/test-week0.ts",
-    "test:pdf": "tsx scripts/test-schedule-pdf.ts"
+    "test:pdf": "tsx scripts/test-schedule-pdf.ts",
+    "test:twoway": "tsx scripts/test-twoway.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

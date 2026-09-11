@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Icon from "./Icon";
 import {
   MIN_GAMES_FOR_EFFICIENCY,
+  MIN_GAMES_FOR_SPLIT,
   SHOW_EFFICIENCY,
   fmt,
   fmtSigned,
@@ -37,6 +38,8 @@ export default function TeamPanel({
     sos: Map<string, number>;
     oEff: Map<string, number>;
     dEff: Map<string, number>;
+    adjO: Map<string, number>;
+    adjD: Map<string, number>;
     ppg: Map<string, number>;
     papg: Map<string, number>;
   };
@@ -61,6 +64,7 @@ export default function TeamPanel({
   const { rating: t, schedule } = view;
   const played = t.wins + t.losses > 0;
   const eff = t.wins + t.losses >= MIN_GAMES_FOR_EFFICIENCY;
+  const split = t.wins + t.losses >= MIN_GAMES_FOR_SPLIT;
   const classCount = payload.ratings.filter(
     (r) => r.classification === t.classification,
   ).length;
@@ -152,7 +156,7 @@ export default function TeamPanel({
 
         {/* Stat strip */}
         <div
-          className="grid grid-cols-3 border-b sm:grid-cols-5"
+          className="grid grid-cols-3 border-b sm:grid-cols-6"
           style={{
             borderColor: "rgb(var(--border))",
             background: "rgb(var(--surface-2))",
@@ -180,10 +184,27 @@ export default function TeamPanel({
               />
             </>
           )}
+          {typeof t.adj_o === "number" && (
+            <>
+              <StatCell
+                label="Adj O"
+                value={split ? fmt(t.adj_o, 1) : "—"}
+                rank={split ? columnRanks.adjO.get(t.slug) : undefined}
+              />
+              <StatCell
+                label="Adj D"
+                value={split ? fmt(t.adj_d ?? 0, 1) : "—"}
+                rank={split ? columnRanks.adjD.get(t.slug) : undefined}
+              />
+            </>
+          )}
           <StatCell
             label="PF/G · PA/G"
             value={played ? `${fmt(t.ppg, 1)} / ${fmt(t.papg, 1)}` : "—"}
           />
+          {typeof t.sor === "number" && played && (
+            <StatCell label="Résumé" value={fmtSigned(t.sor, 2)} tone={t.sor} />
+          )}
         </div>
 
         {/* Schedule */}

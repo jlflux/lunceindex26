@@ -5,6 +5,7 @@ import Icon from "./Icon";
 import TeamPanel from "./TeamPanel";
 import {
   MIN_GAMES_FOR_EFFICIENCY,
+  MIN_GAMES_FOR_SPLIT,
   SHOW_EFFICIENCY,
   fmt,
   fmtPct,
@@ -19,7 +20,7 @@ import {
   type RpiRow,
 } from "@/lib/types";
 
-type Mode = "index" | "rpi";
+type Mode = "index" | "rpi" | "resume";
 
 /**
  * Rank within a numeric column across the whole field, so a figure can be read
@@ -89,14 +90,36 @@ export default function RatingsTable({
   const [query, setQuery] = useState("");
   const [openSlug, setOpenSlug] = useState<string | null>(null);
 
-  const source = mode === "index" ? ratings : rpi;
   const hasResults = ratings.some((r) => r.wins + r.losses > 0);
+  // The adjusted split only exists on boards built by the two-way engine.
+  const hasSplit = ratings.some((r) => typeof r.adj_o === "number");
+
+  /**
+   * The résumé board is the same teams in a different order, so it is derived
+   * here rather than carried separately in the payload. Teams with no games
+   * are dropped: a résumé of nothing is not a zero, it is an absence.
+   */
+  const resumeRows = useMemo(() => {
+    const played = ratings.filter((r) => r.wins + r.losses > 0);
+    const sorted = [...played].sort((a, b) => (b.sor ?? 0) - (a.sor ?? 0));
+    const seen = new Map<string, number>();
+    return sorted.map((r, i) => {
+      const n = (seen.get(r.classification) ?? 0) + 1;
+      seen.set(r.classification, n);
+      return { ...r, rank: i + 1, class_rank: n };
+    });
+  }, [ratings]);
+
+  const source =
+    mode === "index" ? ratings : mode === "resume" ? resumeRows : rpi;
 
   const ranks = useMemo(
     () => ({
       sos: columnRank(ratings, (r) => r.sos),
       oEff: columnRank(ratings, (r) => r.o_eff),
       dEff: columnRank(ratings, (r) => r.d_eff),
+      adjO: columnRank(ratings, (r) => r.adj_o ?? 0),
+      adjD: columnRank(ratings, (r) => r.adj_d ?? 0, false),
       ppg: columnRank(ratings, (r) => r.ppg),
       papg: columnRank(ratings, (r) => r.papg, false),
     }),
@@ -237,6 +260,22 @@ export default function RatingsTable({
               {mode === "index" ? (
                 <>
                   <th className="th hidden !text-right md:table-cell">SOS</th>
+                  {hasSplit && (
+                    <>
+                      <th
+                        className="th hidden !text-right md:table-cell"
+                        title="Points this team would score on an average AHSAA defence"
+                      >
+                        Adj O
+                      </th>
+                      <th
+                        className="th hidden !text-right md:table-cell"
+                        title="Points this team would allow to an average AHSAA offence"
+                      >
+                        Adj D
+                      </th>
+                    </>
+                  )}
                   {SHOW_EFFICIENCY && (
                     <>
                       <th className="th hidden !text-right md:table-cell">
@@ -253,6 +292,19 @@ export default function RatingsTable({
                     Rating
                   </th>
                 </>
+              ) : mode === "resume" ? (
+                <>
+                  <th className="th hidden !text-right md:table-cell">SOS</th>
+                  <th
+                    className="th hidden !text-right lg:table-cell"
+                    title="Wins a top-ten team would be expected to take from this schedule"
+                  >
+                    Par
+                  </th>
+                  <th className="th !px-2 !text-right sm:w-32 sm:!pr-4">
+                    Résumé
+                  </th>
+                </>
               ) : (
                 <>
                   <th className="th hidden !text-right md:table-cell">Win%</th>
@@ -266,7 +318,13 @@ export default function RatingsTable({
           <tbody>
             {rows.length > 0 && (
               <GroupRow
-                colSpan={mode === "index" ? (SHOW_EFFICIENCY ? 9 : 7) : 7}
+                colSpan={
+                  mode === "index"
+                    ? 7 + (hasSplit ? 2 : 0) + (SHOW_EFFICIENCY ? 2 : 0)
+                    : mode === "resume"
+                      ? 6
+                      : 7
+                }
                 label={
                   scoped ? `Top ${HIGHLIGHT_IN_CLASS}` : `Top ${HIGHLIGHT_OVERALL}`
                 }
@@ -276,10 +334,13 @@ export default function RatingsTable({
               const shown = scoped ? r.class_rank : r.rank;
               const top = shown <= cutoff;
               const ir = mode === "index" ? (r as RatingRow) : null;
+              const sr = mode === "resume" ? (r as RatingRow) : null;
               const rr = mode === "rpi" ? (r as RpiRow) : null;
               const games = r.wins + r.losses > 0;
               // Efficiency needs opponents who have played somebody else.
               const eff = r.wins + r.losses >= MIN_GAMES_FOR_EFFICIENCY;
+              // The adjusted split is prior-dominated until a few games in.
+              const split = r.wins + r.losses >= MIN_GAMES_FOR_SPLIT;
 
               return (
                 <tr
@@ -359,6 +420,20 @@ export default function RatingsTable({
                           />
                         </>
                       )}
+                      {hasSplit && (
+                        <>
+                          <Cell
+                            className="hidden md:table-cell"
+                            value={split ? fmt(ir.adj_o ?? 0, 1) : "—"}
+                            rank={split ? ranks.adjO.get(r.slug) : undefined}
+                          />
+                          <Cell
+                            className="hidden md:table-cell"
+                            value={split ? fmt(ir.adj_d ?? 0, 1) : "—"}
+                            rank={split ? ranks.adjD.get(r.slug) : undefined}
+                          />
+                        </>
+                      )}
                       <Cell
                         className="hidden xl:table-cell"
                         value={games ? fmt(ir.ppg, 1) : "—"}
@@ -378,6 +453,31 @@ export default function RatingsTable({
                         </span>
                         <span className="meter">
                           <span style={{ width: `${scale(ir.rating) * 100}%` }} />
+                        </span>
+                      </td>
+                    </>
+                  ) : sr ? (
+                    <>
+                      <Cell
+                        className="hidden md:table-cell"
+                        value={fmt(sr.sos, 1)}
+                        rank={ranks.sos.get(r.slug)}
+                      />
+                      <Cell
+                        className="hidden lg:table-cell"
+                        value={fmt(sr.wins - (sr.sor ?? 0), 2)}
+                      />
+                      <td className="td !px-2 !text-right sm:!pr-4">
+                        <span
+                          className="text-[19px] font-extrabold tracking-[-0.03em] tnum"
+                          style={{
+                            color:
+                              (sr.sor ?? 0) >= 0
+                                ? "rgb(var(--good))"
+                                : "rgb(var(--bad))",
+                          }}
+                        >
+                          {fmtSigned(sr.sor ?? 0, 2)}
                         </span>
                       </td>
                     </>

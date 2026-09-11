@@ -5,6 +5,7 @@ import Icon from "@/components/Icon";
 import { loadRatings } from "@/lib/data";
 import {
   MIN_GAMES_FOR_EFFICIENCY,
+  MIN_GAMES_FOR_SPLIT,
   SHOW_EFFICIENCY,
   fmt,
   fmtPct,
@@ -52,6 +53,8 @@ export default async function TeamPage({
   const hasPlayed = t.wins + t.losses > 0;
   // Efficiency needs opponents who have played somebody other than you.
   const hasEff = t.wins + t.losses >= MIN_GAMES_FOR_EFFICIENCY;
+  // The adjusted split leans on the carry-over until a team has a few games.
+  const hasSplit = t.wins + t.losses >= MIN_GAMES_FOR_SPLIT;
 
   return (
     <AppShell generated={data.generated}>
@@ -172,8 +175,30 @@ export default async function TeamPage({
               <Metric
                 label="Strength of schedule"
                 value={hasPlayed ? fmt(t.sos) : "—"}
-                hint="Mean rating of opponents faced"
+                hint="Mean rating of opponents actually played"
               />
+              {typeof t.adj_o === "number" && (
+                <>
+                  <Metric
+                    label="Adjusted offence"
+                    value={hasSplit ? fmt(t.adj_o, 1) : "—"}
+                    hint="Points this team would score on an average AHSAA defence"
+                  />
+                  <Metric
+                    label="Adjusted defence"
+                    value={hasSplit ? fmt(t.adj_d ?? 0, 1) : "—"}
+                    hint="Points it would allow to an average AHSAA offence"
+                  />
+                </>
+              )}
+              {typeof t.sor === "number" && hasPlayed && (
+                <Metric
+                  label="Résumé"
+                  value={fmtSigned(t.sor, 2)}
+                  hint="Wins above what a top-ten team would take from this schedule"
+                  tone={t.sor}
+                />
+              )}
               {SHOW_EFFICIENCY && (
                 <>
                   <Metric

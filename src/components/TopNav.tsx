@@ -8,9 +8,14 @@ import ThemeToggle from "./ThemeToggle";
 /**
  * RPI is intentionally absent: it is meaningless until a few weeks of results
  * exist. The route still works if linked directly.
+ *
+ * Résumé is here rather than hidden, because it is the answer to the argument
+ * the Power Index always starts — the Index says who is best, Résumé says who
+ * has earned it, and the two disagreeing is the point rather than a fault.
  */
 const LINKS = [
   { href: "/", label: "Power Index" },
+  { href: "/resume", label: "Résumé" },
   { href: "/teams", label: "Teams" },
   { href: "/schedule", label: "Schedule" },
   { href: "/about", label: "How It Works" },
@@ -58,14 +63,16 @@ export default function TopNav({
           </span>
         </Link>
 
-        {/* Three links always fit, so no scroll container — one was adding a
-            stray horizontal scrollbar under the nav. */}
-        <nav className="order-3 flex w-full items-center gap-6 sm:order-none sm:w-auto">
+        {/* Deliberately wrapping rather than scrolling: a scroll container
+            here added a stray horizontal scrollbar under the nav. Five links
+            no longer fit on one phone-width line, so the gap tightens and the
+            row is allowed to wrap onto a second line instead. */}
+        <nav className="order-3 flex w-full flex-wrap items-center gap-x-4 sm:order-none sm:w-auto sm:flex-nowrap sm:gap-x-6">
           {LINKS.map((l) => (
             <Link
               key={l.href}
               href={l.href}
-              className="relative whitespace-nowrap py-[18px] text-[13.5px] transition-colors"
+              className="relative whitespace-nowrap py-3 text-[13.5px] transition-colors sm:py-[18px]"
               style={{
                 color: isActive(l.href) ? "#fff" : "rgb(255 255 255 / 0.5)",
                 fontWeight: isActive(l.href) ? 650 : 500,

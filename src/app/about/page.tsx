@@ -75,6 +75,43 @@ export default function AboutPage() {
         </section>
 
         <div className="space-y-5">
+          <Panel title="Résumé Rankings">
+            <p>
+              The Power Index answers &ldquo;how good is this team?&rdquo; The
+              Résumé board answers a different question &mdash; &ldquo;what has
+              this team actually earned?&rdquo; It takes your wins and subtracts
+              the wins a top-ten team would be expected to take from your exact
+              schedule. A positive number means you have done better than an
+              elite team would have with your slate.
+            </p>
+            <p>
+              Margin is ignored completely. Beating a good team counts the same
+              whether it was by one point or thirty, and losing to a weak one
+              costs the same either way. That is deliberate: it is the half of
+              the picture the Power Index cannot give you, and the two boards
+              disagreeing about a team is usually the interesting part rather
+              than a mistake.
+            </p>
+          </Panel>
+
+          <Panel title="Adjusted offence and defence">
+            <p>
+              Adj O is what a team would score against an average AHSAA defence;
+              Adj D is what it would allow to an average AHSAA offence. The
+              rating is the difference between them. Both are corrected for the
+              quality of the units actually faced, so holding a good offence to
+              14 counts for more than holding a poor one to 7.
+            </p>
+            <p>
+              They stay blank until a team has played three games. Until then
+              the split between offence and defence leans mostly on last
+              season&rsquo;s carry-over rather than on this season&rsquo;s
+              results, and a number that follows the rating instead of the
+              scoreboard is worse than no number. The rating and the record are
+              never hidden.
+            </p>
+          </Panel>
+
           <Panel title="RPI">
             <p>
               RPI is a separate, simpler measure kept alongside the index: 25%

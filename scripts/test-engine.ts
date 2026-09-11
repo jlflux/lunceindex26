@@ -549,7 +549,7 @@ console.log("\n16. The out-of-state pool is solved, not decreed");
     lost < won - 1,
     `pool ${lost.toFixed(2)} after losing, ${won.toFixed(2)} after winning`,
   );
-  // The old behaviour keyed the pool off the field mean, which moves the
+  // The old behavior keyed the pool off the field mean, which moves the
   // OPPOSITE way here — B and C rate higher in the run where they won — so
   // this cannot pass by accident on a constant.
   const meanOf = (r: typeof poolLost) =>

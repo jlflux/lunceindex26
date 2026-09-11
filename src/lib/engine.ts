@@ -181,7 +181,7 @@ export function computeRatings(
   // How tightly the carry-over binds during the solve. `priorBlend` runs from
   // 1 in week 0 to 0 by week four, so this starts high and relaxes to the
   // steady-state `prior_w` — with early_anchor at 0 it IS prior_w throughout,
-  // which is the behaviour every earlier season was rated under.
+  // which is the behavior every earlier season was rated under.
   const anchoredPriorW =
     cfg.prior_w + (1 - cfg.prior_w) * priorBlend * (cfg.early_anchor ?? 0);
 
@@ -192,7 +192,7 @@ export function computeRatings(
   // Out-of-state schools have no rating of their own, so they are treated as
   // one shared opponent and SOLVED like a team rather than fixed at a guess.
   //
-  // The old behaviour pinned every non-AHSAA opponent at `meanRating *
+  // The old behavior pinned every non-AHSAA opponent at `meanRating *
   // oos_mult` for the whole season. That is a decree about a pool we can
   // actually measure: 27 games in 2026 through week two, with the AHSAA side
   // 11-16 and losing the losses badly. A constant set from the field mean

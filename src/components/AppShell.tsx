@@ -2,7 +2,7 @@ import Link from "next/link";
 import TopNav from "./TopNav";
 
 /**
- * Public site chrome: a coloured masthead carrying the wordmark and nav, then
+ * Public site chrome: a colored masthead carrying the wordmark and nav, then
  * one wide content column. No sidebar — the ratings table wants the width.
  */
 export default function AppShell({

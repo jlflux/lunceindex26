@@ -119,7 +119,7 @@ console.log("\n5. Listed non-members import as out-of-state");
   );
 }
 
-console.log("\n6. Out-of-state opponents are recognised by their state");
+console.log("\n6. Out-of-state opponents are recognized by their state");
 {
   for (const raw of ["Pace FL", "Creekside GA", "Jackson Prep MS"]) {
     check(`"${raw}" is out-of-state`, matchTeam({ raw }, index).outOfState === true);

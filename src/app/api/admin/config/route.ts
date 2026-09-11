@@ -76,7 +76,7 @@ function readConfig(body: Record<string, unknown>): EngineConfig {
     );
   }
 
-  // An unrecognised model would silently fall back to classic and look like
+  // An unrecognized model would silently fall back to classic and look like
   // the save had been ignored, so reject it instead.
   const model = body.model;
   if (model !== undefined && model !== null && model !== "") {

@@ -178,7 +178,7 @@ export async function loadAliases(): Promise<Record<string, string>> {
   if (error) throw new Error(`Loading aliases: ${error.message}`);
 
   // The embedded relation comes back as an array or an object depending on
-  // how PostgREST resolves the foreign key; normalise both.
+  // how PostgREST resolves the foreign key; normalize both.
   const out: Record<string, string> = {};
   for (const row of (data ?? []) as unknown as {
     alias: string;

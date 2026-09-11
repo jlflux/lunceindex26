@@ -187,7 +187,7 @@ console.log("\n7. Strength of Record reads the schedule, not the scoreboard");
   check("beating a good team narrowly outranks thrashing a bad one", n > b, `${n.toFixed(3)} vs ${b.toFixed(3)}`);
 }
 
-console.log("\n8. The dispatcher honours the model field");
+console.log("\n8. The dispatcher honors the model field");
 {
   const teams = [team("A", "6A", 20), team("B", "5A", 10)];
   const g = [game("A", 35, "B", 14, 1)];

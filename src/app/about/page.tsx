@@ -92,7 +92,7 @@ export default function AboutPage() {
             <p>
               Each scheduled game shows a projected margin from the rating gap
               plus home-field advantage. Once a result is entered, it is
-              labelled against that projection &mdash; dominant, exceeded, as
+              labeled against that projection &mdash; dominant, exceeded, as
               expected, or below expectation. Projections never feed back into
               the ratings.
             </p>
@@ -103,7 +103,7 @@ export default function AboutPage() {
   );
 }
 
-/** Bulleted point with a class-coloured marker rather than a browser bullet. */
+/** Bulleted point with a class-colored marker rather than a browser bullet. */
 function Point({ children }: { children: React.ReactNode }) {
   return (
     <li className="flex gap-2.5">

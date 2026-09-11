@@ -69,7 +69,7 @@ console.log("\n2. Stripping HS does not collapse distinct schools");
     seen.set(n, t.name);
   }
   check(
-    "no two roster names normalise alike",
+    "no two roster names normalize alike",
     clashes.length === 0,
     clashes.join(", "),
   );

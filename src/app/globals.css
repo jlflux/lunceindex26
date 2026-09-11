@@ -8,7 +8,7 @@
  * which stamps `data-theme` on <html>.
  *
  * There is deliberately no `prefers-color-scheme` block — the theme is a
- * choice between two, not three, and honouring the OS as a third state made
+ * choice between two, not three, and honoring the OS as a third state made
  * the toggle ambiguous.
  */
 :root {
@@ -441,7 +441,7 @@
  * Classification accents, 6A (deepest) down to A.
  *
  * Held as variables rather than baked into the chip rule, because the same
- * colour is also the row's edge stripe on the rankings board and the marker
+ * color is also the row's edge stripe on the rankings board and the marker
  * on schedule rows — one definition, three uses.
  */
 .cls-6A, .stripe-6A { --c: var(--c-6A); }
@@ -458,7 +458,7 @@
   color: rgb(var(--c));
 }
 
-/* Class colour as text, for the line under a team name. */
+/* Class color as text, for the line under a team name. */
 .cls-text {
   color: rgb(var(--c));
   font-weight: 800;

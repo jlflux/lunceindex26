@@ -2,7 +2,7 @@ import Icon, { type IconName } from "./Icon";
 
 /**
  * Metric tile: icon chip, label, figure, and an optional trailing note.
- * `delta` is rendered in the good/bad colour by sign when supplied.
+ * `delta` is rendered in the good/bad color by sign when supplied.
  */
 export default function StatCard({
   icon,

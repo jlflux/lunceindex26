@@ -62,7 +62,7 @@ export const NON_MEMBER_SCHOOLS = new Set(["vina"]);
 /**
  * Whether a name is a known non-member.
  *
- * `extra` holds the admin-maintained names, already normalised. Both sides are
+ * `extra` holds the admin-maintained names, already normalized. Both sides are
  * compared across suffix variants so "Tharptown High School" matches an entry
  * of "Tharptown".
  */
@@ -71,7 +71,7 @@ export function isNonMember(raw: string, extra?: Set<string>): boolean {
   return forms.some((f) => NON_MEMBER_SCHOOLS.has(f) || extra?.has(f));
 }
 
-/** Normalises a stored list of non-member names for matching. */
+/** Normalizes a stored list of non-member names for matching. */
 export function nonMemberSet(names: string[]): Set<string> {
   const out = new Set<string>();
   for (const n of names) for (const v of variants(n)) out.add(v);
@@ -393,7 +393,7 @@ export interface MatchInput {
   regionToken?: string;
   /** Extra aliases resolved by an admin previously. */
   extraAliases?: Record<string, string>;
-  /** Admin-maintained non-members, normalised by `nonMemberSet`. */
+  /** Admin-maintained non-members, normalized by `nonMemberSet`. */
   nonMembers?: Set<string>;
 }
 
@@ -430,10 +430,10 @@ export function matchTeam(
 
   // 1. explicit aliases (admin-resolved ones take precedence)
   //
-  // Matched on the normalised form as well as verbatim: the alias table was
+  // Matched on the normalized form as well as verbatim: the alias table was
   // written against the schedule sheets ("Johnson-Abernathy-Graetz HS") and
   // the results sheets spell the same school differently ("Johnson Abernathy
-  // Graetz"). Both reduce to the same normalised string.
+  // Graetz"). Both reduce to the same normalized string.
   const alias =
     input.extraAliases?.[raw] ??
     ALIASES[raw] ??
@@ -567,10 +567,10 @@ export function cleanOosName(raw: string): string {
 }
 
 /**
- * The alias table keyed by normalised name.
+ * The alias table keyed by normalized name.
  *
  * Built once. The same school reaches us spelled several ways across the
- * AHSAA's own documents, and every one of them reduces to the same normalised
+ * AHSAA's own documents, and every one of them reduces to the same normalized
  * string — so one entry covers all of them rather than needing a row each.
  */
 const NORMALIZED_ALIASES: Record<string, string> = (() => {

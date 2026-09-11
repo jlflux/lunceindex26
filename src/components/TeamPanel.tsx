@@ -87,7 +87,7 @@ export default function TeamPanel({
         role="dialog"
         aria-label={`${t.name} profile`}
       >
-        {/* Header. The class colour runs the full width as a top rule so the
+        {/* Header. The class color runs the full width as a top rule so the
             panel is identifiable at a glance before anything is read. */}
         <div
           className={`sticky top-0 z-10 border-b px-5 py-4 cls-${t.classification}`}
@@ -251,7 +251,7 @@ export default function TeamPanel({
   );
 }
 
-/** Small pill carrying a rank, in the brand red or the team's class colour. */
+/** Small pill carrying a rank, in the brand red or the team's class color. */
 function RankBadge({
   label,
   tone,

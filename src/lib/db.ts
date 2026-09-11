@@ -27,7 +27,7 @@ function required(name: string): string {
  * `/rest/v1/rest/v1/games`, and a doubled slash produces `//rest/v1/games`.
  * Both come back from the API gateway as "Invalid path specified in request
  * URL", which says nothing about the actual cause. Easy to paste in by
- * accident, so normalise rather than fail.
+ * accident, so normalize rather than fail.
  */
 export function normalizeSupabaseUrl(raw: string): string {
   const trimmed = raw.trim().replace(/^['"]|['"]$/g, "");

@@ -5,7 +5,7 @@ import type { Game } from "@/lib/types";
 
 const ROUNDS = ["r1", "r2", "r3", "r4", "r5"];
 
-/** Validates and normalises a game payload from the admin UI. */
+/** Validates and normalizes a game payload from the admin UI. */
 function readGame(body: Record<string, unknown>): Partial<Game> {
   const t1 = String(body.t1 ?? "").trim();
   const t2 = String(body.t2 ?? "").trim();

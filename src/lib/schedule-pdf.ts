@@ -133,7 +133,7 @@ function toCells(row: Row): string[] {
 const DATE_RE =
   /^(?:[A-Z][a-z]{2}\.?\s+\d{1,2},\s*\d{4}|\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?|\d{2}-\d{2}-\d{4})$/;
 
-/** Normalises either form to the display format used everywhere else. */
+/** Normalizes either form to the display format used everywhere else. */
 function displayDate(raw: string): string {
   // Two orderings in circulation: the schedule sheets write YYYY-MM-DD, the
   // results sheets MM-DD-YYYY. Both reach here.

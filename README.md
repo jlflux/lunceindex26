@@ -52,7 +52,7 @@ npm run setup                # write it
 Either route is idempotent and safe to re-run mid-season. Teams upsert by name,
 games upsert on their natural key, and **a game that already has scores is
 never touched** — nor is a formula config you have already tuned. Both
-behaviours are verified against a real Postgres instance, not just asserted.
+behaviors are verified against a real Postgres instance, not just asserted.
 
 Regenerate the SQL after changing anything in `data/`:
 

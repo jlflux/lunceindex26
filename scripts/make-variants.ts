@@ -99,7 +99,7 @@ const CLS = ["6A", "5A", "4A", "3A", "2A", "1A", "AA", "A"];
 
 /**
  * One palette across all three so the comparison is about layout and the use
- * of colour, not about three different colour schemes. Richer than the current
+ * of color, not about three different color schemes. Richer than the current
  * flat navy: the canvas carries a slight violet lift and surfaces step up
  * three levels instead of two.
  */

@@ -2,6 +2,7 @@ import AppShell, { PageHeader } from "@/components/AppShell";
 import EmptyState from "@/components/EmptyState";
 import ScheduleBrowser from "@/components/ScheduleBrowser";
 import { loadRatings } from "@/lib/data";
+import { currentWeekKey } from "@/lib/season";
 
 export const revalidate = 300;
 export const metadata = { title: "Schedule" };
@@ -29,11 +30,16 @@ export default async function SchedulePage() {
     t2Rank: rated.get(g.t2)?.rank ?? null,
   }));
 
+  // Which week to open on. Computed here rather than in the browser so the
+  // first paint already shows it — the page revalidates every five minutes,
+  // so it is never more than that stale.
+  const opening = currentWeekKey(data.games) ?? "all";
+
   return (
     <AppShell generated={data.generated}>
       <PageHeader
         title="Schedule"
-        subtitle="Every game on file, ordered by the home team’s classification. Results appear as soon as both scores are entered."
+        subtitle="Opens on the current week, which runs Monday through Sunday so a weekend’s results stay up until the next one starts. Results appear as soon as both scores are entered."
       />
       {games.length === 0 ? (
         <EmptyState
@@ -42,7 +48,7 @@ export default async function SchedulePage() {
           icon="calendar"
         />
       ) : (
-        <ScheduleBrowser games={games} />
+        <ScheduleBrowser games={games} initialWeek={opening} />
       )}
     </AppShell>
   );

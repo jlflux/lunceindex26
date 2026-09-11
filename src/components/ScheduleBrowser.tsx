@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import Icon from "./Icon";
 import { weekLabel } from "@/lib/format";
+import { weekKey, weekOrder } from "@/lib/season";
 import {
   CLS_FILTER_ORDER,
   type Classification,
@@ -30,31 +31,33 @@ function classOrder(c: Classification | null): number {
   return i < 0 ? CLS_FILTER_ORDER.length : i;
 }
 
-export default function ScheduleBrowser({ games }: { games: ScheduleGame[] }) {
+export default function ScheduleBrowser({
+  games,
+  initialWeek = "all",
+}: {
+  games: ScheduleGame[];
+  /** Which week to open on. The page works this out from today's date. */
+  initialWeek?: string;
+}) {
   const [cls, setCls] = useState<Classification | "all">("all");
-  const [week, setWeek] = useState<string>("all");
+  const [week, setWeek] = useState<string>(initialWeek);
   const [query, setQuery] = useState("");
 
   const weeks = useMemo(() => {
     const keys = new Map<string, ScheduleGame>();
     for (const g of games) {
-      const k = g.type === "playoff" ? `p:${g.round ?? "r0"}` : `r:${g.week}`;
+      const k = weekKey(g);
       if (!keys.has(k)) keys.set(k, g);
     }
-    return [...keys.entries()].sort((a, b) => {
-      const rank = (k: string) =>
-        k.startsWith("p:") ? 100 + Number(k.slice(3) || 0) : Number(k.slice(2));
-      return rank(a[0]) - rank(b[0]);
-    });
+    return [...keys.entries()].sort(
+      (a, b) => weekOrder(a[0]) - weekOrder(b[0]),
+    );
   }, [games]);
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = games.filter((g) => {
-      if (week !== "all") {
-        const k = g.type === "playoff" ? `p:${g.round ?? "r0"}` : `r:${g.week}`;
-        if (k !== week) return false;
-      }
+      if (week !== "all" && weekKey(g) !== week) return false;
       // Either side matching keeps a team's away games in its own filter.
       if (cls !== "all" && g.t1Class !== cls && g.t2Class !== cls) return false;
       if (q && !`${g.t1} ${g.t2}`.toLowerCase().includes(q)) return false;
@@ -62,6 +65,14 @@ export default function ScheduleBrowser({ games }: { games: ScheduleGame[] }) {
     });
 
     return filtered.sort((a, b) => {
+      // Chronological first, always. Searching one team used to return its
+      // season in the order 6, 7, 2, 9, 10, 4, 3, 8, 1, 0 — sorted by the
+      // opponent's classification, which is meaningless when every row is the
+      // same team. Inside a single week this key is constant and the old
+      // class-then-rank ordering takes over unchanged.
+      const wa = weekOrder(weekKey(a));
+      const wb = weekOrder(weekKey(b));
+      if (wa !== wb) return wa - wb;
       const ca = classOrder(a.t1Class);
       const cb = classOrder(b.t1Class);
       if (ca !== cb) return ca - cb;
@@ -97,7 +108,15 @@ export default function ScheduleBrowser({ games }: { games: ScheduleGame[] }) {
             className="input !pl-9"
             placeholder="Search teams…"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              // Searching a team means you want that team's season, not the
+              // one game of theirs that falls in the week being shown. Only on
+              // the transition into a search, so the week pills still work
+              // while one is typed.
+              if (!query.trim() && next.trim()) setWeek("all");
+              setQuery(next);
+            }}
             aria-label="Search games"
             style={{ background: "rgb(var(--surface-2))" }}
           />

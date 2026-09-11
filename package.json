@@ -22,7 +22,8 @@
     "test:names": "tsx scripts/test-names.ts",
     "test:week0": "tsx scripts/test-week0.ts",
     "test:pdf": "tsx scripts/test-schedule-pdf.ts",
-    "test:twoway": "tsx scripts/test-twoway.ts"
+    "test:twoway": "tsx scripts/test-twoway.ts",
+    "test:season": "tsx scripts/test-season.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

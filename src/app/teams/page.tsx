@@ -13,7 +13,7 @@ export default async function TeamsPage() {
     <AppShell generated={data.generated}>
       <PageHeader
         title="All Teams"
-        subtitle="Every AHSAA football program, grouped by classification and region."
+        subtitle="Every AHSAA football program, grouped by classification and region. Records read overall first, then region — and region order is what decides the playoffs."
       />
       {data.ratings.length === 0 ? (
         <EmptyState
@@ -22,7 +22,7 @@ export default async function TeamsPage() {
           icon="users"
         />
       ) : (
-        <TeamDirectory rows={data.ratings} />
+        <TeamDirectory rows={data.ratings} games={data.games} />
       )}
     </AppShell>
   );

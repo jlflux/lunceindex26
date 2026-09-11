@@ -4,15 +4,34 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import Icon from "./Icon";
 import { fmt, ordinal, record } from "@/lib/format";
+import { regionRecords, standingsCompare } from "@/lib/season";
 import {
   CLS_FILTER_ORDER,
   type Classification,
+  type Game,
   type RatingRow,
 } from "@/lib/types";
 
-export default function TeamDirectory({ rows }: { rows: RatingRow[] }) {
+/** Region record, or a dash when region play has not started. */
+function regionLabel(r: { wins: number; losses: number } | undefined): string {
+  if (!r || r.wins + r.losses === 0) return "0-0";
+  return `${r.wins}-${r.losses}`;
+}
+
+export default function TeamDirectory({
+  rows,
+  games = [],
+}: {
+  rows: RatingRow[];
+  games?: Game[];
+}) {
   const [query, setQuery] = useState("");
   const [cls, setCls] = useState<Classification | "all">("all");
+
+  // Region record is what qualifies a team for the playoffs, so it leads the
+  // ordering inside each region box — ahead of the rating, which has no
+  // bearing on qualification at all.
+  const reg = useMemo(() => regionRecords(rows, games), [rows, games]);
 
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -101,8 +120,8 @@ export default function TeamDirectory({ rows }: { rows: RatingRow[] }) {
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {[...regions.keys()]
                 .sort((a, b) => a - b)
-                .map((reg) => (
-                  <div key={reg} className="card overflow-hidden">
+                .map((regionNo) => (
+                  <div key={regionNo} className="card overflow-hidden">
                     <div
                       className="border-b px-3 py-2 text-[11px] font-bold uppercase tracking-wider"
                       style={{
@@ -111,12 +130,11 @@ export default function TeamDirectory({ rows }: { rows: RatingRow[] }) {
                         color: "rgb(var(--text-faint))",
                       }}
                     >
-                      Region {reg}
+                      Region {regionNo}
                     </div>
                     <ul className="divide-y" style={{ borderColor: "rgb(var(--border))" }}>
-                      {regions
-                        .get(reg)!
-                        .sort((a, b) => b.rating - a.rating)
+                      {[...regions.get(regionNo)!]
+                        .sort((a, b) => standingsCompare(a, b, reg))
                         .map((t) => (
                           <li key={t.slug}>
                             <Link
@@ -131,7 +149,11 @@ export default function TeamDirectory({ rows }: { rows: RatingRow[] }) {
                                   className="text-[11px]"
                                   style={{ color: "rgb(var(--text-faint))" }}
                                 >
-                                  {ordinal(t.rank)} · {record(t.wins, t.losses)}
+                                  {ordinal(t.rank)} ·{" "}
+                                  {record(t.wins, t.losses)}{" "}
+                                  <span style={{ color: "rgb(var(--text-muted))" }}>
+                                    ({regionLabel(reg.get(t.name))})
+                                  </span>
                                 </span>
                               </span>
                               <span className="shrink-0 text-[13px] font-bold tnum">

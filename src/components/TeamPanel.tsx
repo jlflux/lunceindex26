@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 import Icon from "./Icon";
 import {
@@ -99,9 +100,22 @@ export default function TeamPanel({
         >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h2 className="truncate text-[27px] font-extrabold leading-tight tracking-[-0.03em]">
-                {t.name}
-              </h2>
+              {/* The name is the way out of the drawer to the full team page;
+                  without it the drawer is a dead end you have to close first. */}
+              <Link
+                href={`/team/${t.slug}`}
+                className="group block min-w-0"
+                title={`Open the ${t.name} team page`}
+              >
+                <h2 className="truncate text-[27px] font-extrabold leading-tight tracking-[-0.03em] group-hover:underline">
+                  {t.name}
+                  <Icon
+                    name="arrow-left"
+                    size={16}
+                    className="ml-1.5 inline-block rotate-180 align-baseline opacity-0 transition-opacity group-hover:opacity-60"
+                  />
+                </h2>
+              </Link>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span
                   className="chip !px-2 !py-1 !text-[12px] !font-extrabold"

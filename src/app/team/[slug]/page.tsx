@@ -180,14 +180,14 @@ export default async function TeamPage({
               {typeof t.adj_o === "number" && (
                 <>
                   <Metric
-                    label="Adjusted offence"
+                    label="Adjusted offense"
                     value={hasSplit ? fmt(t.adj_o, 1) : "—"}
-                    hint="Points this team would score on an average AHSAA defence"
+                    hint="Points this team would score on an average AHSAA defense"
                   />
                   <Metric
-                    label="Adjusted defence"
+                    label="Adjusted defense"
                     value={hasSplit ? fmt(t.adj_d ?? 0, 1) : "—"}
-                    hint="Points it would allow to an average AHSAA offence"
+                    hint="Points it would allow to an average AHSAA offense"
                   />
                 </>
               )}

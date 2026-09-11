@@ -35,7 +35,7 @@ const TWOWAY_GROUPS: { title: string; blurb: string; knobs: TwoWayKnob[] }[] = [
       "How far a team is allowed to move off its prior. Both are in pseudo-games: at lambda 1.5, a team's carry-over weighs the same as one and a half games of results.",
     knobs: [
       { key: "lambda", label: "Level shrinkage", min: 0.1, max: 20, step: 0.1, help: "Applies to the overall rating, in pseudo-games — at 1.5, a team's carry-over weighs the same as one and a half games of results. Raising it kept a 0-2 team above the 3-0 team that shut it out." },
-      { key: "split_lambda", label: "Offence/defence split shrinkage", min: 0, max: 60, step: 0.5, help: "Harder than the level: split-half reliability puts net at r=0.36 but the offence/defence split at only r=0.16. Too high and it manufactures the split out of the net rating — at 4, a team averaging four points a game showed an adjusted offence of 54. A full 2025 season predicts the same anywhere from 0 to 8." },
+      { key: "split_lambda", label: "Offense/defense split shrinkage", min: 0, max: 60, step: 0.5, help: "Harder than the level: split-half reliability puts net at r=0.36 but the offense/defense split at only r=0.16. Too high and it manufactures the split out of the net rating — at 4, a team averaging four points a game showed an adjusted offense of 54. A full 2025 season predicts the same anywhere from 0 to 8." },
     ],
   },
   {
@@ -60,7 +60,7 @@ const TWOWAY_GROUPS: { title: string; blurb: string; knobs: TwoWayKnob[] }[] = [
   {
     title: "Scoring ceiling",
     blurb:
-      "A multiplicative model has no upper bound and football does — 48 minutes, starters pulled, a clock that keeps running. Without this the best offence in the state read as 94 points a game.",
+      "A multiplicative model has no upper bound and football does — 48 minutes, starters pulled, a clock that keeps running. Without this the best offense in the state read as 94 points a game.",
     knobs: [
       { key: "ceiling_from", label: "Ceiling starts at", min: 10, max: 200, step: 1, help: "Adjusted figures below this are left exactly as solved." },
       { key: "ceiling", label: "Ceiling", min: 10, max: 400, step: 1, help: "No adjusted figure can exceed this. Chosen off the 2025 holdout: the tail over-prediction falls from 13% to 5% while margin error moves only 13.74 to 13.81. Tighter values calibrate the tail further but start costing real accuracy." },
@@ -254,7 +254,7 @@ export default function FormulaEditor({ initial }: { initial: EngineConfig }) {
                   ],
                   [
                     "twoway",
-                    "Two-way (adjusted offence & defence)",
+                    "Two-way (adjusted offense & defense)",
                     "Solves what you score and what you allow separately, each adjusted for the opponent. Over the full 2025 season it picks 82.7% of winners out of sample with a calibration slope of 1.01, and its 2025 board correlates 0.982 with the one that shipped.",
                   ],
                 ] as [RatingModel, string, string][]

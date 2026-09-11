@@ -25,7 +25,7 @@ console.log(
 );
 
 console.log(
-  "     CLASSIC (Massey)                      |  TWO-WAY (adjusted offence & defence)",
+  "     CLASSIC (Massey)                      |  TWO-WAY (adjusted offense & defense)",
 );
 console.log(
   "  #  Team                    Rating  Rec   |  #  Team                     Net  AdjO  AdjD   SoR",

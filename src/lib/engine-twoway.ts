@@ -1,5 +1,5 @@
 /**
- * The two-way rating engine: opponent-adjusted scoring offence and defence.
+ * The two-way rating engine: opponent-adjusted scoring offense and defense.
  *
  * The classic engine (engine.ts) solves ONE number per team out of margins.
  * This solves two — what you score and what you allow, each corrected for the
@@ -7,14 +7,14 @@
  *
  *   points i scores on j  ≈  μ · exp(o_i) · exp(d_j) · exp(site)
  *
- *   AdjO_i = μ·exp(o_i)   points i would score on an average AHSAA defence
- *   AdjD_i = μ·exp(d_i)   points i would allow to an average AHSAA offence
+ *   AdjO_i = μ·exp(o_i)   points i would score on an average AHSAA defense
+ *   AdjD_i = μ·exp(d_i)   points i would allow to an average AHSAA offense
  *   rating = AdjO_i − AdjD_i
  *
  * Everything is multiplicative, in log space. An additive version of this was
  * tried first and had to be abandoned: it predicts NEGATIVE points for the
- * best defences, which is not a rounding problem but the model being wrong
- * about what a score is. A good defence holds you to a FRACTION of your usual
+ * best defenses, which is not a rounding problem but the model being wrong
+ * about what a score is. A good defense holds you to a FRACTION of your usual
  * output rather than subtracting a fixed number from it.
  *
  * Solved figures pass through a scoring CEILING before being published, because
@@ -28,7 +28,7 @@
  * shipped. See scripts/validate-2025-season.ts, which asserts all of it —
  * including that the POINTS predictions calibrate, not only the margins. That
  * check was missing at first, and its absence is exactly how an adjusted
- * offence of 94 points a game reached the public site.
+ * offense of 94 points a game reached the public site.
  */
 
 import {
@@ -48,7 +48,7 @@ const mean = (xs: number[]) =>
  *
  * Identity up to `from`, then bending over to approach `ceiling` and never
  * reaching it. A multiplicative model is unbounded above and football is not,
- * so without this the best offence in the state reads as 94 points a game.
+ * so without this the best offense in the state reads as 94 points a game.
  *
  * Applied to the solved figures rather than inside the solve: that is the
  * form the 2025 season validates, and it leaves the ranking essentially
@@ -160,7 +160,7 @@ export function computeTwoWay(
   // Net margin → a symmetric pair of log multipliers, exactly: a team expected
   // to beat the average side by N is seeded perfectly balanced with net N,
   // since N = 2μ·sinh(n/2). Seeding by halving N in POINTS is what let the
-  // prior assert a −33-point defence in an earlier draft.
+  // prior assert a −33-point defense in an earlier draft.
   const priorNetLog = new Map<string, number>();
   for (const t of teams) {
     const net =
@@ -193,8 +193,8 @@ export function computeTwoWay(
     for (const team of scoredBy.keys()) {
       const pn = priorNetLog.get(team) ?? 0;
 
-      // Offence: points actually scored, over what an average offence would
-      // have scored against those same defences. λ pseudo-games held at the
+      // Offense: points actually scored, over what an average offense would
+      // have scored against those same defenses. λ pseudo-games held at the
       // prior rate, which is also what stops a shut-out team taking log(0).
       let num = cfg.lambda * mu * Math.exp(pn / 2);
       let den = cfg.lambda * mu;
@@ -218,8 +218,8 @@ export function computeTwoWay(
       // balanced, and much harder. Split-half reliability over 275 teams puts
       // net (AdjO − AdjD) at r = 0.36 but the split (AdjO + AdjD) at only
       // r = 0.16: margins tell you how good a team is, and much less about
-      // whether that comes from the offence or the defence. Leaving the split
-      // free let one 56-point night against a good defence carry a team to
+      // whether that comes from the offense or the defense. Leaving the split
+      // free let one 56-point night against a good defense carry a team to
       // second overall.
       const net = rawO - rawD;
       const bal =

@@ -167,7 +167,7 @@ console.log(
     `AdjD ${minD.toFixed(1)}..${Math.max(...played.map((r) => r.adj_d as number)).toFixed(1)}`,
 );
 // The whole reason for the multiplicative form. An additive version of this
-// model put Thompson's adjusted defence at −13 points a game.
+// model put Thompson's adjusted defense at −13 points a game.
 check("no team scores or concedes a negative number of points", minD > 0 && minO > 0);
 check(
   "the champion is at the top",
@@ -220,11 +220,11 @@ console.log("\n5. AdjO means what it says");
 {
   // The check that was missing. Margins were validated from the start; the
   // per-team POINTS were not, and AdjO is a claim about points — "this team
-  // would score X against an average AHSAA defence". Unbounded, the model was
-  // claiming 94 for the best offence in the state.
+  // would score X against an average AHSAA defense". Unbounded, the model was
+  // claiming 94 for the best offense in the state.
   //
   // Tested against the claim rather than against a game-level product: take
-  // only the games where the opponent's defence really was close to average,
+  // only the games where the opponent's defense really was close to average,
   // and see whether teams scored near their AdjO in them.
   //
   // This is a sanity check, NOT a tripwire for the 94-point bug. Checked: with
@@ -259,7 +259,7 @@ console.log("\n5. AdjO means what it says");
     };
   };
   console.log(
-    `  ${near.length} team-games against a genuinely average defence`,
+    `  ${near.length} team-games against a genuinely average defense`,
   );
   for (const [lo, hi] of [
     [0, 20],
@@ -275,13 +275,13 @@ console.log("\n5. AdjO means what it says");
   }
   const top = band(40, 500);
   check(
-    "high-scoring teams score near their AdjO against average defences",
+    "high-scoring teams score near their AdjO against average defenses",
     top.n >= 15 && top.claim / top.act < 1.15,
     `claims ${top.claim.toFixed(1)}, scored ${top.act.toFixed(1)} over ${top.n} games`,
   );
   const maxO = Math.max(...rows.map((r) => r.adj_o as number));
   check(
-    "no adjusted offence exceeds the ceiling",
+    "no adjusted offense exceeds the ceiling",
     maxO <= CFG.ceiling,
     `max ${maxO.toFixed(1)}, ceiling ${CFG.ceiling}`,
   );

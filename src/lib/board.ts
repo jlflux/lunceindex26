@@ -6,7 +6,7 @@
  *
  *   classic  the modified Massey solver in engine.ts — one rating per team,
  *            derived from margins, with SOS and win-rate bolted on after.
- *   twoway   engine-twoway.ts — opponent-adjusted scoring offence and defence
+ *   twoway   engine-twoway.ts — opponent-adjusted scoring offense and defense
  *            solved separately, rating = the difference.
  *
  * Against the 2025 season the two-way engine predicts better (82.7% on winners

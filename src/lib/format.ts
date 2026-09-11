@@ -80,15 +80,15 @@ export const MIN_GAMES_FOR_EFFICIENCY = 3;
 export const SHOW_EFFICIENCY = false;
 
 /**
- * Games a team needs before its adjusted offence and defence are worth
+ * Games a team needs before its adjusted offense and defense are worth
  * showing.
  *
  * The two-way engine's NET rating is meaningful from the first week — it is
- * what the whole board is sorted by. The split between offence and defence is
+ * what the whole board is sorted by. The split between offense and defense is
  * not: with two games played the carry-over supplies roughly half of it, so
  * the figures follow the team's overall rating rather than its actual
  * scoring. Muscle Shoals through week two averaged four points a game and
- * showed an adjusted offence of fifty.
+ * showed an adjusted offense of fifty.
  *
  * Three games is where the team's own results outweigh the prior. The net
  * rating and the record are never gated — only the split.

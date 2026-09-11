@@ -53,7 +53,7 @@ const solve = (t: Team[], g: Game[], c: Partial<typeof TWOWAY_DEFAULTS> = {}) =>
 console.log("\n1. Points can never come out negative");
 {
   // The reason this engine is multiplicative. An additive version of the same
-  // model put the best defence in the state at −13 points a game, because
+  // model put the best defense in the state at −13 points a game, because
   // nothing in it knows a score has a floor.
   const teams = [
     team("Monster", "6A", 40),
@@ -67,8 +67,8 @@ console.log("\n1. Points can never come out negative");
   ]);
   const worst = Math.min(...res.ratings.map((r) => r.adj_d as number));
   const leanest = Math.min(...res.ratings.map((r) => r.adj_o as number));
-  check("no negative adjusted defence", worst > 0, `min ${worst.toFixed(2)}`);
-  check("no negative adjusted offence", leanest > 0, `min ${leanest.toFixed(2)}`);
+  check("no negative adjusted defense", worst > 0, `min ${worst.toFixed(2)}`);
+  check("no negative adjusted offense", leanest > 0, `min ${leanest.toFixed(2)}`);
   check(
     "and the rating is still the difference of the two",
     res.ratings.every(
@@ -93,7 +93,7 @@ console.log("\n2. A shut-out does not blow up the solve");
   check("the shut-out team scores above zero, not at it", (z.adj_o as number) > 0);
 }
 
-console.log("\n3. The offence/defence split is shrunk harder than the level");
+console.log("\n3. The offense/defense split is shrunk harder than the level");
 {
   // One freak offensive night must not decide a season. Same net margin, very
   // different shape: a 56-42 win and a 21-7 win are both +14.
@@ -110,7 +110,7 @@ console.log("\n3. The offence/defence split is shrunk harder than the level");
     return Math.abs((a.adj_o as number) - (b.adj_o as number));
   };
   check(
-    "hard shrinkage pulls the two offences together",
+    "hard shrinkage pulls the two offenses together",
     gap(tight) < gap(loose),
     `${gap(tight).toFixed(2)} vs ${gap(loose).toFixed(2)}`,
   );

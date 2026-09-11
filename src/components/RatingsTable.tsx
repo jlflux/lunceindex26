@@ -264,13 +264,13 @@ export default function RatingsTable({
                     <>
                       <th
                         className="th hidden !text-right md:table-cell"
-                        title="Points this team would score on an average AHSAA defence"
+                        title="Points this team would score on an average AHSAA defense"
                       >
                         Adj O
                       </th>
                       <th
                         className="th hidden !text-right md:table-cell"
-                        title="Points this team would allow to an average AHSAA offence"
+                        title="Points this team would allow to an average AHSAA offense"
                       >
                         Adj D
                       </th>

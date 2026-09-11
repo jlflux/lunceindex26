@@ -283,7 +283,7 @@ export interface TwoWayConfig {
    */
   lambda: number;
   /**
-   * Shrinkage on the offence/defence split. Deliberately far harder than
+   * Shrinkage on the offense/defense split. Deliberately far harder than
    * `lambda`: net is reliable (split-half r = 0.36), the split much less so
    * (r = 0.16).
    */
@@ -311,7 +311,7 @@ export interface TwoWayConfig {
    *
    * A purely multiplicative model has no upper bound, and football does — 48
    * minutes, starters pulled, a clock that keeps running. Left unbounded it
-   * put Thompson's adjusted offence at 94 points a game. Out of sample on the
+   * put Thompson's adjusted offense at 94 points a game. Out of sample on the
    * 2025 season, when the model predicted 70+ the teams actually scored 56,
    * and predictions at 50+ ran about 13% hot. With the ceiling the same tail
    * predicts 51.5 against 49.0 actual.
@@ -337,9 +337,9 @@ export const TWOWAY_DEFAULTS: TwoWayConfig = {
   lambda: 1.5,
   // Was 4. On a full 2025 season anything from 0 to 8 predicts the same
   // (MAE 13.74-13.93), so the heavy setting was buying nothing and costing
-  // something: it manufactures the offence/defence split out of the net
+  // something: it manufactures the offense/defense split out of the net
   // rating, which is how a team averaging 4 points a game came to show an
-  // adjusted offence of 54.
+  // adjusted offense of 54.
   split_lambda: 2,
   prior_scale: 1.75,
   class_spread: 55,

@@ -32,10 +32,10 @@ const TWOWAY_GROUPS: { title: string; blurb: string; knobs: TwoWayKnob[] }[] = [
   {
     title: "Shrinkage",
     blurb:
-      "How far a team is allowed to move off its prior. Both are in pseudo-games: at lambda 2, two games of evidence weigh the same as the prior.",
+      "How far a team is allowed to move off its prior. Both are in pseudo-games: at lambda 1.5, a team's carry-over weighs the same as one and a half games of results.",
     knobs: [
-      { key: "lambda", label: "Level shrinkage", min: 0.1, max: 20, step: 0.1, help: "Applies to the overall rating. About 2 against a real carry-over rating, about 1 against a bare class baseline — a stronger prior earns more weight." },
-      { key: "split_lambda", label: "Offence/defence split shrinkage", min: 0, max: 60, step: 0.5, help: "Deliberately much harder than the level. Split-half reliability puts net at r=0.36 but the offence/defence split at only r=0.16: margins say how good you are, far less about which unit is doing it. Leaving this low let one 56-point night carry a team to second overall." },
+      { key: "lambda", label: "Level shrinkage", min: 0.1, max: 20, step: 0.1, help: "Applies to the overall rating, in pseudo-games — at 1.5, a team's carry-over weighs the same as one and a half games of results. Raising it kept a 0-2 team above the 3-0 team that shut it out." },
+      { key: "split_lambda", label: "Offence/defence split shrinkage", min: 0, max: 60, step: 0.5, help: "Harder than the level: split-half reliability puts net at r=0.36 but the offence/defence split at only r=0.16. Too high and it manufactures the split out of the net rating — at 4, a team averaging four points a game showed an adjusted offence of 54. A full 2025 season predicts the same anywhere from 0 to 8." },
     ],
   },
   {

@@ -9,6 +9,7 @@
  * Usage: npx tsx scripts/compare-boards.ts [rows]
  */
 import { computeBoard } from "../src/lib/board";
+import { MIN_GAMES_FOR_SPLIT } from "../src/lib/format";
 import { roster, games } from "./tune";
 
 const rows = Number(process.argv[2]) || 20;
@@ -32,10 +33,16 @@ console.log(
 for (let i = 0; i < Math.min(rows, classic.ratings.length); i++) {
   const c = classic.ratings[i];
   const t = twoway.ratings[i];
+  // The split is prior-dominated until a team has played a few games; the net
+  // rating is not. Show a dash rather than a number the results cannot support.
+  const split =
+    t.wins + t.losses >= MIN_GAMES_FOR_SPLIT
+      ? `${(t.adj_o as number).toFixed(1).padStart(5)} ${(t.adj_d as number).toFixed(1).padStart(5)}`
+      : `${"—".padStart(5)} ${"—".padStart(5)}`;
   console.log(
     `${String(i + 1).padStart(3)}  ${c.name.padEnd(22)} ${c.rating.toFixed(1).padStart(6)}  ${c.wins}-${c.losses}  ` +
       `| ${String(i + 1).padStart(2)}  ${t.name.padEnd(22)} ${t.rating.toFixed(1).padStart(5)} ` +
-      `${(t.adj_o as number).toFixed(1).padStart(5)} ${(t.adj_d as number).toFixed(1).padStart(5)} ` +
+      `${split} ` +
       `${(t.sor as number) >= 0 ? "+" : ""}${(t.sor as number).toFixed(2).padStart(5)}`,
   );
 }

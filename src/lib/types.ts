@@ -309,8 +309,18 @@ export interface TwoWayConfig {
 }
 
 export const TWOWAY_DEFAULTS: TwoWayConfig = {
-  lambda: 2,
-  split_lambda: 4,
+  // 2 kept a 0-2 team that had scored four points a game above the 3-0 team
+  // which shut it out. The carry-over is worth about half a team's rating at
+  // two games played, and that is too much to still be saying after a team
+  // has been beaten twice. 1.5 moves off it faster; margin error is unchanged
+  // at 17.08 and the 2025 season is unaffected.
+  lambda: 1.5,
+  // Was 4. On a full 2025 season anything from 0 to 8 predicts the same
+  // (MAE 13.74-13.93), so the heavy setting was buying nothing and costing
+  // something: it manufactures the offence/defence split out of the net
+  // rating, which is how a team averaging 4 points a game came to show an
+  // adjusted offence of 54.
+  split_lambda: 2,
   prior_scale: 1.75,
   class_spread: 55,
   recency: 0.95,

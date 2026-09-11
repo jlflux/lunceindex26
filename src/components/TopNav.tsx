@@ -15,6 +15,8 @@ import ThemeToggle from "./ThemeToggle";
  */
 const LINKS = [
   { href: "/", label: "Power Index" },
+  { href: "/composite", label: "Composite" },
+  { href: "/aswa", label: "ASWA" },
   { href: "/resume", label: "Résumé" },
   { href: "/teams", label: "Standings" },
   { href: "/schedule", label: "Schedule" },
@@ -66,7 +68,8 @@ export default function TopNav({
         {/* Deliberately wrapping rather than scrolling: a scroll container
             here added a stray horizontal scrollbar under the nav. Five links
             no longer fit on one phone-width line, so the gap tightens and the
-            row is allowed to wrap onto a second line instead. */}
+            row is allowed to wrap onto as many lines as it needs. At seven it
+            wraps on a laptop too, which is fine — it is a nav, not a slogan. */}
         <nav className="order-3 flex w-full flex-wrap items-center gap-x-4 sm:order-none sm:w-auto sm:flex-nowrap sm:gap-x-6">
           {LINKS.map((l) => (
             <Link

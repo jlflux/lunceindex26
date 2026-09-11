@@ -10,6 +10,8 @@ const LINKS = [
   { href: "/admin/games", label: "Games" },
   { href: "/admin/import", label: "Import" },
   { href: "/admin/formula", label: "Formula" },
+  { href: "/admin/composite", label: "Composite" },
+  { href: "/admin/aswa", label: "ASWA" },
   { href: "/admin/teams", label: "Teams" },
 ] as const;
 

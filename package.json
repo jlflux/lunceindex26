@@ -23,7 +23,8 @@
     "test:week0": "tsx scripts/test-week0.ts",
     "test:pdf": "tsx scripts/test-schedule-pdf.ts",
     "test:twoway": "tsx scripts/test-twoway.ts",
-    "test:season": "tsx scripts/test-season.ts"
+    "test:season": "tsx scripts/test-season.ts",
+    "test:rankings": "tsx scripts/test-rankings.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

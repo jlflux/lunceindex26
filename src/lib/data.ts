@@ -9,6 +9,7 @@ import "server-only";
 
 import { computeBoard } from "./board";
 import { publicClient, serviceClient } from "./db";
+import type { AswaEntry, CompositeEntry } from "./rankings";
 import {
   DEFAULT_CONFIG,
   type EngineConfig,
@@ -46,6 +47,84 @@ export async function loadTeams(admin = false): Promise<Team[]> {
 export async function loadGames(admin = false): Promise<Game[]> {
   const c = admin ? serviceClient() : publicClient();
   return selectAll<Game>(c, "games", "id");
+}
+
+/**
+ * The hand-entered outside poll numbers behind the Composite.
+ *
+ * Our own rank is deliberately not stored here — it is read off the published
+ * board when the page renders, so the two can never disagree.
+ */
+export async function loadComposite(admin = false): Promise<CompositeEntry[]> {
+  const preview = await previewSlice<CompositeEntry>("composite");
+  if (preview) return preview;
+  try {
+    const c = admin ? serviceClient() : publicClient();
+    const { data, error } = await c
+      .from("composite_ranks")
+      .select("*")
+      .order("team");
+    // Reading an admin board should say why it failed; the public page just
+    // shows its empty state.
+    if (error) {
+      if (admin && !isMissingTable(error)) throw new Error(error.message);
+      return [];
+    }
+    return (data ?? []) as CompositeEntry[];
+  } catch (e) {
+    if (admin) throw e;
+    return [];
+  }
+}
+
+export async function loadAswa(admin = false): Promise<AswaEntry[]> {
+  const preview = await previewSlice<AswaEntry>("aswa");
+  if (preview) return preview;
+  try {
+    const c = admin ? serviceClient() : publicClient();
+    const { data, error } = await c
+      .from("aswa_ranks")
+      .select("*")
+      .order("classification")
+      .order("rank", { nullsFirst: false });
+    if (error) {
+      if (admin && !isMissingTable(error)) throw new Error(error.message);
+      return [];
+    }
+    return (data ?? []) as AswaEntry[];
+  } catch (e) {
+    if (admin) throw e;
+    return [];
+  }
+}
+
+/**
+ * Optional extra data in the local preview file.
+ *
+ * `npm run preview` renders the real UI against a generated payload with no
+ * database behind it. These two boards are hand-entered, so a preview that
+ * cannot show them leaves half the site unrenderable offline.
+ */
+async function previewSlice<T>(key: "composite" | "aswa"): Promise<T[] | null> {
+  const path = process.env.ALPREPS_PREVIEW_DATA;
+  if (!path) return null;
+  const { readFileSync } = await import("node:fs");
+  const parsed = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+  const slice = parsed[key];
+  return Array.isArray(slice) ? (slice as T[]) : [];
+}
+
+/**
+ * Whether a failure is just "the migration has not been run here".
+ *
+ * A deployment that has not applied 003 yet, or has no database configured at
+ * all, must still render every other page — these two boards are additions,
+ * not prerequisites. PostgREST reports a missing relation as 42P01; a missing
+ * environment variable throws before the query is even sent, which the callers
+ * catch above.
+ */
+function isMissingTable(e: { code?: string; message?: string }): boolean {
+  return e.code === "42P01" || /does not exist/i.test(e.message ?? "");
 }
 
 export async function loadConfig(admin = false): Promise<EngineConfig> {

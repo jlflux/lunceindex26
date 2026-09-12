@@ -1,19 +1,26 @@
 /**
- * Matching AHSAA schedule-PDF school names to canonical roster names.
+ * Matching AHSAA school names to canonical roster names.
  *
- * The PDFs use long form ("B.B. Comer High School"); the roster uses short
- * ("BB Comer"). Resolution order, most trustworthy first:
+ * The AHSAA's sheets use long form ("B.B. Comer High School"); the roster uses
+ * short ("BB Comer"). Resolution order, most trustworthy first:
  *
- *   1. explicit alias table
+ *   1. an alias naming the exact spelling
  *   2. exact normalized match
- *   3. progressive suffix stripping ("Briarwood Christian School" → Briarwood)
- *   4. classification + region disambiguation (for genuinely ambiguous names)
- *   5. fuzzy similarity, 0.86 cutoff
+ *   3. an alias reached by normalizing or shortening its source spelling
+ *   4. progressive suffix stripping ("Briarwood Christian School" → Briarwood)
+ *   5. classification + region disambiguation (for genuinely ambiguous names)
+ *   6. fuzzy similarity, 0.86 cutoff
  *
- * Known weakness carried over from the original: step 4 trusts the PDF's
- * classification, and the PDFs contain classification errors. An error on an
- * ambiguous name could silently pick the wrong school, so every non-exact
- * match is reported with its confidence for a human to check.
+ * Steps 2 and 3 are in that order on purpose. Alias sources are expanded into
+ * every form suffix-stripping can reach, and a long name can shorten onto a
+ * school the roster already holds outright — "Prattville Christian Academy"
+ * shortens to "prattville", which is a 6A school's whole name. The roster wins
+ * those; only a verbatim alias, at step 1, overrides it.
+ *
+ * Known weakness carried over from the original: step 5 trusts the sheet's
+ * classification, and the published files contain classification errors. An
+ * error on an ambiguous name could silently pick the wrong school, so every
+ * non-exact match is reported with its confidence for a human to check.
  */
 
 import type { Classification, Team } from "./types";
@@ -432,30 +439,45 @@ export function matchTeam(
     };
   }
 
-  // 1. explicit aliases (admin-resolved ones take precedence)
+  // 1. an alias naming this exact spelling
   //
-  // Matched on the normalized form as well as verbatim: the alias table was
-  // written against the schedule sheets ("Johnson-Abernathy-Graetz HS") and
-  // the results sheets spell the same school differently ("Johnson Abernathy
-  // Graetz"). Both reduce to the same normalized string.
-  const alias =
-    input.extraAliases?.[raw] ??
-    ALIASES[raw] ??
-    normalizedAlias(input.extraAliases)[normalize(raw)] ??
-    NORMALIZED_ALIASES[normalize(raw)];
-  if (alias && index.byName.has(alias)) {
-    return { ...base, name: alias, method: "alias", confidence: 1 };
+  // Only the verbatim key wins here, ahead of the roster: writing the source
+  // string out in full is how the table — or an admin resolving a match by
+  // hand — deliberately overrides everything else.
+  const verbatim = input.extraAliases?.[raw] ?? ALIASES[raw];
+  if (verbatim && index.byName.has(verbatim)) {
+    return { ...base, name: verbatim, method: "alias", confidence: 1 };
   }
 
   const forms = variants(raw);
 
   // 2. exact normalized, unambiguous
+  //
+  // Ahead of the derived aliases below, because a school the roster holds
+  // under this very name is not something an alias for a *different* school
+  // may redirect. "Prattville HS" normalizes to "prattville" — and so does
+  // "Prattville Christian Academy", once its suffixes come off. The 6A school
+  // wins: it is on the roster as plain "Prattville", while Prattville
+  // Christian is only reachable by shortening someone else's longer spelling.
   const exact = index.byNormalized.get(forms[0]);
   if (exact?.length === 1) {
     return { ...base, name: exact[0].name, method: "exact", confidence: 1 };
   }
 
-  // 4a. ambiguity on the full form — resolve by class + region
+  // 3. aliases reached by normalizing or shortening the source spelling
+  //
+  // The table was written against the schedule sheets
+  // ("Johnson-Abernathy-Graetz HS") and the results sheets spell the same
+  // school differently ("Johnson Abernathy Graetz"); both reduce to one
+  // normalized string, and shortening reaches the rest.
+  const derived =
+    normalizedAlias(input.extraAliases)[normalize(raw)] ??
+    NORMALIZED_ALIASES[normalize(raw)];
+  if (derived && index.byName.has(derived)) {
+    return { ...base, name: derived, method: "alias", confidence: 1 };
+  }
+
+  // 4. ambiguity on the full form — resolve by class + region
   if (exact && exact.length > 1) {
     const picked = disambiguate(exact, input);
     if (picked) {
@@ -469,7 +491,7 @@ export function matchTeam(
     }
   }
 
-  // 3. progressive suffix stripping
+  // 5. progressive suffix stripping
   for (const f of forms.slice(1)) {
     const hit = index.byNormalized.get(f);
     if (hit?.length === 1) {
@@ -489,7 +511,7 @@ export function matchTeam(
     }
   }
 
-  // 4b. known ambiguous bases ("Lee High School", "Southside High School")
+  // 6. known ambiguous bases ("Lee High School", "Southside High School")
   const head = forms[forms.length - 1];
   const candidates = AMBIGUOUS_BASES[head];
   if (candidates) {
@@ -508,7 +530,7 @@ export function matchTeam(
     }
   }
 
-  // 5. fuzzy
+  // 7. fuzzy
   let best: { team: Team; score: number } | null = null;
   for (const t of index.teams) {
     for (const tv of variants(t.name)) {

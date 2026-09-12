@@ -7,7 +7,7 @@
  * own, plus the guardrails that stop a misspelling being quietly adopted as a
  * new school.
  */
-import { buildIndex, matchTeam, nonMemberSet } from "../src/lib/names";
+import { ALIASES, buildIndex, matchTeam, nonMemberSet } from "../src/lib/names";
 import { loadRosterCsv } from "../src/lib/roster-csv";
 
 let failures = 0;
@@ -128,6 +128,61 @@ console.log("\n6. Out-of-state opponents are recognized by their state");
   check(
     "\"Homewood\" is not",
     matchTeam({ raw: "Homewood" }, index).outOfState === false,
+  );
+}
+
+console.log("\n7. An alias for one school cannot capture another school's name");
+{
+  // Alias sources are expanded into every form suffix-stripping can reach, so
+  // "Prattville Christian Academy" produces "prattville" among others — which
+  // is a 6A school's entire name. For three weeks that sent Prattville's
+  // games to a Single-A school two classifications away.
+  //
+  // The spelling decided it, which is why this went unnoticed: "Prattville
+  // High School" survives normalization with its suffix intact and reaches
+  // the roster on its own, while "Prattville HS" reduces straight to
+  // "prattville" and landed on the alias.
+  for (const raw of ["Prattville", "Prattville HS", "Prattville High School"]) {
+    check(
+      `"${raw}" is the 6A school`,
+      matchTeam({ raw }, index).name === "Prattville",
+      `${matchTeam({ raw }, index).name}`,
+    );
+  }
+  for (const raw of [
+    "Prattville Christian",
+    "Prattville Christian Academy",
+    "Prattville Christian HS",
+  ]) {
+    check(
+      `"${raw}" is still the Single-A school`,
+      matchTeam({ raw }, index).name === "Prattville Christian",
+      `${matchTeam({ raw }, index).name}`,
+    );
+  }
+
+  // The general rule, checked over the whole roster rather than the one name
+  // that exposed it: no school's own name resolves to a different school.
+  const stolen = teams.flatMap((t) =>
+    [t.name, `${t.name} HS`, `${t.name} High School`]
+      .map((raw) => ({ raw, got: matchTeam({ raw }, index).name, want: t.name }))
+      .filter((r) => r.got && r.got !== r.want),
+  );
+  check(
+    `no roster name resolves to a different school (${teams.length} schools)`,
+    stolen.length === 0,
+    stolen.map((s) => `"${s.raw}" → ${s.got}`).join("; "),
+  );
+
+  // And the aliases still do their job — the fix reorders them, so every
+  // source spelling in the table has to keep landing on its target.
+  const broken = Object.entries(ALIASES).filter(
+    ([src, want]) => matchTeam({ raw: src }, index).name !== want,
+  );
+  check(
+    `all ${Object.keys(ALIASES).length} alias sources still resolve`,
+    broken.length === 0,
+    broken.map(([s, w]) => `"${s}" wanted ${w}`).join("; "),
   );
 }
 

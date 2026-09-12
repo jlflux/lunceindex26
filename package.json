@@ -19,6 +19,7 @@
     "setup": "tsx scripts/setup.ts",
     "seed:sql": "tsx scripts/make-seed-sql.ts",
     "test:duplicates": "tsx scripts/test-duplicates.ts",
+    "test:coverage": "tsx scripts/test-coverage.ts",
     "test:names": "tsx scripts/test-names.ts",
     "test:week0": "tsx scripts/test-week0.ts",
     "test:pdf": "tsx scripts/test-schedule-pdf.ts",

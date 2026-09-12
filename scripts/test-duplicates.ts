@@ -130,6 +130,65 @@ console.log("\n9. Every group keeps at least one row");
   check("nothing is fully deleted", survives);
 }
 
+console.log("\n10. One school with two games in a week");
+{
+  // The case that caught nothing before: the opponents differ, so the pair
+  // checks above have nothing to group on. This is what a name matched to the
+  // wrong school leaves behind on whoever it played.
+  const r = findDuplicates([
+    g(1, "Tuscaloosa County", "Prattville", 2, 0, 62),
+    g(2, "Tuscaloosa County", "Prattville Christian", 2, 0, 62),
+    g(3, "Hoover", "Vestavia Hills", 2),
+  ]);
+  check("one collision", r.collisions.length === 1, `${r.collisions.length}`);
+  check("naming the school with two games", r.collisions[0]?.label.startsWith("Tuscaloosa County"));
+  check("holding both rows", r.collisions[0]?.games.length === 2);
+  check("and it is not a reversed pair", r.reversed.length === 0);
+  check("nor a repeated pairing", r.repeated.length === 0);
+  check("a school with one game is untouched", r.collisions.length === 1);
+}
+
+console.log("\n11. A collision is reported once, not once per school");
+{
+  const r = findDuplicates([
+    g(1, "A", "B", 1),
+    g(2, "A", "C", 1),
+    g(3, "B", "C", 1),
+  ]);
+  // A, B and C each have two games this week, but there are three distinct
+  // fixtures — so three groups, one per school, is correct here.
+  check("three schools each doubled up", r.collisions.length === 3, `${r.collisions.length}`);
+  const labels = r.collisions.map((c) => c.label.split(" ·")[0]).sort();
+  check("one per school", labels.join() === "A,B,C", labels.join());
+}
+
+console.log("\n12. A swapped pair is not also reported as a collision");
+{
+  // Both rows are the same fixture, already reported above. Counting it twice
+  // would make one fault look like three.
+  const r = findDuplicates([g(1, "A", "B", 1), g(2, "B", "A", 1)]);
+  check("one reversed group", r.reversed.length === 1);
+  check("no collisions", r.collisions.length === 0, `${r.collisions.length}`);
+}
+
+console.log("\n13. Playoff rounds sharing a week number are not collisions");
+{
+  const r = findDuplicates([
+    { ...g(1, "Thompson", "Hoover", 12, 28, 21, "playoff"), round: "r1" },
+    { ...g(2, "Thompson", "Auburn", 12, 35, 14, "playoff"), round: "r2" },
+  ]);
+  check("rounds keep them apart", r.collisions.length === 0, `${r.collisions.length}`);
+}
+
+console.log("\n14. Two games in the same playoff round is still a collision");
+{
+  const r = findDuplicates([
+    { ...g(1, "Thompson", "Hoover", 12, 28, 21, "playoff"), round: "r1" },
+    { ...g(2, "Thompson", "Auburn", 12, 35, 14, "playoff"), round: "r1" },
+  ]);
+  check("caught", r.collisions.length === 1, `${r.collisions.length}`);
+}
+
 console.log(
   failures === 0
     ? "\nDuplicate detection behaves.\n"

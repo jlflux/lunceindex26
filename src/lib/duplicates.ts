@@ -12,7 +12,7 @@
 import type { Game } from "./types";
 
 export interface DuplicateGroup {
-  kind: "reversed" | "repeated";
+  kind: "reversed" | "repeated" | "collision";
   label: string;
   games: Game[];
 }
@@ -23,6 +23,8 @@ export interface DuplicateReport {
   reversed: DuplicateGroup[];
   /** Same pair across different regular-season weeks. Needs judgement. */
   repeated: DuplicateGroup[];
+  /** One school with two games in the same week, against different opponents. */
+  collisions: DuplicateGroup[];
 }
 
 const pairKey = (g: Game) =>
@@ -71,7 +73,65 @@ export function findDuplicates(games: Game[]): DuplicateReport {
       games: group,
     }));
 
-  return { totalGames: games.length, reversed, repeated };
+  return {
+    totalGames: games.length,
+    reversed,
+    repeated,
+    collisions: findCollisions(games, alreadyReported),
+  };
+}
+
+/**
+ * One school with two games in the same week.
+ *
+ * The opponents differ, so none of the pair-based checks above can see it —
+ * and that is exactly the shape a mis-matched name leaves behind. When
+ * "Prattville HS" resolved to Prattville Christian, Tuscaloosa County ended up
+ * with a week-two result against Prattville Christian sitting beside the one
+ * against Prattville, two rows that share no key at all.
+ *
+ * Nothing here is offered for automatic deletion. Which of the two is wrong
+ * depends on which name was misread, and that is not knowable from the rows.
+ */
+function findCollisions(
+  games: Game[],
+  alreadyReported: Set<number | undefined>,
+): DuplicateGroup[] {
+  const byTeamWeek = new Map<string, Game[]>();
+  for (const g of games) {
+    // Rounds are keyed separately: a team plays once per playoff round, and
+    // two rounds can share a week number.
+    const slot = `${g.week}|${g.type}|${g.round ?? ""}`;
+    for (const team of [g.t1, g.t2]) {
+      const key = `${team}|${slot}`;
+      byTeamWeek.set(key, [...(byTeamWeek.get(key) ?? []), g]);
+    }
+  }
+
+  const out: DuplicateGroup[] = [];
+  const seen = new Set<string>();
+  for (const [key, group] of byTeamWeek) {
+    if (group.length < 2) continue;
+    // A swapped pair is the same fixture twice and is already reported above;
+    // reporting it again here would double the noise for one fault.
+    if (group.every((g) => alreadyReported.has(g.id))) continue;
+
+    const team = key.slice(0, key.indexOf("|"));
+    // One fixture reaches this map under both schools. Report it once.
+    const identity = group
+      .map((g) => g.id ?? `${g.t1}|${g.t2}`)
+      .sort()
+      .join(",");
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+
+    out.push({
+      kind: "collision",
+      label: `${team} · week ${group[0].week} · ${group.length} games`,
+      games: group,
+    });
+  }
+  return out;
 }
 
 /**

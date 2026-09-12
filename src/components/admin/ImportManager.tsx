@@ -455,7 +455,9 @@ function ScheduleImport({ source }: { source: "pdf" | "sheet" }) {
           `${body.scored ? `, ${body.scored} of them with scores` : ""}` +
           `${body.skippedAlreadyPlayed ? `, left ${body.skippedAlreadyPlayed} alone because they already have scores` : ""}` +
           `.${clash.length ? ` ${clash.length} differ from what is on file and were NOT overwritten: ${clash.slice(0, 5).join("; ")}${clash.length > 5 ? " …" : ""}` : ""}` +
-          ` Publish from the dashboard to update the site.`,
+          ` Open the Games page next — its schedule scan runs on its own and` +
+          ` will say whether any school is now missing a week or holding two` +
+          ` games in one. Then publish from the dashboard.`,
       });
       setReport(null);
       setText("");

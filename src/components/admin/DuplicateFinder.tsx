@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Banner } from "./PublishButton";
 import { weekLabel } from "@/lib/format";
+import type { CoverageReport, TeamGap } from "@/lib/coverage";
 import { redundantIds, type DuplicateGroup } from "@/lib/duplicates";
 import type { Game } from "@/lib/types";
 
@@ -19,14 +20,20 @@ async function readJson<T = Record<string, unknown>>(res: Response): Promise<T> 
 }
 
 /**
- * Surfaces fixtures stored twice and lets one side be removed.
+ * Everything that can be checked about the stored schedule without a human
+ * reading four hundred rows.
  *
- * Re-importing cannot create these — the unique key prevents it. They come
- * from two sources disagreeing about which team is at home, or about the week.
+ * Two questions, and one fault answers both. A school matched to the wrong
+ * name leaves a spare game on whoever it played and a hole in the schedule of
+ * whoever it should have been — so the scan reports extra games and missing
+ * ones side by side.
  */
 export default function DuplicateFinder() {
   const [reversed, setReversed] = useState<Group[]>([]);
   const [repeated, setRepeated] = useState<Group[]>([]);
+  const [collisions, setCollisions] = useState<Group[]>([]);
+  const [coverage, setCoverage] = useState<CoverageReport | null>(null);
+  const [showByes, setShowByes] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [total, setTotal] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -35,7 +42,9 @@ export default function DuplicateFinder() {
     text: string;
   } | null>(null);
 
-  async function scan() {
+  // Runs on its own when the page opens. A check nobody remembers to press is
+  // not a check — the Prattville mismatch sat in the board for three weeks.
+  const scan = useCallback(async () => {
     setBusy(true);
     setMessage(null);
     try {
@@ -45,15 +54,27 @@ export default function DuplicateFinder() {
         totalGames: number;
         reversed: Group[];
         repeated: Group[];
+        collisions: Group[];
+        coverage: CoverageReport;
       }>(res);
       if (!res.ok) throw new Error(body.error ?? "Scan failed.");
       setReversed(body.reversed);
       setRepeated(body.repeated);
+      setCollisions(body.collisions ?? []);
+      setCoverage(body.coverage ?? null);
       setTotal(body.totalGames);
       setScanned(true);
+      const missing =
+        (body.coverage?.suspect.length ?? 0) + (body.coverage?.absent.length ?? 0);
       setMessage({
-        tone: body.reversed.length ? "warn" : "good",
-        text: `${body.totalGames} games · ${body.reversed.length} stored with the sides swapped · ${body.repeated.length} same pairing in more than one week.`,
+        tone:
+          body.reversed.length || body.collisions?.length || missing
+            ? "warn"
+            : "good",
+        text:
+          `${body.totalGames} games · ${body.reversed.length} with the sides swapped · ` +
+          `${body.collisions?.length ?? 0} school(s) with two games in a week · ` +
+          `${missing} school(s) missing a week they should have played.`,
       });
     } catch (e) {
       setMessage({
@@ -63,7 +84,11 @@ export default function DuplicateFinder() {
     } finally {
       setBusy(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    scan();
+  }, [scan]);
 
   async function remove(ids: number[]) {
     setBusy(true);
@@ -95,10 +120,14 @@ export default function DuplicateFinder() {
     <section className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-[13px] font-bold uppercase tracking-wider">
-          Duplicate check
+          Schedule check
         </h2>
-        <button className="btn !py-1.5 !text-xs" onClick={scan} disabled={busy}>
-          {busy ? "Scanning…" : scanned ? "Re-scan" : "Scan for duplicates"}
+        <button
+          className="btn !py-1.5 !text-xs"
+          onClick={() => scan()}
+          disabled={busy}
+        >
+          {busy ? "Scanning…" : scanned ? "Re-scan" : "Scan the schedule"}
         </button>
         {reversed.length > 0 && (
           <button
@@ -121,9 +150,10 @@ export default function DuplicateFinder() {
 
       <p className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
         Re-running an import cannot create duplicates — games are keyed on home,
-        away, week and type, so a repeat import updates the same row. These come
-        from two sources disagreeing about which side is at home, or about which
-        week a game falls in.
+        away, week and type, so a repeat import updates the same row. What does
+        slip through is a school matched to the wrong name: it leaves an extra
+        game on its opponent and an empty week on the school it should have
+        been, which is what the two halves of this scan look for.
       </p>
 
       {message && <Banner tone={message.tone}>{message.text}</Banner>}
@@ -140,6 +170,29 @@ export default function DuplicateFinder() {
           </div>
         </div>
       )}
+
+      {collisions.length > 0 && (
+        <div className="card p-4">
+          <h3 className="text-sm font-bold">
+            One school, two games in a week ({collisions.length})
+          </h3>
+          <p
+            className="mt-1 text-xs"
+            style={{ color: "rgb(var(--text-muted))" }}
+          >
+            The opponents differ, so nothing else catches this. Usually one of
+            the two opponents was matched to the wrong school — check which name
+            the sheet actually carried before deleting either row.
+          </p>
+          <div className="mt-2 space-y-2">
+            {collisions.map((g, i) => (
+              <GroupRow key={i} group={g} onDelete={remove} busy={busy} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {coverage && <Coverage report={coverage} show={showByes} onShow={setShowByes} />}
 
       {repeated.length > 0 && (
         <div className="card p-4">
@@ -161,12 +214,167 @@ export default function DuplicateFinder() {
         </div>
       )}
 
-      {scanned && !reversed.length && !repeated.length && (
-        <Banner tone="good">
-          No duplicates found across {total} games.
-        </Banner>
-      )}
+      {scanned &&
+        !reversed.length &&
+        !repeated.length &&
+        !collisions.length &&
+        !coverage?.suspect.length &&
+        !coverage?.absent.length && (
+          <Banner tone="good">
+            Nothing out of place across {total} games. Every school has a game
+            in every week that finished importing.
+          </Banner>
+        )}
     </section>
+  );
+}
+
+/**
+ * The other half of the scan: schools with no game in a week that everyone
+ * else played.
+ *
+ * An open week is normally a bye, so the weeks that are only half-loaded are
+ * set aside first and a single open week is kept apart from several. Without
+ * that this would report most of the state every time it ran.
+ */
+function Coverage({
+  report,
+  show,
+  onShow,
+}: {
+  report: CoverageReport;
+  show: boolean;
+  onShow: (v: boolean) => void;
+}) {
+  if (!report.weeks.length) return null;
+
+  return (
+    <div className="card space-y-3 p-4">
+      <div>
+        <h3 className="text-sm font-bold">Weeks loaded</h3>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {report.weeks.map((w) => (
+            <span
+              key={w.week}
+              className="rounded-md px-2 py-1 text-[11px] tnum"
+              title={
+                w.complete
+                  ? `${w.games} games, ${w.teams} schools`
+                  : `${w.games} games, ${w.teams} schools — too few to judge an absence against, so this week is not used`
+              }
+              style={{
+                background: "rgb(var(--surface-2))",
+                color: w.complete
+                  ? "rgb(var(--text-muted))"
+                  : "rgb(var(--text-faint))",
+                border: w.complete
+                  ? "1px solid transparent"
+                  : "1px dashed rgb(var(--border))",
+              }}
+            >
+              <span className="font-bold">Wk {w.week}</span> · {w.teams}{" "}
+              schools
+              {!w.complete && " · partial"}
+            </span>
+          ))}
+        </div>
+        {report.thin.length > 0 && (
+          <p
+            className="mt-2 text-xs"
+            style={{ color: "rgb(var(--text-muted))" }}
+          >
+            Week{report.thin.length === 1 ? "" : "s"}{" "}
+            {report.thin.join(", ")} hold too few schools to judge anyone
+            against and {report.thin.length === 1 ? "is" : "are"} left out of
+            the check below. Week 0 is genuinely short every year; any other
+            week showing as partial is one to re-import.
+          </p>
+        )}
+      </div>
+
+      {report.completeWeeks < 2 ? (
+        <p className="text-xs" style={{ color: "rgb(var(--text-muted))" }}>
+          Missing-week checking needs at least two fully loaded weeks to have
+          anything to compare against.
+        </p>
+      ) : (
+        <>
+          {report.absent.length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold" style={{ color: "rgb(var(--bad))" }}>
+                No games at all ({report.absent.length})
+              </h3>
+              <p className="mt-1 text-[12px]">{report.absent.join(", ")}</p>
+            </div>
+          )}
+
+          {report.suspect.length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold">
+                Missing two or more weeks ({report.suspect.length})
+              </h3>
+              <p
+                className="mt-1 text-xs"
+                style={{ color: "rgb(var(--text-muted))" }}
+              >
+                Teams play ten games across eleven weeks, so one open week is a
+                bye — two is usually a name that went to the wrong school.
+              </p>
+              <div className="mt-2 space-y-1">
+                {report.suspect.map((g) => (
+                  <GapRow key={g.team} gap={g} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {report.byes.length > 0 && (
+            <div>
+              <button
+                className="text-sm font-bold hover:underline"
+                onClick={() => onShow(!show)}
+              >
+                One open week ({report.byes.length}) {show ? "▾" : "▸"}
+              </button>
+              {show && (
+                <>
+                  <p
+                    className="mt-1 text-xs"
+                    style={{ color: "rgb(var(--text-muted))" }}
+                  >
+                    Almost certainly byes. Listed so a genuinely missing game
+                    can still be found.
+                  </p>
+                  <div className="mt-2 space-y-1">
+                    {report.byes.map((g) => (
+                      <GapRow key={g.team} gap={g} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function GapRow({ gap }: { gap: TeamGap }) {
+  return (
+    <div
+      className="flex flex-wrap items-baseline gap-x-2 rounded-lg px-3 py-1.5 text-[12px]"
+      style={{ background: "rgb(var(--surface-2))" }}
+    >
+      <span className="font-semibold">{gap.team}</span>
+      <span style={{ color: "rgb(var(--text-muted))" }}>
+        no game in week{gap.missing.length === 1 ? "" : "s"}{" "}
+        {gap.missing.join(", ")}
+      </span>
+      <span className="ml-auto tnum" style={{ color: "rgb(var(--text-faint))" }}>
+        {gap.played} played
+      </span>
+    </div>
   );
 }
 

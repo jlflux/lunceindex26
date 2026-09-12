@@ -108,7 +108,11 @@ Setup reads no data and grants no access; it is a calculator.
    never overwritten.
 2. **Enter results** — either Admin → Games one at a time, or Admin → Import →
    Weekly scores for a CSV of the whole week.
-3. **Publish** — Admin → Dashboard → Recompute & publish.
+3. **Check the schedule** — open Admin → Games. The scan at the bottom runs by
+   itself and reports schools missing a week everyone else played, and schools
+   holding two games in one week. Both are what a name matched to the wrong
+   school looks like, and neither is visible by reading the board.
+4. **Publish** — Admin → Dashboard → Recompute & publish.
 
 Nothing you change reaches the public site until you publish, and ratings never
 move on their own. A game only counts once **both** scores are present, so the
@@ -121,7 +125,7 @@ full season schedule can be loaded in advance without affecting anything.
 | Page | What it does |
 |---|---|
 | Dashboard | Counts, current formula, publish button with a top-10 preview |
-| Games | Add, edit and delete games; filter by week, search, show unplayed only |
+| Games | Add, edit and delete games; filter by week, search, show unplayed only. The schedule scan runs on open: swapped sides, a school with two games in one week, and schools missing a week everyone else played |
 | Import | The AHSAA weekly sheet (pasted or as CSV); your own score CSV; the older AHSAA PDF |
 | Formula | Sliders for every tunable, with a live top-25 preview showing rank movement before you save |
 | Teams | Edit names, classification, region and preseason rating; bulk-import priors |
@@ -138,6 +142,7 @@ npm run validate          # reproduce the 2025 ratings from the 2025 export
 npm run smoke             # roster → PDF → engine, end to end, no database
 npm run parse-schedule    # parse report for a schedule PDF
 npm run test:sheet        # the AHSAA weekly Google Sheet, against a real week
+npm run test:coverage     # the missing-week scan, including the bye/noise rules
 npm run typecheck
 ```
 
@@ -166,6 +171,8 @@ src/
 │   ├── schedule-sheet.ts# AHSAA weekly Google Sheet (CSV/TSV) parser
 │   ├── schedule-pdf.ts  # AHSAA schedule PDF parser (superseded, still used)
 │   ├── score-csv.ts     # weekly score CSV parsing and validation
+│   ├── duplicates.ts    # fixtures stored twice; a school with two games in a week
+│   ├── coverage.ts      # schools missing a week everyone else played
 │   ├── team-view.ts     # schedule, projections, result classification
 │   ├── data.ts          # loading data, publishing snapshots
 │   ├── db.ts            # Supabase clients (public read / service write)

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAdmin } from "@/lib/admin-auth";
+import { findCoverage } from "@/lib/coverage";
+import { loadTeams } from "@/lib/data";
 import { serviceClient } from "@/lib/db";
 import { findDuplicates } from "@/lib/duplicates";
 import type { Game } from "@/lib/types";
@@ -25,6 +27,10 @@ export const runtime = "nodejs";
  *
  * Playoff rematches are excluded — a regular-season meeting followed by a
  * playoff meeting is normal and not a duplicate.
+ *
+ * The same pass also answers the opposite question — which schools are missing
+ * a week they should have played — because a name matched to the wrong school
+ * shows up as both at once: a spare game on one team and a hole in another.
  */
 export const GET = withAdmin(async () => {
   const db = serviceClient();
@@ -43,7 +49,13 @@ export const GET = withAdmin(async () => {
     if (!data || data.length < page) break;
   }
 
-  return NextResponse.json({ ok: true, ...findDuplicates(rows) });
+  const teams = await loadTeams(true);
+
+  return NextResponse.json({
+    ok: true,
+    ...findDuplicates(rows),
+    coverage: findCoverage(rows, teams.map((t) => t.name)),
+  });
 });
 
 /** Deletes the given game ids. */

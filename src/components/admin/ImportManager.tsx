@@ -31,32 +31,34 @@ async function readJson<T = any>(res: Response): Promise<T> {
 }
 
 
-type Mode = "scores" | "schedule";
+type Mode = "sheet" | "scores" | "schedule";
 
 export default function ImportManager() {
-  const [mode, setMode] = useState<Mode>("scores");
+  // The AHSAA's Google Sheet is how the week arrives now, so it leads.
+  const [mode, setMode] = useState<Mode>("sheet");
 
   return (
     <div className="space-y-6">
       <AdminHeader
         title="Import"
-        subtitle="Load a week from the AHSAA PDF or a CSV. Scores are read when the sheet carries them."
+        subtitle="Load a week from the AHSAA sheet, the older PDF, or your own CSV. Scores are read when the sheet carries them."
       />
 
       <div
-        className="flex gap-1 rounded-xl p-1"
+        className="flex flex-wrap gap-1 rounded-xl p-1"
         style={{ background: "rgb(var(--surface-2))" }}
       >
         {(
           [
+            ["sheet", "AHSAA sheet"],
             ["scores", "Weekly scores (CSV)"],
-            ["schedule", "Schedule & scores (AHSAA PDF)"],
+            ["schedule", "AHSAA PDF"],
           ] as [Mode, string][]
         ).map(([id, label]) => (
           <button
             key={id}
             onClick={() => setMode(id)}
-            className="flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
+            className="flex-1 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
             style={
               mode === id
                 ? {
@@ -71,7 +73,11 @@ export default function ImportManager() {
         ))}
       </div>
 
-      {mode === "scores" ? <ScoreImport /> : <ScheduleImport />}
+      {mode === "scores" ? (
+        <ScoreImport />
+      ) : (
+        <ScheduleImport source={mode === "sheet" ? "sheet" : "pdf"} />
+      )}
     </div>
   );
 }
@@ -352,16 +358,18 @@ interface ParsedGame {
   awayScore: number | null;
 }
 
-function ScheduleImport() {
+function ScheduleImport({ source }: { source: "pdf" | "sheet" }) {
   const [week, setWeek] = useState("0");
   const [type, setType] = useState<"regular" | "playoff">("regular");
   const [round, setRound] = useState<PlayoffRound>("r1");
+  const [text, setText] = useState("");
   const [report, setReport] = useState<{
     games: ParsedGame[];
     totalRows: number;
     warnings: string[];
     duplicates: string[];
     skipped: { line: string; reason: string }[];
+    unplayed?: { matchup: string; note: string }[];
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{
@@ -369,29 +377,43 @@ function ScheduleImport() {
     text: string;
   } | null>(null);
 
-  async function upload(file: File) {
+  /**
+   * One endpoint, two containers: a PDF goes up as a file, the Google Sheet as
+   * text. A CSV downloaded from that sheet works through either.
+   */
+  async function preview(payload: File | string) {
     setBusy(true);
     setMessage(null);
     setReport(null);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/admin/import/schedule", {
-        method: "POST",
-        body: form,
-      });
+      let res: Response;
+      if (typeof payload === "string") {
+        res = await fetch("/api/admin/import/schedule", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: payload }),
+        });
+      } else {
+        const form = new FormData();
+        form.append("file", payload);
+        res = await fetch("/api/admin/import/schedule", {
+          method: "POST",
+          body: form,
+        });
+      }
       const body = await readJson(res);
-      if (!res.ok) throw new Error(body.error ?? "Could not read that PDF.");
+      if (!res.ok) throw new Error(body.error ?? "Could not read that file.");
       setReport(body);
+      const scored = body.games.filter(
+        (g: ParsedGame) => g.homeScore !== null,
+      ).length;
       setMessage({
         tone: body.skipped.length ? "warn" : "good",
         text:
           `Read ${body.totalRows} rows → ${body.games.length} games` +
-          `${
-            body.games.filter((g: ParsedGame) => g.homeScore !== null).length
-              ? `, ${body.games.filter((g: ParsedGame) => g.homeScore !== null).length} with scores`
-              : ""
-          }. ${body.duplicates.length} duplicate listing(s) collapsed, ${body.skipped.length} row(s) skipped.`,
+          `${scored ? `, ${scored} with scores` : ""}. ` +
+          `${body.duplicates.length} duplicate listing(s) collapsed, ` +
+          `${body.skipped.length} row(s) skipped.`,
       });
     } catch (e) {
       setMessage({
@@ -436,6 +458,7 @@ function ScheduleImport() {
           ` Publish from the dashboard to update the site.`,
       });
       setReport(null);
+      setText("");
     } catch (e) {
       setMessage({
         tone: "bad",
@@ -450,10 +473,20 @@ function ScheduleImport() {
     <div className="space-y-4">
       <div className="card space-y-3 p-4">
         <p className="text-sm" style={{ color: "rgb(var(--text-muted))" }}>
-          Upload the weekly AHSAA schedule PDF. Classification always comes from
-          your roster, never from the PDF — the published files contain class
-          errors. Scores are never touched, and games that already have a result
-          are left alone.
+          {source === "sheet" ? (
+            <>
+              Open the AHSAA&rsquo;s weekly Google Sheet, select the whole tab
+              and paste it below — or File &rarr; Download &rarr; CSV and drop
+              the file in. Include the{" "}
+              <span className="font-mono text-xs">DATE, TIME, HOME&hellip;</span>{" "}
+              header line; the columns are read from it.
+            </>
+          ) : (
+            <>Upload the weekly AHSAA schedule PDF.</>
+          )}{" "}
+          Classification always comes from your roster, never from the sheet —
+          the published files contain class errors. Games that already have a
+          result are left alone.
         </p>
 
         <div className="grid gap-3 sm:grid-cols-3">
@@ -507,15 +540,42 @@ function ScheduleImport() {
 
         <input
           type="file"
-          accept=".pdf,application/pdf"
+          accept={
+            source === "sheet"
+              ? ".csv,.tsv,.txt,text/csv"
+              : ".pdf,application/pdf"
+          }
           className="text-sm"
           disabled={busy}
           onChange={(e) => {
             const f = e.target.files?.[0];
-            if (f) upload(f);
+            if (f) preview(f);
           }}
         />
-        {busy && (
+
+        {source === "sheet" && (
+          <>
+            <textarea
+              className="input font-mono !text-xs"
+              rows={8}
+              placeholder={
+                "DATE\tTIME\tHOME\tCLASS\tREG\tSCORE\tVISITOR\tCLASS\tREG\tSCORE\tSITE\n" +
+                "09-11-2026\t7:00 PM\tSpain Park HS\t6A\tR-3\t14\tThompson HS\t6A\tR-3\t48\tSpain Park HS"
+              }
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+            <button
+              className="btn btn-primary"
+              onClick={() => preview(text)}
+              disabled={busy || !text.trim()}
+            >
+              {busy ? "Reading…" : "Check the sheet"}
+            </button>
+          </>
+        )}
+
+        {busy && source === "pdf" && (
           <p className="text-sm" style={{ color: "rgb(var(--text-muted))" }}>
             Reading PDF…
           </p>
@@ -537,6 +597,34 @@ function ScheduleImport() {
                   <li key={i}>• {w}</li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* Not a problem, but worth seeing before importing: a week where
+              this list is unexpectedly long usually means the sheet went up
+              before the late games finished. */}
+          {!!report.unplayed?.length && (
+            <div className="card p-4">
+              <h3 className="text-sm font-bold">
+                No result yet ({report.unplayed.length})
+              </h3>
+              <ul
+                className="mt-2 space-y-1 text-xs"
+                style={{ color: "rgb(var(--text-muted))" }}
+              >
+                {report.unplayed.map((u, i) => (
+                  <li key={i}>
+                    • {u.matchup} — {u.note}
+                  </li>
+                ))}
+              </ul>
+              <p
+                className="mt-2 text-xs"
+                style={{ color: "rgb(var(--text-faint))" }}
+              >
+                These import as scheduled games. Re-import the sheet once the
+                scores are in and they will fill themselves in.
+              </p>
             </div>
           )}
 

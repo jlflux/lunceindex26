@@ -6,7 +6,8 @@
  * fields by token pattern — the two CL/REG pairs bracket the home and visitor
  * names — rather than by column geometry. Geometry alone is not enough: the
  * header row only appears on some pages, so a parser keyed to header offsets
- * silently drops every continuation page.
+ * silently drops every continuation page. (The spreadsheet the AHSAA now
+ * publishes does have real columns; see schedule-sheet.ts.)
  *
  * The PDFs are unreliable in specific, recurring ways — all handled here:
  *   - the same matchup listed twice with a different classification each time
@@ -16,17 +17,25 @@
  *     leaving an orphan date cell behind
  *   - schools absent from the roster entirely
  *
- * Classification always comes from the roster, never from the PDF.
+ * Everything past "this row says these two schools played" lives in
+ * schedule-rows.ts, shared with the spreadsheet reader.
  */
 
 import {
-  buildIndex,
-  isOutOfStateToken,
-  matchTeam,
-  type MatchResult,
-  type MatcherIndex,
-} from "./names";
-import type { Game, Team } from "./types";
+  asScore,
+  assemble,
+  CLASS_RE,
+  DATE_RE,
+  displayDate,
+  REGION_RE,
+  SCORE_RE,
+  type ParseReport,
+  type RowFields,
+} from "./schedule-rows";
+import type { Team } from "./types";
+
+export type { ParsedGame, ParseReport } from "./schedule-rows";
+export { toGames } from "./schedule-rows";
 
 interface TextItem {
   str: string;
@@ -38,31 +47,6 @@ interface TextItem {
 interface Row {
   y: number;
   items: TextItem[];
-}
-
-export interface ParsedGame {
-  date: string;
-  home: MatchResult;
-  away: MatchResult;
-  homeClassToken: string;
-  awayClassToken: string;
-  /** Null on a forward schedule, and on a game that did not finish. */
-  homeScore: number | null;
-  awayScore: number | null;
-  location: string;
-  /** Line the row came from, for troubleshooting. */
-  sourceLine: string;
-}
-
-export interface ParseReport {
-  games: ParsedGame[];
-  /** Rows that looked like games but could not be read. */
-  skipped: { line: string; reason: string }[];
-  /** Matches a human should check before importing. */
-  warnings: string[];
-  /** Duplicate matchups collapsed to one game. */
-  duplicates: string[];
-  totalRows: number;
 }
 
 /** Extracts positioned text runs from every page. */
@@ -123,69 +107,6 @@ function toCells(row: Row): string[] {
   if (cur.trim()) cells.push(cur.replace(/\s+/g, " ").trim());
   return cells;
 }
-
-/**
- * Two date formats appear in the same file. Most rows read "Aug. 21, 2026",
- * but sections the AHSAA built differently carry a raw Excel serial date
- * ("2026-08-22 0:00:00"). Matching only the first silently drops every row in
- * those sections — the Week 0 Saturday block went missing this way.
- */
-const DATE_RE =
-  /^(?:[A-Z][a-z]{2}\.?\s+\d{1,2},\s*\d{4}|\d{4}-\d{2}-\d{2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?|\d{2}-\d{2}-\d{4})$/;
-
-/** Normalizes either form to the display format used everywhere else. */
-function displayDate(raw: string): string {
-  // Two orderings in circulation: the schedule sheets write YYYY-MM-DD, the
-  // results sheets MM-DD-YYYY. Both reach here.
-  const usa = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-  const ymd = usa
-    ? { y: usa[3], m: usa[1], d: usa[2] }
-    : (() => {
-        const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        return m ? { y: m[1], m: m[2], d: m[3] } : null;
-      })();
-  if (!ymd) return raw;
-
-  const d = new Date(`${ymd.y}-${ymd.m}-${ymd.d}T00:00:00Z`);
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).replace(/^(\w{3})/, "$1.");
-}
-
-/**
- * A classification cell: an AHSAA class (tolerating the `4a\`` typos and the
- * stale `7A` label) or another state's association.
- */
-const CLASS_RE =
-  /^(Double\s*-?\s*AA|Single\s*-?\s*A|Ind-AA|Ind-A|[1-7][Aa][`'’]?|FHSAA?|GHSAA?|MHSAA?|TSSAA|LHSAA|MAIS|GISA)$/i;
-
-/** A region cell. Out-of-state rows carry "NA". */
-const REGION_RE = /^(R-?\s?\d|NA)$/i;
-
-interface RowFields {
-  date: string;
-  home: string;
-  cl1: string;
-  reg1: string;
-  /** Present on the results sheets, absent on a forward schedule. */
-  homeScore: number | null;
-  away: string;
-  cl2: string;
-  reg2: string;
-  awayScore: number | null;
-  location: string;
-}
-
-/** A score cell: a bare number a football team could plausibly have scored. */
-const SCORE_RE = /^\d{1,3}$/;
-const asScore = (cell: string | undefined): number | null => {
-  if (!cell || !SCORE_RE.test(cell)) return null;
-  const n = Number(cell);
-  return n <= 200 ? n : null;
-};
 
 /**
  * Splits a row's cells into fields. The two classification cells are the
@@ -271,132 +192,25 @@ export async function parseSchedulePdf(
   teams: Team[],
   extraAliases: Record<string, string> = {},
 ): Promise<ParseReport> {
-  const index = buildIndex(teams);
   const pages = await extractItems(data);
 
-  const games: ParsedGame[] = [];
+  const rows: { fields: RowFields; line: string }[] = [];
   const skipped: { line: string; reason: string }[] = [];
-  const warnings: string[] = [];
-  const duplicates: string[] = [];
-  let totalRows = 0;
 
-  for (const rows of pages) {
-    for (const row of rows) {
+  for (const page of pages) {
+    for (const row of page) {
       const cells = toCells(row);
       if (!cells.length || !DATE_RE.test(cells[0])) continue;
-
-      const line = cells.join("  ");
 
       // A row carrying only a date is the tail of a wrapped stadium name.
       if (cells.length === 1) continue;
 
+      const line = cells.join("  ");
       const fields = readRow(cells);
-      if (!fields) {
-        totalRows++;
-        skipped.push({ line, reason: "Could not read row layout" });
-        continue;
-      }
-
-      totalRows++;
-      const { home: homeRaw, away: awayRaw, cl1, reg1, cl2, reg2 } = fields;
-
-      if (!homeRaw || !awayRaw) {
-        skipped.push({ line, reason: "Missing home or visitor name" });
-        continue;
-      }
-
-      const home = matchTeam(
-        { raw: homeRaw, classToken: cl1, regionToken: reg1, extraAliases },
-        index,
-      );
-      const away = matchTeam(
-        { raw: awayRaw, classToken: cl2, regionToken: reg2, extraAliases },
-        index,
-      );
-
-      // Both sides out of state means it isn't an AHSAA game at all.
-      if (home.outOfState && away.outOfState) {
-        skipped.push({ line, reason: "Neither school is an AHSAA member" });
-        continue;
-      }
-      if (!home.name || !away.name) {
-        skipped.push({
-          line,
-          reason: [home, away]
-            .filter((m) => !m.name)
-            .map((m) => `Unmatched: "${m.raw}"`)
-            .join("; "),
-        });
-        continue;
-      }
-
-      for (const m of [home, away]) if (m.note) warnings.push(m.note);
-
-      games.push({
-        date: fields.date,
-        home,
-        away,
-        homeClassToken: cl1,
-        awayClassToken: cl2,
-        homeScore: fields.homeScore,
-        awayScore: fields.awayScore,
-        location: fields.location,
-        sourceLine: line,
-      });
+      if (!fields) skipped.push({ line, reason: "Could not read row layout" });
+      else rows.push({ fields, line });
     }
   }
 
-  return {
-    games: dedupe(games, duplicates),
-    skipped,
-    warnings: [...new Set(warnings)],
-    duplicates,
-    totalRows,
-  };
-}
-
-/**
- * The PDFs list some matchups twice, differing only in the classification
- * column. Since classification comes from the roster anyway, the duplicates
- * are identical games — keep the first.
- */
-function dedupe(games: ParsedGame[], log: string[]): ParsedGame[] {
-  const seen = new Set<string>();
-  const out: ParsedGame[] = [];
-  for (const g of games) {
-    const key = `${g.home.name}|${g.away.name}`;
-    if (seen.has(key)) {
-      log.push(`${g.home.name} vs ${g.away.name} listed more than once`);
-      continue;
-    }
-    seen.add(key);
-    out.push(g);
-  }
-  return out;
-}
-
-/** Turns parsed rows into insertable games. Scores stay null. */
-export function toGames(
-  report: ParseReport,
-  week: number,
-  type: "regular" | "playoff" = "regular",
-  round: Game["round"] = null,
-): Game[] {
-  return report.games.map((g) => {
-    // Both or neither. A row where only one score parsed is a game that did
-    // not finish, and half a scoreline would read as a shutout.
-    const played = g.homeScore !== null && g.awayScore !== null;
-    return {
-      t1: g.home.name as string,
-      s1: played ? g.homeScore : null,
-      t2: g.away.name as string,
-      s2: played ? g.awayScore : null,
-      week,
-      type,
-      round,
-      date: g.date,
-      status: played ? "final" : "scheduled",
-      neutral_site: false,
-    };
-  });
+  return assemble(rows, teams, extraAliases, { skipped });
 }

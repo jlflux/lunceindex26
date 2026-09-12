@@ -3,39 +3,69 @@ import { withAdmin } from "@/lib/admin-auth";
 import { loadAliases, loadTeams } from "@/lib/data";
 import { serviceClient } from "@/lib/db";
 import { parseSchedulePdf } from "@/lib/schedule-pdf";
+import type { ParseReport } from "@/lib/schedule-rows";
+import { parseScheduleSheet } from "@/lib/schedule-sheet";
 import type { Game } from "@/lib/types";
 
 // pdf.js needs the Node runtime, not Edge.
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/** Dry run: parse the uploaded PDF and report what would be imported. */
+/**
+ * Dry run: parse the week's sheet and report what would be imported.
+ *
+ * Two containers arrive here, because the AHSAA publishes the same table two
+ * ways — the PDF as an upload, the Google Sheet as pasted or downloaded text.
+ * Only the reading differs; everything after it, including the commit below,
+ * is shared.
+ */
 export const POST = withAdmin(async (req: Request) => {
-  const form = await req.formData();
-  const file = form.get("file");
-  if (!(file instanceof File)) throw new Error("Attach a schedule PDF.");
-
   const [teams, aliases] = await Promise.all([loadTeams(true), loadAliases()]);
 
-  let report;
-  try {
-    report = await parseSchedulePdf(
-      new Uint8Array(await file.arrayBuffer()),
-      teams,
-      aliases,
-    );
-  } catch (e) {
-    const why = e instanceof Error ? e.message : String(e);
-    // pdf.js reaches for its worker by dynamic import, which a bundler can
-    // strip out. Say what that means rather than surfacing the raw error.
-    if (/fake worker|pdf\.worker/i.test(why)) {
+  let report: ParseReport & { unplayed?: { matchup: string; note: string }[] };
+
+  if (req.headers.get("content-type")?.includes("application/json")) {
+    const { text } = (await req.json()) as { text?: string };
+    if (!text?.trim()) {
+      throw new Error("Paste the sheet, or upload it as a CSV.");
+    }
+    report = parseScheduleSheet(text, teams, aliases);
+    if (!report.games.length && !report.skipped.length) {
       throw new Error(
-        `The PDF reader could not start on the server. This is a deployment ` +
-          `problem rather than anything wrong with the file — pdfjs-dist has ` +
-          `to stay outside the server bundle (next.config.mjs). Original: ${why}`,
+        "No game rows found. The sheet needs its DATE, TIME, HOME, CLASS, " +
+          "REG, SCORE, VISITOR… header row — copy the whole tab, including " +
+          "that line.",
       );
     }
-    throw new Error(`Could not read that PDF: ${why}`);
+  } else {
+    const form = await req.formData();
+    const file = form.get("file");
+    if (!(file instanceof File)) throw new Error("Attach a schedule PDF.");
+
+    // A CSV downloaded from the Google Sheet lands on the file input too.
+    if (/\.(csv|tsv|txt)$/i.test(file.name) || /text\//.test(file.type)) {
+      report = parseScheduleSheet(await file.text(), teams, aliases);
+    } else {
+      try {
+        report = await parseSchedulePdf(
+          new Uint8Array(await file.arrayBuffer()),
+          teams,
+          aliases,
+        );
+      } catch (e) {
+        const why = e instanceof Error ? e.message : String(e);
+        // pdf.js reaches for its worker by dynamic import, which a bundler can
+        // strip out. Say what that means rather than surfacing the raw error.
+        if (/fake worker|pdf\.worker/i.test(why)) {
+          throw new Error(
+            `The PDF reader could not start on the server. This is a deployment ` +
+              `problem rather than anything wrong with the file — pdfjs-dist has ` +
+              `to stay outside the server bundle (next.config.mjs). Original: ${why}`,
+          );
+        }
+        throw new Error(`Could not read that PDF: ${why}`);
+      }
+    }
   }
 
   return NextResponse.json({
@@ -44,6 +74,7 @@ export const POST = withAdmin(async (req: Request) => {
     warnings: report.warnings,
     duplicates: report.duplicates,
     skipped: report.skipped,
+    unplayed: report.unplayed ?? [],
     games: report.games.map((g) => ({
       date: g.date,
       home: g.home.name,

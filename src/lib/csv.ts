@@ -1,8 +1,14 @@
 /**
- * Runtime-agnostic CSV parsing (no fs), shared by the browser and API routes.
- * Handles quoted fields containing commas, quotes and newlines.
+ * Runtime-agnostic delimited-text parsing (no fs), shared by the browser and
+ * API routes. Handles quoted fields containing the delimiter, quotes and
+ * newlines.
+ *
+ * Tabs are supported for the same reason commas are: selecting a Google Sheet
+ * and copying it puts tab-separated text on the clipboard, with the same
+ * quoting rules, and a stadium name wrapped across two lines inside a quoted
+ * cell must not be read as two rows.
  */
-export function parseCsvText(text: string): string[][] {
+export function parseCsvText(text: string, delimiter = ","): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -20,7 +26,7 @@ export function parseCsvText(text: string): string[][] {
       continue;
     }
     if (c === '"') quoted = true;
-    else if (c === ",") {
+    else if (c === delimiter) {
       row.push(field);
       field = "";
     } else if (c === "\n") {

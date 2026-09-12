@@ -22,6 +22,7 @@
     "test:names": "tsx scripts/test-names.ts",
     "test:week0": "tsx scripts/test-week0.ts",
     "test:pdf": "tsx scripts/test-schedule-pdf.ts",
+    "test:sheet": "tsx scripts/test-schedule-sheet.ts",
     "test:twoway": "tsx scripts/test-twoway.ts",
     "test:season": "tsx scripts/test-season.ts",
     "test:rankings": "tsx scripts/test-rankings.ts"

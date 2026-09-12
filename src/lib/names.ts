@@ -141,6 +141,9 @@ export const ALIASES: Record<string, string> = {
   "Booker T. Washington, Tuskegee": "BT Washington",
   "Johnson Abernathy Graetz (JAG) HS": "JAG",
   "Johnson-Abernathy-Graetz HS": "JAG",
+  // The Week 3 spreadsheet types it this way. Left as an alias rather than
+  // corrected upstream, because the file is the AHSAA's to fix, not ours.
+  "Jnohnson Abernathy Graetz HS": "JAG",
   "D.A.R. High School": "DAR",
   "Percy L. Julian High School": "Percy Julian",
   "Mae C. Jemison High School": "Mae Jemison",
@@ -166,6 +169,7 @@ export const ALIASES: Record<string, string> = {
   "St. James School": "St. James",
   "Lindsay Lane Christian Academy": "Lindsay Lane",
   "Trinity Presbyterian School": "Trinity",
+  "Trinity Presbyterian Schools": "Trinity",
   "Vincent Middle High School": "Vincent",
   "Ramsay IB High School": "Ramsay",
   "Alabama Aerospace & Aviation": "Alabama Aerospace and Aviation",

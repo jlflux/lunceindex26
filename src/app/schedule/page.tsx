@@ -44,7 +44,7 @@ export default async function SchedulePage() {
       {games.length === 0 ? (
         <EmptyState
           title="No games on file"
-          body="Import a weekly schedule PDF from the admin section to populate this."
+          body="Import a week from the AHSAA sheet in the admin section to populate this."
           icon="calendar"
         />
       ) : (

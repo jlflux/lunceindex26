@@ -100,9 +100,11 @@ Setup reads no data and grants no access; it is a calculator.
 
 ## Weekly workflow
 
-1. **Import the schedule** — Admin → Import → Schedule, upload the AHSAA weekly
-   PDF, pick the week, review the parse report, import. Classification always
-   comes from your roster, never the PDF. Games that already have scores are
+1. **Import the week** — Admin → Import → AHSAA sheet. Open the association's
+   weekly Google Sheet, select the whole tab and paste it in (or download it as
+   CSV and upload that), pick the week, review the parse report, import. The
+   older weekly PDF still works under the AHSAA PDF tab. Classification always
+   comes from your roster, never the sheet. Games that already have scores are
    never overwritten.
 2. **Enter results** — either Admin → Games one at a time, or Admin → Import →
    Weekly scores for a CSV of the whole week.
@@ -120,7 +122,7 @@ full season schedule can be loaded in advance without affecting anything.
 |---|---|
 | Dashboard | Counts, current formula, publish button with a top-10 preview |
 | Games | Add, edit and delete games; filter by week, search, show unplayed only |
-| Import | Weekly scores from CSV; schedules from the AHSAA PDF |
+| Import | The AHSAA weekly sheet (pasted or as CSV); your own score CSV; the older AHSAA PDF |
 | Formula | Sliders for every tunable, with a live top-25 preview showing rank movement before you save |
 | Teams | Edit names, classification, region and preseason rating; bulk-import priors |
 
@@ -135,6 +137,7 @@ npm run test:engine       # 24 invariant checks on the rating engine
 npm run validate          # reproduce the 2025 ratings from the 2025 export
 npm run smoke             # roster → PDF → engine, end to end, no database
 npm run parse-schedule    # parse report for a schedule PDF
+npm run test:sheet        # the AHSAA weekly Google Sheet, against a real week
 npm run typecheck
 ```
 
@@ -158,8 +161,10 @@ src/
 ├── lib/
 │   ├── engine.ts        # THE RATING ENGINE — Massey solve + adjustments, and RPI
 │   ├── types.ts         # domain types, classification order, default config
-│   ├── names.ts         # PDF spelling → roster name matching
-│   ├── schedule-pdf.ts  # AHSAA schedule PDF parser
+│   ├── names.ts         # AHSAA spelling → roster name matching
+│   ├── schedule-rows.ts # shared row → game logic for both AHSAA readers
+│   ├── schedule-sheet.ts# AHSAA weekly Google Sheet (CSV/TSV) parser
+│   ├── schedule-pdf.ts  # AHSAA schedule PDF parser (superseded, still used)
 │   ├── score-csv.ts     # weekly score CSV parsing and validation
 │   ├── team-view.ts     # schedule, projections, result classification
 │   ├── data.ts          # loading data, publishing snapshots
@@ -188,8 +193,8 @@ than an error. `PROJECT.md` covers the reasoning.
   loading a full season would erase the preseason carry-over instantly.
 - **Eight classification tiers**, not seven: A, AA, 1A–6A. Any `7A` reference
   is stale 2025 code.
-- **Classification comes from the roster, never the PDF.** The published PDFs
-  contain classification errors.
+- **Classification comes from the roster, never the AHSAA sheet.** The
+  published files contain classification errors.
 
 ## Validation status
 

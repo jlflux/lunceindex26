@@ -33,6 +33,15 @@ const PAGES = [
   { href: "/about", label: "How It Works" },
 ] as const;
 
+/**
+ * The ratings live on their own subdomain, so the way back to the main site
+ * has to be somewhere obvious. It sits at the far end of the second row rather
+ * than among the tabs: everything to its left is a page of this site, and this
+ * one leaves it. Same tab, because it is the parent site and not an outside
+ * link — the arrow says where it goes.
+ */
+const HOME_URL = "https://alpreps.com";
+
 export default function TopNav({
   generated,
   season = "2026",
@@ -162,6 +171,18 @@ export default function TopNav({
               )}
             </Link>
           ))}
+
+          {/* Right-aligned only where the row has room for it. On a phone the
+              second row is already full, so ml-auto stranded this alone on a
+              line of its own; letting it wrap left reads as a continuation. */}
+          <a
+            href={HOME_URL}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap py-2.5 text-[13px] font-semibold transition-colors hover:underline sm:ml-auto"
+            style={{ color: "rgb(var(--brand))" }}
+          >
+            ALPreps Home
+            <Icon name="external" size={12} />
+          </a>
         </nav>
       </div>
     </>

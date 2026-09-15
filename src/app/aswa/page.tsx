@@ -1,8 +1,14 @@
 import Link from "next/link";
-import AppShell, { PageHeader } from "@/components/AppShell";
+import AppShell, { PageHeader, UpdatedStamp } from "@/components/AppShell";
 import EmptyState from "@/components/EmptyState";
 import { loadAswa, loadRatings } from "@/lib/data";
-import { buildAswa, othersLine, type AswaClassBlock } from "@/lib/rankings";
+import {
+  buildAswa,
+  formatUpdated,
+  latestUpdate,
+  othersLine,
+  type AswaClassBlock,
+} from "@/lib/rankings";
 import { CLS_FILTER_ORDER } from "@/lib/types";
 
 export const revalidate = 300;
@@ -17,7 +23,19 @@ export default async function AswaPage() {
     <AppShell generated={entries.length ? data.generated : undefined}>
       <PageHeader
         title="ASWA Poll"
-        subtitle="The Alabama Sports Writers Association top ten in each classification, voted by a panel of twenty. First-place votes in parentheses, total points on the right. Entered by hand from the weekly release — this is the panel's poll, not ours."
+        subtitle={
+          <>
+            The Alabama Sports Writers Association top ten is a poll voted on by
+            20 sports writers from around the state. First place votes are in
+            parentheses. Note: ALPreps does not vote in the ASWA rankings.
+          </>
+        }
+        meta={
+          <UpdatedStamp
+            label="Poll updated"
+            when={formatUpdated(latestUpdate(entries))}
+          />
+        }
       />
 
       {!blocks.length ? (

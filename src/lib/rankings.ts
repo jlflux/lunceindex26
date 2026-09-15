@@ -23,6 +23,8 @@ export interface CompositeEntry {
   massey: number | null;
   hsratings: number | null;
   ahsfhs: number | null;
+  /** Set on save. Optional because nothing in the arithmetic depends on it. */
+  updated_at?: string | null;
 }
 
 export interface CompositeRow extends CompositeEntry {
@@ -106,6 +108,8 @@ export interface AswaEntry {
   losses: number;
   first_votes: number;
   points: number;
+  /** Set on save. Optional because nothing in the arithmetic depends on it. */
+  updated_at?: string | null;
 }
 
 export interface AswaClassBlock {
@@ -157,4 +161,51 @@ export function othersLine(others: AswaEntry[]): string {
   return others
     .map((o) => (o.points ? `${o.team} ${o.points}` : o.team))
     .join(", ");
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * When a hand-entered board was last saved.
+ *
+ * Each of these boards moves on its own schedule — the Composite goes in when
+ * the outside sites refresh, the ASWA poll when the panel releases it, and
+ * neither has anything to do with when the Index last recomputed. The
+ * timestamp in the masthead answers that third question and would be actively
+ * misleading here, so each board carries its own.
+ *
+ * The ASWA poll is saved one classification at a time, so the latest save is
+ * the honest page-level answer: it is the freshest thing on the page.
+ */
+export function latestUpdate(
+  rows: { updated_at?: string | null }[],
+): string | null {
+  let best = 0;
+  for (const r of rows) {
+    if (!r.updated_at) continue;
+    const t = Date.parse(r.updated_at);
+    if (Number.isFinite(t) && t > best) best = t;
+  }
+  return best ? new Date(best).toISOString() : null;
+}
+
+/**
+ * Formatted for an Alabama reader, not for the server.
+ *
+ * These pages render on the server, where the clock is UTC — a poll entered on
+ * Monday evening would otherwise be stamped Tuesday. The audience is in one
+ * time zone, so it is named rather than guessed at.
+ */
+export function formatUpdated(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Chicago",
+  }).format(d);
 }

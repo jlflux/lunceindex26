@@ -10,6 +10,8 @@ import {
   buildAswa,
   buildComposite,
   COMPOSITE_SOURCES,
+  formatUpdated,
+  latestUpdate,
   othersLine,
   type AswaEntry,
   type CompositeEntry,
@@ -207,6 +209,40 @@ console.log("\n9. Every classification the site filters by is a valid poll class
     blocks.length === all.length,
     `${blocks.length}`,
   );
+}
+
+console.log("\n10. Each board carries its own date");
+{
+  // The point of these is that the two boards move on different days: the
+  // Composite goes in when the outside sites refresh, the poll when the panel
+  // releases it. A stale one has to be visibly stale.
+  const rows = [
+    { updated_at: "2026-09-14T22:31:00.000Z" },
+    { updated_at: "2026-09-08T14:02:00.000Z" },
+    { updated_at: null },
+  ];
+  check(
+    "the newest save wins",
+    latestUpdate(rows) === "2026-09-14T22:31:00.000Z",
+    `${latestUpdate(rows)}`,
+  );
+  check("a board with no timestamps has no date", latestUpdate([{}]) === null);
+  check("nor does an empty board", latestUpdate([]) === null);
+  check(
+    "a malformed timestamp is ignored rather than shown as Invalid Date",
+    latestUpdate([{ updated_at: "not a date" }]) === null,
+  );
+
+  // Rendering happens on the server, where the clock is UTC. 10:31pm Central
+  // on the 14th is already the 15th in UTC, so a naive format would date
+  // Monday's poll to Tuesday.
+  check(
+    "formatted in Alabama's time zone, not the server's",
+    formatUpdated("2026-09-15T03:31:00.000Z") === "Mon, Sep 14, 10:31 PM",
+    `${formatUpdated("2026-09-15T03:31:00.000Z")}`,
+  );
+  check("nothing to show when there is no date", formatUpdated(null) === null);
+  check("and a bad value shows nothing", formatUpdated("nonsense") === null);
 }
 
 console.log(

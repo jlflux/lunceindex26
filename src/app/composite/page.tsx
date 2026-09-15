@@ -1,5 +1,5 @@
 import Link from "next/link";
-import AppShell, { PageHeader } from "@/components/AppShell";
+import AppShell, { PageHeader, UpdatedStamp } from "@/components/AppShell";
 import EmptyState from "@/components/EmptyState";
 import { loadComposite, loadRatings } from "@/lib/data";
 import {
@@ -7,6 +7,8 @@ import {
   COMPOSITE_RANKED,
   COMPOSITE_SHOWN,
   COMPOSITE_SOURCES,
+  formatUpdated,
+  latestUpdate,
 } from "@/lib/rankings";
 import type { Classification } from "@/lib/types";
 
@@ -35,7 +37,21 @@ export default async function CompositePage() {
     <AppShell generated={entries.length ? data.generated : undefined}>
       <PageHeader
         title="Composite Rankings"
-        subtitle="The ALPreps Index averaged with four outside polls. Every number is entered by hand — nothing here is pulled from anyone's site. A team needs a position in all five to be ranked."
+        subtitle={
+          <>
+            The ALPreps Composite Rankings include rankings from five sources
+            &mdash; our own power index, MaxPreps, Massey, HSRatings (formerly
+            CalPreps) and AHSFHS Power Ratings. Please note: these are not
+            opinionated rankings. All polls use different computer formulas and
+            we combine them to show a composite ranking.
+          </>
+        }
+        meta={
+          <UpdatedStamp
+            label="Composite updated"
+            when={formatUpdated(latestUpdate(entries))}
+          />
+        }
       />
 
       {!ranked.length ? (

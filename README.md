@@ -143,6 +143,7 @@ npm run smoke             # roster → PDF → engine, end to end, no database
 npm run parse-schedule    # parse report for a schedule PDF
 npm run test:sheet        # the AHSAA weekly Google Sheet, against a real week
 npm run test:coverage     # the missing-week scan, including the bye/noise rules
+npm run test:forfeits     # that a vacated win changes the record and not the rating
 npm run typecheck
 ```
 
@@ -171,6 +172,7 @@ src/
 │   ├── schedule-sheet.ts# AHSAA weekly Google Sheet (CSV/TSV) parser
 │   ├── schedule-pdf.ts  # AHSAA schedule PDF parser (superseded, still used)
 │   ├── score-csv.ts     # weekly score CSV parsing and validation
+│   ├── result.ts        # who won on the field vs who won officially (forfeits)
 │   ├── duplicates.ts    # fixtures stored twice; a school with two games in a week
 │   ├── coverage.ts      # schools missing a week everyone else played
 │   ├── team-view.ts     # schedule, projections, result classification
@@ -202,6 +204,11 @@ than an error. `PROJECT.md` covers the reasoning.
   is stale 2025 code.
 - **Classification comes from the roster, never the AHSAA sheet.** The
   published files contain classification errors.
+- **A forfeit changes the record, never the rating.** `forfeit_by` names which
+  side gave a game up; the scores stay as played. Everything record-shaped
+  (standings, region order, RPI, Résumé) reads the ruling, and the Index reads
+  the field — including the win-rate term, which is part of the rating rather
+  than a display column. See `src/lib/result.ts`.
 
 ## Validation status
 

@@ -18,7 +18,10 @@ const cell = (v: unknown) => {
  */
 export const GET = withAdmin(async () => {
   const games = await loadGames(true);
-  const header = "home,home_score,away,away_score,week,type,round,date,status";
+  // forfeit_by is part of the result: without it a re-import of this file
+// would quietly restore two wins the association took away.
+const header =
+    "home,home_score,away,away_score,week,type,round,date,status,forfeit_by";
   const body = games
     .map((g) =>
       [
@@ -31,6 +34,7 @@ export const GET = withAdmin(async () => {
         g.round,
         g.date,
         g.status,
+        g.forfeit_by ?? "",
       ]
         .map(cell)
         .join(","),

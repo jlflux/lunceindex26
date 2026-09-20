@@ -14,6 +14,7 @@
  *     null-vs-null games reading as 0-0 ties.
  */
 
+import { fieldWinner, officialWinner } from "./result";
 import {
   CLS_MAX,
   CLS_TIER,
@@ -123,9 +124,19 @@ export function computeRatings(
   }
 
   // Per-team record and scoring, plus the opponents actually faced.
+  //
+  // Two records, because a forfeit makes them different things. `fieldW/fieldL`
+  // is what happened on the field and is what the rating's win-rate term reads;
+  // `offW/offL` is the official record and is what gets published. They are
+  // identical for every team that has not forfeited anything, which is nearly
+  // all of them.
   interface Acc {
-    wins: number;
-    losses: number;
+    fieldW: number;
+    fieldL: number;
+    offW: number;
+    offL: number;
+    /** Games of this team's whose official result was overturned. */
+    forfeits: number;
     pf: number;
     pa: number;
     games: number;
@@ -134,8 +145,11 @@ export function computeRatings(
   }
   const acc = new Map<string, Acc>();
   const blank = (): Acc => ({
-    wins: 0,
-    losses: 0,
+    fieldW: 0,
+    fieldL: 0,
+    offW: 0,
+    offL: 0,
+    forfeits: 0,
     pf: 0,
     pa: 0,
     games: 0,
@@ -156,6 +170,8 @@ export function computeRatings(
   };
 
   for (const g of played) {
+    const field = fieldWinner(g);
+    const official = officialWinner(g);
     const home = acc.get(g.t1);
     const away = acc.get(g.t2);
     if (home) {
@@ -163,16 +179,22 @@ export function computeRatings(
       home.pf += g.s1;
       home.pa += g.s2;
       home.opponents.push(g.t2);
-      if (g.s1 > g.s2) home.wins++;
-      else if (g.s1 < g.s2) home.losses++;
+      if (field === "t1") home.fieldW++;
+      else if (field === "t2") home.fieldL++;
+      if (official === "t1") home.offW++;
+      else if (official === "t2") home.offL++;
+      if (g.forfeit_by) home.forfeits++;
     }
     if (away) {
       away.games++;
       away.pf += g.s2;
       away.pa += g.s1;
       away.opponents.push(g.t1);
-      if (g.s2 > g.s1) away.wins++;
-      else if (g.s2 < g.s1) away.losses++;
+      if (field === "t2") away.fieldW++;
+      else if (field === "t1") away.fieldL++;
+      if (official === "t2") away.offW++;
+      else if (official === "t1") away.offL++;
+      if (g.forfeit_by) away.forfeits++;
     }
     h2hAdd(g.t1, g.t2, g.s1, g.s2);
     h2hAdd(g.t2, g.t1, g.s2, g.s1);
@@ -359,7 +381,10 @@ export function computeRatings(
     const sos = sosOf.get(t.name) as number;
     const oEff = oEffOf.get(t.name) as number;
     const dEff = dEffOf.get(t.name) as number;
-    const winRate = a.games ? a.wins / a.games : 0.5; // neutral when unplayed
+    // The field record, not the official one. This term is part of the
+    // rating, so a vacated win must not cost a team places on a board that is
+    // meant to say how well they play.
+    const winRate = a.games ? a.fieldW / a.games : 0.5; // neutral when unplayed
 
     // Dampens efficiency credit on a weak schedule — you don't get full marks
     // for outscoring bad opponents. A negative SOS scales to zero, so those
@@ -389,8 +414,9 @@ export function computeRatings(
       slug: t.slug,
       classification: t.classification,
       region: t.region,
-      wins: a.wins,
-      losses: a.losses,
+      wins: a.offW,
+      losses: a.offL,
+      forfeits: a.forfeits,
       rating: composite,
       massey: m,
       sos,
@@ -440,21 +466,31 @@ export function computeRpi(teams: Team[], gamesIn: Game[]): RpiRow[] {
 
   const known = new Set(teams.map((t) => t.name));
 
-  const rec = new Map<string, { w: number; l: number; opps: string[] }>();
-  for (const t of teams) rec.set(t.name, { w: 0, l: 0, opps: [] });
+  const rec = new Map<
+    string,
+    { w: number; l: number; ff: number; opps: string[] }
+  >();
+  for (const t of teams) rec.set(t.name, { w: 0, l: 0, ff: 0, opps: [] });
 
   for (const g of played) {
+    // RPI is built out of win-loss records and nothing else, so it takes the
+    // official one: a forfeited win is not a win here, and the opponent's
+    // improved record propagates through the opponent-strength terms exactly
+    // as the association's own numbers would.
+    const winner = officialWinner(g);
     const h = rec.get(g.t1);
     const a = rec.get(g.t2);
     if (h) {
-      if (g.s1 > g.s2) h.w++;
-      else if (g.s1 < g.s2) h.l++;
+      if (winner === "t1") h.w++;
+      else if (winner === "t2") h.l++;
+      if (g.forfeit_by) h.ff++;
       // Record counts every game; only in-state opponents feed strength.
       if (known.has(g.t2)) h.opps.push(g.t2);
     }
     if (a) {
-      if (g.s2 > g.s1) a.w++;
-      else if (g.s2 < g.s1) a.l++;
+      if (winner === "t2") a.w++;
+      else if (winner === "t1") a.l++;
+      if (g.forfeit_by) a.ff++;
       if (known.has(g.t1)) a.opps.push(g.t1);
     }
   }
@@ -491,6 +527,7 @@ export function computeRpi(teams: Team[], gamesIn: Game[]): RpiRow[] {
       region: t.region,
       wins: r.w,
       losses: r.l,
+      forfeits: r.ff,
       win_pct: wp,
       opp_win_pct: owp,
       opp_opp_win_pct: oowp,

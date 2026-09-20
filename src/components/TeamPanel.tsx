@@ -1,5 +1,6 @@
 "use client";
 
+import ForfeitMark from "./ForfeitMark";
 import Link from "next/link";
 import { useEffect } from "react";
 import Icon from "./Icon";
@@ -176,7 +177,15 @@ export default function TeamPanel({
             background: "rgb(var(--surface-2))",
           }}
         >
-          <StatCell label="Record" value={record(t.wins, t.losses)} />
+          <StatCell
+            label="Record"
+            value={
+              <>
+                {record(t.wins, t.losses)}
+                <ForfeitMark n={t.forfeits} />
+              </>
+            }
+          />
           <StatCell
             label="SOS"
             value={played ? fmt(t.sos, 1) : "—"}
@@ -291,7 +300,7 @@ function StatCell({
   tone,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   rank?: number;
   tone?: number;
 }) {
@@ -361,9 +370,31 @@ function ScheduleRow({ e }: { e: ScheduleEntry }) {
         {e.played ? (
           <span
             className="w-4 shrink-0 text-center text-[14px] font-extrabold"
-            style={{ color: e.won ? "rgb(var(--good))" : "rgb(var(--bad))" }}
+            style={{
+              color:
+                e.won === null
+                  ? "rgb(var(--text-muted))"
+                  : e.won
+                    ? "rgb(var(--good))"
+                    : "rgb(var(--bad))",
+            }}
+            title={
+              e.forfeit === "gave"
+                ? "Won on the field, forfeited afterwards"
+                : e.forfeit === "received"
+                  ? "Awarded by forfeit"
+                  : undefined
+            }
           >
-            {e.actual === 0 ? "T" : e.won ? "W" : "L"}
+            {e.won === null ? "T" : e.won ? "W" : "L"}
+            {e.forfeit && (
+              <span
+                className="align-super text-[9px]"
+                style={{ color: "rgb(var(--warn))" }}
+              >
+                FF
+              </span>
+            )}
           </span>
         ) : (
           <span className="w-4 shrink-0" />

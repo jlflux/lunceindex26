@@ -97,6 +97,23 @@ export default function AboutPage() {
               the ratings.
             </p>
           </Panel>
+
+          <Panel title="Forfeits">
+            <p>
+              A forfeit is a ruling about the record, not about the football. A
+              team that wins on the field and gives the game up afterwards
+              &mdash; almost always an eligibility finding weeks later &mdash;
+              keeps the scoreline and loses the win.
+            </p>
+            <p>
+              So the two are separated. Records, standings, region order, RPI
+              and Résumé all count the forfeit, because those are statements
+              about what a team officially holds. The Index does not: it
+              measures how well a team plays, and a paperwork ruling does not
+              change how a game was played. A record marked with an asterisk
+              includes a game decided this way.
+            </p>
+          </Panel>
         </div>
       </div>
     </AppShell>

@@ -19,6 +19,7 @@ const emptyForm = {
   type: "regular" as "regular" | "playoff",
   round: "r1" as PlayoffRound,
   neutral_site: false,
+  forfeit_by: "" as "" | "t1" | "t2",
 };
 
 export default function GamesManager({
@@ -68,6 +69,7 @@ export default function GamesManager({
       type: g.type,
       round: (g.round ?? "r1") as PlayoffRound,
       neutral_site: Boolean(g.neutral_site),
+      forfeit_by: (g.forfeit_by ?? "") as "" | "t1" | "t2",
     });
     setMessage(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -252,6 +254,56 @@ export default function GamesManager({
           Neutral site (no home-field advantage in projections)
         </label>
 
+        {/* A ruling, not a result — so it sits apart from the score boxes and
+            says in plain words what it will do before it is saved. */}
+        <div
+          className="space-y-2 rounded-xl border px-3 py-3"
+          style={{ borderColor: "rgb(var(--border))" }}
+        >
+          <Field label="Forfeit">
+            <select
+              className="input"
+              value={form.forfeit_by}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  forfeit_by: e.target.value as "" | "t1" | "t2",
+                })
+              }
+            >
+              <option value="">No forfeit — the result stands</option>
+              <option value="t1" disabled={!form.t1}>
+                {form.t1 || "Home team"} forfeited this game
+              </option>
+              <option value="t2" disabled={!form.t2}>
+                {form.t2 || "Away team"} forfeited this game
+              </option>
+            </select>
+          </Field>
+          <p className="text-xs" style={{ color: "rgb(var(--text-muted))" }}>
+            {form.forfeit_by ? (
+              <>
+                <strong>
+                  {form.forfeit_by === "t1" ? form.t2 : form.t1 || "The opponent"}
+                </strong>{" "}
+                is credited with the win, so it counts in records, standings,
+                region order and RPI. The score stays as played and the Power
+                Index still reads it as a{" "}
+                <strong>
+                  {form.forfeit_by === "t1" ? form.t1 : form.t2 || "the other team"}
+                </strong>{" "}
+                win — a vacated game does not change how well anyone played.
+              </>
+            ) : (
+              <>
+                Use this when a result is overturned after the fact, usually an
+                eligibility ruling. Enter the score the way it finished; the
+                forfeit is recorded beside it rather than replacing it.
+              </>
+            )}
+          </p>
+        </div>
+
         <p className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
           A game only counts toward ratings once both scores are entered.
           Leaving them blank keeps it on the schedule as upcoming.
@@ -352,6 +404,18 @@ export default function GamesManager({
                     <span className="font-semibold">{g.t1}</span>
                     <span style={{ color: "rgb(var(--text-faint))" }}> vs </span>
                     <span className="font-semibold">{g.t2}</span>
+                    {g.forfeit_by && (
+                      <span
+                        className="ml-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                        style={{
+                          background: "rgb(var(--warn-soft))",
+                          color: "rgb(var(--warn))",
+                        }}
+                        title={`${g.forfeit_by === "t1" ? g.t1 : g.t2} forfeited — ${g.forfeit_by === "t1" ? g.t2 : g.t1} is credited with the win`}
+                      >
+                        FF {g.forfeit_by === "t1" ? g.t1 : g.t2}
+                      </span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-right text-sm font-bold tabular-nums">
                     {g.s1 !== null && g.s2 !== null ? (

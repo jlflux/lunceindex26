@@ -1,5 +1,6 @@
 "use client";
 
+import ForfeitMark from "./ForfeitMark";
 import { Fragment, useMemo, useState } from "react";
 import Icon from "./Icon";
 import TeamPanel from "./TeamPanel";
@@ -386,6 +387,7 @@ export default function RatingsTable({
                       {/* Record rides along here once its own column is gone. */}
                       <span className="tnum sm:hidden">
                         · {record(r.wins, r.losses)}
+                        <ForfeitMark n={"forfeits" in r ? r.forfeits : undefined} />
                       </span>
                     </span>
                   </td>
@@ -395,6 +397,7 @@ export default function RatingsTable({
                     style={{ color: "rgb(var(--text-muted))" }}
                   >
                     {record(r.wins, r.losses)}
+                    <ForfeitMark n={"forfeits" in r ? r.forfeits : undefined} />
                   </td>
 
                   {ir ? (

@@ -101,6 +101,11 @@ export interface Game {
    */
   status: string | null;
   neutral_site?: boolean;
+  /**
+   * Which side gave the game up, when the official result is not the one
+   * played. The scores stay as played; see result.ts for what reads which.
+   */
+  forfeit_by?: "t1" | "t2" | null;
 }
 
 export interface EngineConfig {
@@ -222,8 +227,14 @@ export interface RatingRow {
   slug: string;
   classification: Classification;
   region: number;
+  /** Official record — a forfeited win counts as a loss here. */
   wins: number;
   losses: number;
+  /**
+   * Games this team played whose official result was overturned. Zero for
+   * almost everyone; when it is not, the record above needs a footnote.
+   */
+  forfeits?: number;
   rating: number;
   massey: number;
   sos: number;
@@ -252,6 +263,8 @@ export interface RpiRow {
   region: number;
   wins: number;
   losses: number;
+  /** Games whose official result was overturned; a footnote for the record. */
+  forfeits?: number;
   win_pct: number;
   opp_win_pct: number;
   opp_opp_win_pct: number;

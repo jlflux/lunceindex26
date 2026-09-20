@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import ForfeitMark from "./ForfeitMark";
 import { useMemo, useState } from "react";
 import Icon from "./Icon";
 import { fmt, ordinal, record } from "@/lib/format";
@@ -150,7 +151,8 @@ export default function TeamDirectory({
                                   style={{ color: "rgb(var(--text-faint))" }}
                                 >
                                   {ordinal(t.rank)} ·{" "}
-                                  {record(t.wins, t.losses)}{" "}
+                                  {record(t.wins, t.losses)}
+                                  <ForfeitMark n={t.forfeits} />{" "}
                                   <span style={{ color: "rgb(var(--text-muted))" }}>
                                     ({regionLabel(reg.get(t.name))})
                                   </span>

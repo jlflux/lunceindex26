@@ -1,3 +1,4 @@
+import ForfeitMark from "@/components/ForfeitMark";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import AppShell from "@/components/AppShell";
@@ -95,6 +96,7 @@ export default async function TeamPage({
                 }}
               >
                 {record(t.wins, t.losses)}
+                <ForfeitMark n={t.forfeits} />
               </span>
             </div>
           </div>
@@ -370,24 +372,42 @@ function ScheduleRow({ e }: { e: ScheduleEntry }) {
           {e.played ? (
             <>
               <div className="flex items-center justify-end gap-1.5">
+                {/* Keyed on the official result rather than the margin, so a
+                    forfeited win reads L beside the score it was won by. */}
+                {e.forfeit && (
+                  <span
+                    className="chip !px-1.5 !text-[10px]"
+                    style={{
+                      background: "rgb(var(--warn-soft))",
+                      color: "rgb(var(--warn))",
+                    }}
+                    title={
+                      e.forfeit === "gave"
+                        ? "Won on the field, forfeited afterwards. The Power Index still counts the result; the record does not."
+                        : "Awarded by forfeit. It counts in the record; the Power Index reads the game as played."
+                    }
+                  >
+                    FF
+                  </span>
+                )}
                 <span
                   className="chip !px-1.5"
                   style={{
                     background:
-                      e.actual === 0
+                      e.won === null
                         ? "rgb(var(--surface-3))"
                         : e.won
                           ? "rgb(var(--good-soft))"
                           : "rgb(var(--bad-soft))",
                     color:
-                      e.actual === 0
+                      e.won === null
                         ? "rgb(var(--text-muted))"
                         : e.won
                           ? "rgb(var(--good))"
                           : "rgb(var(--bad))",
                   }}
                 >
-                  {e.actual === 0 ? "T" : e.won ? "W" : "L"}
+                  {e.won === null ? "T" : e.won ? "W" : "L"}
                 </span>
                 <span className="text-sm font-extrabold tnum">
                   {e.teamScore}–{e.oppScore}

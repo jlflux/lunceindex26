@@ -45,6 +45,12 @@ function readGame(body: Record<string, unknown>): Partial<Game> {
     );
   }
 
+  // Which side gave the game up, when a result was overturned after the fact.
+  // Anything else — including the empty string the select sends for "no" —
+  // clears it.
+  const ff = String(body.forfeit_by ?? "");
+  const forfeit_by = ff === "t1" || ff === "t2" ? ff : null;
+
   return {
     t1,
     t2,
@@ -56,6 +62,7 @@ function readGame(body: Record<string, unknown>): Partial<Game> {
     date: body.date ? String(body.date) : null,
     status: s1 !== null ? "final" : "scheduled",
     neutral_site: Boolean(body.neutral_site),
+    forfeit_by,
   };
 }
 

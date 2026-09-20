@@ -31,6 +31,9 @@
  * offense of 94 points a game reached the public site.
  */
 
+// `Side` is aliased: this file already has a local Side meaning one side
+// of a scoring observation, which is a different idea entirely.
+import { officialWinner, type Side as RowSide } from "./result";
 import {
   type Classification,
   type Game,
@@ -239,22 +242,39 @@ export function computeTwoWay(
   const netOf = (n: string) => adjO(n) - adjD(n);
 
   // ---- record, scoring, schedule -----------------------------------------
-  interface Acc { w: number; l: number; g: number; pf: number; pa: number; opps: string[] }
+  //
+  // The record here is the official one, forfeits included. Unlike the classic
+  // engine it feeds nothing but the published row — this model's rating is
+  // built entirely from scores — so there is no second copy to keep.
+  interface Acc {
+    w: number;
+    l: number;
+    ff: number;
+    g: number;
+    pf: number;
+    pa: number;
+    opps: string[];
+  }
   const acc = new Map<string, Acc>();
-  for (const t of teams) acc.set(t.name, { w: 0, l: 0, g: 0, pf: 0, pa: 0, opps: [] });
+  for (const t of teams) {
+    acc.set(t.name, { w: 0, l: 0, ff: 0, g: 0, pf: 0, pa: 0, opps: [] });
+  }
   for (const g of played) {
-    for (const [t, opp, pf, pa] of [
-      [g.t1, g.t2, g.s1, g.s2],
-      [g.t2, g.t1, g.s2, g.s1],
-    ] as [string, string, number, number][]) {
+    const winner = officialWinner(g);
+    const pairs: [string, string, number, number, RowSide][] = [
+      [g.t1, g.t2, g.s1, g.s2, "t1"],
+      [g.t2, g.t1, g.s2, g.s1, "t2"],
+    ];
+    for (const [t, opp, pf, pa, side] of pairs) {
       const a = acc.get(t);
       if (!a) continue;
       a.g++;
       a.pf += pf;
       a.pa += pa;
       a.opps.push(opp);
-      if (pf > pa) a.w++;
-      else if (pf < pa) a.l++;
+      if (winner === side) a.w++;
+      else if (winner) a.l++;
+      if (g.forfeit_by) a.ff++;
     }
   }
 
@@ -267,6 +287,7 @@ export function computeTwoWay(
       region: t.region,
       wins: a.w,
       losses: a.l,
+      forfeits: a.ff,
       rating: netOf(t.name),
       massey: netOf(t.name),
       sos: a.g ? mean(a.opps.map((n) => netOf(nameOf(n)))) : 0,
@@ -333,13 +354,18 @@ function attachStrengthOfRecord(
 
   for (const g of played) {
     const neutral = g.neutral_site ? 0 : 1;
-    for (const [me, opp, mine, theirs, site] of [
-      [g.t1, g.t2, g.s1, g.s2, +neutral],
-      [g.t2, g.t1, g.s2, g.s1, -neutral],
-    ] as [string, string, number, number, number][]) {
+    // Strength of Record asks what a team's results have earned it, so the
+    // wins counted are the ones it still officially holds. The expected-wins
+    // side is untouched: the schedule was as hard as it was either way.
+    const winner = officialWinner(g);
+    const pairs: [string, string, number, RowSide][] = [
+      [g.t1, g.t2, +neutral, "t1"],
+      [g.t2, g.t1, -neutral, "t2"],
+    ];
+    for (const [me, opp, site, side] of pairs) {
       const e = tally.get(me);
       if (!e) continue;
-      if (mine > theirs) e.wins++;
+      if (winner === side) e.wins++;
       e.exp += p(bench - netOf(nameOf(opp)) + site * cfg.hfa);
     }
   }

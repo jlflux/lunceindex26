@@ -3,6 +3,7 @@
  * margins and how each result compared with its projection.
  */
 import { classifyPerformance, expectedMargin, isPlayed } from "./engine";
+import { forfeitFor, officialWinner, type Side } from "./result";
 import type {
   Classification,
   Game,
@@ -25,7 +26,14 @@ export interface ScheduleEntry {
   played: boolean;
   teamScore: number | null;
   oppScore: number | null;
+  /** The official result — a win given up by forfeit reads as a loss. */
   won: boolean | null;
+  /**
+   * Set when the ruling and the scoreboard disagree. "gave" is this team's
+   * forfeit, "received" the opponent's. The scores shown are still the ones
+   * played, which is the point: the row says 48-7 and says it was a loss.
+   */
+  forfeit: "gave" | "received" | null;
   /** Projected margin from this team's perspective. */
   expected: number | null;
   /** Actual margin from this team's perspective. */
@@ -53,9 +61,11 @@ export function buildTeamView(
     .filter((g) => g.t1 === rating.name || g.t2 === rating.name)
     .map<ScheduleEntry>((game) => {
       const isHome = game.t1 === rating.name;
+      const side: Side = isHome ? "t1" : "t2";
       const opponent = isHome ? game.t2 : game.t1;
       const opp = byName.get(opponent) ?? null;
       const played = isPlayed(game);
+      const winner = officialWinner(game);
 
       const teamScore = played ? Number(isHome ? game.s1 : game.s2) : null;
       const oppScore = played ? Number(isHome ? game.s2 : game.s1) : null;
@@ -91,7 +101,11 @@ export function buildTeamView(
         played,
         teamScore,
         oppScore,
-        won: actual === null ? null : actual > 0,
+        // Official, so the schedule agrees with the record above it. The
+        // margin below stays as played, which is what `performance` grades —
+        // a forfeited win still shows as the rout it was.
+        won: winner === null ? null : winner === side,
+        forfeit: forfeitFor(game, side),
         expected,
         actual,
         performance,

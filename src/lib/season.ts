@@ -4,6 +4,7 @@
  * Both are derived from the games rather than configured, so neither needs
  * touching when the calendar moves.
  */
+import { officialWinner } from "./result";
 import type { Classification, Game, RatingRow } from "./types";
 
 /** The key ScheduleBrowser uses to identify a week or a playoff round. */
@@ -123,7 +124,7 @@ export interface Record2 {
  */
 export function regionRecords(
   ratings: Pick<RatingRow, "name" | "classification" | "region">[],
-  games: Pick<Game, "t1" | "t2" | "s1" | "s2" | "type">[],
+  games: Pick<Game, "t1" | "t2" | "s1" | "s2" | "type" | "forfeit_by">[],
 ): Map<string, Record2> {
   const meta = new Map<string, { c: Classification; r: number }>();
   for (const t of ratings) meta.set(t.name, { c: t.classification, r: t.region });
@@ -133,15 +134,18 @@ export function regionRecords(
 
   for (const g of games) {
     if (g.type === "playoff") continue;
-    if (g.s1 === null || g.s2 === null) continue;
+    // A forfeit counts here even with no score behind it — a team that does
+    // not field a side still loses the region game, and this is the table
+    // that decides who plays in November.
+    if (!g.forfeit_by && (g.s1 === null || g.s2 === null)) continue;
     const a = meta.get(g.t1);
     const b = meta.get(g.t2);
     if (!a || !b) continue; // one side is out of state
     if (a.c !== b.c || a.r !== b.r) continue; // not a region game
-    if (g.s1 === g.s2) continue;
-    const homeWon = Number(g.s1) > Number(g.s2);
-    const w = out.get(homeWon ? g.t1 : g.t2);
-    const l = out.get(homeWon ? g.t2 : g.t1);
+    const winner = officialWinner(g);
+    if (!winner) continue; // a tie
+    const w = out.get(winner === "t1" ? g.t1 : g.t2);
+    const l = out.get(winner === "t1" ? g.t2 : g.t1);
     if (w) w.wins++;
     if (l) l.losses++;
   }

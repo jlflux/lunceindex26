@@ -4,6 +4,11 @@
 -- editor, which is the whole point: the sources have their own sites and their
 -- own terms, and scraping them is not on the table.
 --
+--
+-- Every object is schema-qualified: an unqualified name is resolved against
+-- whatever search_path the session happens to carry, which a SQL editor does
+-- not guarantee. "relation ... does not exist" on a database where the table
+-- is plainly there is what that looks like when it goes wrong.
 -- Safe to run more than once.
 
 -- ---------------------------------------------------------------------------
@@ -15,7 +20,7 @@
 -- A team needs a number in all four columns to receive a composite — a partial
 -- average would let one generous source carry a team up the board on a single
 -- data point. Rows short of that still save, and simply show as incomplete.
-create table if not exists composite_ranks (
+create table if not exists public.composite_ranks (
   team       text primary key,
   maxpreps   integer,
   massey     integer,
@@ -24,16 +29,18 @@ create table if not exists composite_ranks (
   updated_at timestamptz not null default now()
 );
 
-alter table composite_ranks enable row level security;
+alter table public.composite_ranks enable row level security;
 
 do $$
 begin
   if not exists (
     select 1 from pg_policies
-    where tablename = 'composite_ranks' and policyname = 'public read composite_ranks'
+    where schemaname = 'public'
+      and tablename = 'composite_ranks'
+      and policyname = 'public read composite_ranks'
   ) then
     create policy "public read composite_ranks"
-      on composite_ranks for select using (true);
+      on public.composite_ranks for select using (true);
   end if;
 end $$;
 
@@ -44,7 +51,7 @@ end $$;
 -- `rank` null means the team is in that class's "others receiving votes" line
 -- rather than the top ten, which is why it is nullable and why the primary key
 -- is a surrogate: several teams share the null rank inside one classification.
-create table if not exists aswa_ranks (
+create table if not exists public.aswa_ranks (
   id             bigserial primary key,
   classification text    not null,
   -- 1-10 for the poll proper; null for others receiving votes.
@@ -59,20 +66,22 @@ create table if not exists aswa_ranks (
 );
 
 create unique index if not exists aswa_ranks_class_team
-  on aswa_ranks (classification, team);
+  on public.aswa_ranks (classification, team);
 
 create index if not exists aswa_ranks_class_rank
-  on aswa_ranks (classification, rank);
+  on public.aswa_ranks (classification, rank);
 
-alter table aswa_ranks enable row level security;
+alter table public.aswa_ranks enable row level security;
 
 do $$
 begin
   if not exists (
     select 1 from pg_policies
-    where tablename = 'aswa_ranks' and policyname = 'public read aswa_ranks'
+    where schemaname = 'public'
+      and tablename = 'aswa_ranks'
+      and policyname = 'public read aswa_ranks'
   ) then
     create policy "public read aswa_ranks"
-      on aswa_ranks for select using (true);
+      on public.aswa_ranks for select using (true);
   end if;
 end $$;

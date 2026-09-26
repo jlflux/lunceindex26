@@ -10,6 +10,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { computeRatings } from "../src/lib/engine";
+import { computeOdds, WIN_SCALE } from "../src/lib/playoffs";
 import { parseCsvText } from "../src/lib/csv";
 import { loadRosterCsv } from "../src/lib/roster-csv";
 import { parseSchedulePdf, toGames } from "../src/lib/schedule-pdf";
@@ -180,6 +181,14 @@ async function main() {
     games,
     max_week_played: result.maxWeekPlayed,
     prior_blend: result.priorBlend,
+    // Only worth simulating when there are results to simulate from. With no
+    // games played every region sits 0-0 and the odds are a tautology.
+    odds: withResults
+      ? computeOdds(result.ratings, games, {
+          scale: WIN_SCALE.classic,
+          hfa: DEFAULT_CONFIG.hfa,
+        })
+      : undefined,
   };
 
   mkdirSync("scripts/out", { recursive: true });

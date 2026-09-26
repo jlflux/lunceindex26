@@ -27,7 +27,9 @@
     "test:twoway": "tsx scripts/test-twoway.ts",
     "test:season": "tsx scripts/test-season.ts",
     "test:rankings": "tsx scripts/test-rankings.ts",
-    "test:forfeits": "tsx scripts/test-forfeits.ts"
+    "test:forfeits": "tsx scripts/test-forfeits.ts",
+    "test:playoffs": "tsx scripts/test-playoffs.ts",
+    "calibrate:odds": "tsx scripts/calibrate-odds.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

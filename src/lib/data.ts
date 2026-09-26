@@ -5,9 +5,10 @@
  * request — a 300-iteration solve over a full season is not something to run
  * per page view. Any admin write that changes the inputs republishes.
  */
+import { computeOdds, WIN_SCALE } from "./playoffs";
 import "server-only";
 
-import { computeBoard } from "./board";
+import { computeBoard, modelOf } from "./board";
 import { publicClient, serviceClient } from "./db";
 import type { AswaEntry, CompositeEntry } from "./rankings";
 import {
@@ -161,6 +162,13 @@ export async function publishRatings(): Promise<RatingsPayload> {
     games,
     max_week_played: result.maxWeekPlayed,
     prior_blend: result.priorBlend,
+    // Simulated here rather than on the page: the odds only move when the
+    // results do, and publishing is exactly that moment. A few seconds on a
+    // button press beats recomputing ten thousand seasons for every reader.
+    odds: computeOdds(result.ratings, games, {
+      scale: WIN_SCALE[modelOf(config)],
+      hfa: config.hfa,
+    }),
   };
 
   const { error } = await serviceClient()

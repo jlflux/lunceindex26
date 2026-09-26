@@ -3,6 +3,12 @@ import { revalidatePath } from "next/cache";
 import { withAdmin } from "@/lib/admin-auth";
 import { publishRatings } from "@/lib/data";
 
+// Publishing now also simulates the rest of the season ten thousand times,
+// which takes a few seconds on a full slate. The platform default is shorter
+// than that.
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 /** Recomputes ratings from current data and refreshes the public pages. */
 export const POST = withAdmin(async () => {
   const payload = await publishRatings();

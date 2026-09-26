@@ -112,7 +112,9 @@ Setup reads no data and grants no access; it is a calculator.
    itself and reports schools missing a week everyone else played, and schools
    holding two games in one week. Both are what a name matched to the wrong
    school looks like, and neither is visible by reading the board.
-4. **Publish** — Admin → Dashboard → Recompute & publish.
+4. **Publish** — Admin → Dashboard → Recompute & publish. This also simulates
+   the rest of the season ten thousand times to refresh the playoff odds, so it
+   takes a few seconds longer than it used to.
 
 Nothing you change reaches the public site until you publish, and ratings never
 move on their own. A game only counts once **both** scores are present, so the
@@ -144,6 +146,8 @@ npm run parse-schedule    # parse report for a schedule PDF
 npm run test:sheet        # the AHSAA weekly Google Sheet, against a real week
 npm run test:coverage     # the missing-week scan, including the bye/noise rules
 npm run test:forfeits     # that a vacated win changes the record and not the rating
+npm run test:playoffs     # the odds: bracket, probability invariants, clinch/elimination
+npm run calibrate:odds    # refits the win-probability curve against the 2025 season
 npm run typecheck
 ```
 
@@ -173,6 +177,7 @@ src/
 │   ├── schedule-pdf.ts  # AHSAA schedule PDF parser (superseded, still used)
 │   ├── score-csv.ts     # weekly score CSV parsing and validation
 │   ├── result.ts        # who won on the field vs who won officially (forfeits)
+│   ├── playoffs.ts      # bracket structure and the Monte Carlo playoff odds
 │   ├── duplicates.ts    # fixtures stored twice; a school with two games in a week
 │   ├── coverage.ts      # schools missing a week everyone else played
 │   ├── team-view.ts     # schedule, projections, result classification
@@ -204,6 +209,11 @@ than an error. `PROJECT.md` covers the reasoning.
   is stale 2025 code.
 - **Classification comes from the roster, never the AHSAA sheet.** The
   published files contain classification errors.
+- **The playoff bracket is derived from data, not memory.** `podsFor` in
+  `src/lib/playoffs.ts` encodes what the 2025 playoffs actually did: eight-region
+  classes pair 1-2, 3-4, 5-6, 7-8 in the first round, four-region classes cross
+  1-4 and 2-3. `QUALIFIERS_PER_REGION` is the one genuine assumption — four per
+  region — and the one place to change it.
 - **A forfeit changes the record, never the rating.** `forfeit_by` names which
   side gave a game up; the scores stay as played. Everything record-shaped
   (standings, region order, RPI, Résumé) reads the ruling, and the Index reads

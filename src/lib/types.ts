@@ -376,4 +376,13 @@ export interface RatingsPayload {
   games: Game[];
   max_week_played: number;
   prior_blend: number;
+  /**
+   * Playoff odds, simulated at publish time.
+   *
+   * Optional because a snapshot published before the odds existed is still a
+   * perfectly good snapshot — the page says "publish to generate these"
+   * rather than breaking. Typed loosely here to keep types.ts free of the
+   * simulation; the real shape is OddsReport in playoffs.ts.
+   */
+  odds?: import("./playoffs").OddsReport;
 }

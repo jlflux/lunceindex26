@@ -98,6 +98,29 @@ export default function AboutPage() {
             </p>
           </Panel>
 
+          <Panel title="Playoff odds">
+            <p>
+              The odds are the rest of the season played ten thousand times.
+              Each game still to come is decided by a coin weighted by the two
+              ratings and home field, the region tables are rebuilt, and the
+              brackets are seeded and played out. A team&rsquo;s odds are the
+              share of those seasons in which the thing happened.
+            </p>
+            <p>
+              The one number behind it is how often a rating gap turns into a
+              win. It is fitted against the 2025 season rather than guessed, by
+              rating the weeks before each week and predicting that week cold.
+              It picks about four winners in five, and what it calls a 70%
+              chance happened about 70% of the time.
+            </p>
+            <p>
+              &ldquo;Clinched&rdquo; and &ldquo;eliminated&rdquo; are not read
+              off the simulation. Ten thousand seasons without an outcome is not
+              a proof, and those two words deserve one, so both come from what
+              the remaining games make arithmetically possible.
+            </p>
+          </Panel>
+
           <Panel title="Forfeits">
             <p>
               A forfeit is a ruling about the record, not about the football. A

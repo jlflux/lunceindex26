@@ -9,8 +9,8 @@ import { fmt, ordinal, record } from "@/lib/format";
 import { qualifiersFor } from "@/lib/playoffs";
 import {
   orderRegionStandings,
-  regionHeadToHead,
   regionRecords,
+  tieDataFor,
   type Record2,
 } from "@/lib/season";
 import {
@@ -65,7 +65,8 @@ export default function TeamDirectory({
   // ordering inside each region box — ahead of the rating, which has no
   // bearing on qualification at all.
   const reg = useMemo(() => regionRecords(rows, games), [rows, games]);
-  const h2h = useMemo(() => regionHeadToHead(rows, games), [rows, games]);
+  // Everything the AHSAA tiebreakers reach for, gathered once.
+  const tie = useMemo(() => tieDataFor(rows, games), [rows, games]);
 
   // Grouped and ordered from the whole class, then narrowed for display. A
   // team's place in its region and the playoff line under the qualifiers have
@@ -83,11 +84,11 @@ export default function TeamDirectory({
     }
     for (const regions of byClass.values()) {
       for (const [n, list] of regions) {
-        regions.set(n, orderRegionStandings(list, reg, h2h));
+        regions.set(n, orderRegionStandings(list, reg, tie));
       }
     }
     return byClass;
-  }, [rows, cls, reg, h2h]);
+  }, [rows, cls, reg, tie]);
 
   const q = query.trim().toLowerCase();
   const matches = (t: RatingRow) => !q || t.name.toLowerCase().includes(q);

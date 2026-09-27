@@ -147,6 +147,7 @@ npm run test:sheet        # the AHSAA weekly Google Sheet, against a real week
 npm run test:coverage     # the missing-week scan, including the bye/noise rules
 npm run test:forfeits     # that a vacated win changes the record and not the rating
 npm run test:playoffs     # the odds: bracket, probability invariants, clinch/elimination
+npm run test:tiebreak     # the AHSAA tie-breaking procedure, (a) through (q)
 npm run calibrate:odds    # refits the win-probability curve against the 2025 season
 npm run typecheck
 ```
@@ -216,13 +217,15 @@ than an error. `PROJECT.md` covers the reasoning.
   1-4 and 2-3. Ordinary bracket seeding then reproduces the AHSAA pairing
   (A1-B4, B2-A3, B1-A4, A2-B3) on its own, which is why it is trusted for the
   field sizes 2025 has no precedent for.
-- **The region tiebreak chain is incomplete on purpose.** `TIE_RULES` in
-  `src/lib/tiebreak.ts` implements head-to-head, which the association applies
-  first, and falls through to the Index rating in place of the coin flip it
-  ends with. The lettered rules in between are absent rather than guessed:
-  a tiebreaker in the wrong position produces a defensible-looking wrong order,
-  which is worse than a missing one. Standings and the odds simulation both go
-  through this, so they cannot disagree about who holds a playoff place.
+- **The region tiebreak is the AHSAA's own procedure, (a)-(q).** `TIE_RULES`
+  in `src/lib/tiebreak.ts`. It is not a sort: the rule settles one place at a
+  time and refuses to rank the rest of a tied group until the top of it is
+  decided, and each factor *narrows* rather than orders. `pickHighest` is the
+  entry point for that reason. (q) is a coin flip, so the Index rating stands
+  in. Factors (k)-(p) count roster opponents only, because rule 7's
+  eligibility test for out-of-state schools is not something this data can
+  answer. Standings and the odds simulation both go through this, so they
+  cannot disagree about who holds a playoff place.
 - **Qualifiers per region differ by classification** and are told to us rather
   than derived: 6A sends six, AA sends all eight (its bracket is a seeding
   exercise, not a qualification one), everything else sends four. `QUALIFIERS`

@@ -67,12 +67,15 @@ export default async function OddsPage() {
                   from the ratings.
                 </>
               )}{" "}
-              Teams level in a region are separated by head-to-head among the
-              tied group, which is the first tiebreaker the association
-              applies. Anything it cannot separate falls through to the Index
-              rating, which stands in for the coin flip at the end of the
-              association&rsquo;s list — the same order the standings page
-              uses, so the two cannot disagree about who is in a playoff
+              Teams level in a region are separated by the
+              association&rsquo;s own procedure, (a) through (q): head-to-head
+              first, then records against each ranked team in the region, then
+              non-region common opponents, then how much the teams they beat
+              have won. It settles one place at a time and starts over for
+              whoever is left, which is what the rule says to do. The last
+              step is a coin flip, and since there is no coin here the Index
+              rating stands in for it. The standings page runs the same
+              procedure, so the two cannot disagree about who holds a playoff
               place.
             </p>
             <p className="mt-2">

@@ -10,6 +10,7 @@ import {
   parseGameDate,
   orderRegionStandings,
   regionRecords,
+  tieDataFor,
   weekKey,
   weekOrder,
 } from "../src/lib/season";
@@ -159,70 +160,54 @@ console.log("\n5. Region record counts region games and nothing else");
 
 console.log("\n6. Standings order puts region record ahead of rating");
 {
-  // One helper: order a region the way the page does, and report the names.
+  // Order a region the way the page does: real games in, names out.
   const order = (
     teams: [string, number][],
-    rec: Record<string, [number, number]>,
-    beats: string[] = [],
-  ) =>
-    orderRegionStandings(
-      teams.map(([n, rating]) => row(n, "5A", 1, rating)),
-      new Map(
-        Object.entries(rec).map(([k, [w, l]]) => [k, { wins: w, losses: l }]),
-      ),
-      new Set(beats),
+    played: Game[],
+    wins: Record<string, number> = {},
+  ) => {
+    const rows = teams.map(([n, rating]) => ({
+      ...row(n, "5A", 1, rating),
+      wins: wins[n] ?? 0,
+    }));
+    return orderRegionStandings(
+      rows,
+      regionRecords(rows, played),
+      tieDataFor(rows, played),
     ).map((t) => t.name);
+  };
 
   check(
     "a 1-0 region team outranks a far better rating at 0-1",
-    order([["Good rating", 90], ["Good region", 10]], {
-      "Good rating": [0, 1],
-      "Good region": [1, 0],
-    })[0] === "Good region",
-  );
-
-  // Percentage before count, the way a standings table reads.
-  check(
-    "1-0 leads 3-1",
-    order([["One and none", 0], ["Three and one", 0]], {
-      "One and none": [1, 0],
-      "Three and one": [3, 1],
-    })[0] === "One and none",
-  );
-
-  // ...with the count breaking a tie on percentage.
-  check(
-    "2-0 leads 1-0",
-    order([["Two and none", 0], ["One and none", 0]], {
-      "Two and none": [2, 0],
-      "One and none": [1, 0],
-    })[0] === "Two and none",
-  );
-
-  // A team yet to start region play is neutral, not last.
-  check(
-    "0-0 in region sits above 0-1",
-    order([["Not started", 0], ["Lost one", 50]], {
-      "Not started": [0, 0],
-      "Lost one": [0, 1],
-    })[0] === "Not started",
-  );
-
-  check(
-    "head-to-head beats the rating when records are level",
     order(
-      [["Worse rating", 10], ["Better rating", 90]],
-      { "Worse rating": [2, 1], "Better rating": [2, 1] },
-      ["Worse rating|Better rating"],
-    )[0] === "Worse rating",
+      [["Good rating", 90], ["Good region", 10]],
+      [g("Good region", 21, "Good rating", 7, 1)],
+    )[0] === "Good region",
   );
 
   check(
-    "the rating separates a tie nobody has played",
-    order([["Higher", 50], ["Lower", 10]], {
-      Higher: [1, 0],
-      Lower: [1, 0],
-    })[0] === "Higher",
+    "head-to-head decides a two-way tie, against the rating",
+    order(
+      [["Worse rating", 10], ["Better rating", 90], ["Third", 0]],
+      [
+        g("Worse rating", 21, "Better rating", 7, 1),
+        g("Worse rating", 7, "Third", 21, 2),
+        g("Better rating", 7, "Third", 21, 3),
+      ],
+    )[1] === "Worse rating",
+  );
+
+  check(
+    "a team yet to start region play sits above one that has lost",
+    order(
+      [["Not started", 0], ["Lost one", 50], ["Winner", 40]],
+      [g("Winner", 28, "Lost one", 0, 1)],
+    )[1] === "Not started",
+  );
+
+  check(
+    "the rating separates a tie nobody can break",
+    order([["Higher", 50], ["Lower", 10]], [])[0] === "Higher",
   );
 }
 

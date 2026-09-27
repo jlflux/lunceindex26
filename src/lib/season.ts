@@ -5,8 +5,12 @@
  * touching when the calendar moves.
  */
 import { officialWinner } from "./result";
-import { orderRegion } from "./tiebreak";
-import type { Classification, Game, RatingRow } from "./types";
+import {
+  orderRegion,
+  type TieContext,
+  type TieGame,
+} from "./tiebreak";
+import { CLS_ORDER, type Classification, type Game, type RatingRow } from "./types";
 
 /** The key ScheduleBrowser uses to identify a week or a playoff round. */
 export function weekKey(g: Pick<Game, "type" | "round" | "week">): string {
@@ -153,30 +157,84 @@ export function regionRecords(
   return out;
 }
 
-/** Who beat whom in region play, for the tiebreakers. */
-export function regionHeadToHead(
-  ratings: Pick<RatingRow, "name" | "classification" | "region">[],
+/**
+ * Everything the tiebreak chain needs about a season, gathered once.
+ *
+ * The association's later factors reach past the region — non-region common
+ * opponents, the victories of the teams you beat — so this carries every game,
+ * not only the region ones.
+ */
+export function tieDataFor(
+  ratings: Pick<RatingRow, "name" | "classification" | "region" | "wins" | "rating">[],
   games: Pick<Game, "t1" | "t2" | "s1" | "s2" | "type" | "forfeit_by">[],
-): Set<string> {
+): TieData {
   const meta = new Map<string, { c: Classification; r: number }>();
   for (const t of ratings) meta.set(t.name, { c: t.classification, r: t.region });
-  const out = new Set<string>();
+
+  const results = new Map<string, TieGame[]>();
+  const beat = new Set<string>();
+  const met = new Set<string>();
+  for (const t of ratings) results.set(t.name, []);
+
   for (const g of games) {
     if (g.type === "playoff") continue;
+    const winner = officialWinner(g);
+    if (!winner) continue; // unplayed or drawn
     const a = meta.get(g.t1);
     const b = meta.get(g.t2);
-    if (!a || !b || a.c !== b.c || a.r !== b.r) continue;
-    const w = officialWinner(g);
-    if (!w) continue;
-    out.add(w === "t1" ? `${g.t1}|${g.t2}` : `${g.t2}|${g.t1}`);
+    const required = Boolean(a && b && a.c === b.c && a.r === b.r);
+    const w = winner === "t1" ? g.t1 : g.t2;
+    const l = winner === "t1" ? g.t2 : g.t1;
+    results.get(g.t1)?.push({ opponent: g.t2, won: winner === "t1", required });
+    results.get(g.t2)?.push({ opponent: g.t1, won: winner === "t2", required });
+    if (required) {
+      beat.add(`${w}|${l}`);
+      met.add(`${g.t1}|${g.t2}`);
+      met.add(`${g.t2}|${g.t1}`);
+    }
   }
-  return out;
+
+  const victories = new Map<string, number>();
+  const rating = new Map<string, number>();
+  const classOrder = new Map<string, number>();
+  for (const t of ratings) {
+    victories.set(t.name, t.wins);
+    rating.set(t.name, t.rating);
+    classOrder.set(t.name, CLS_ORDER[t.classification] ?? 0);
+  }
+
+  return { results, beat, met, victories, rating, classOrder };
+}
+
+export interface TieData {
+  results: Map<string, TieGame[]>;
+  beat: Set<string>;
+  met: Set<string>;
+  victories: Map<string, number>;
+  rating: Map<string, number>;
+  classOrder: Map<string, number>;
+}
+
+/** Turns the gathered season into the context the chain reads. */
+export function tieContext(
+  data: TieData,
+  teamAtPlace: (place: number) => string | null,
+): TieContext {
+  return {
+    beat: (a, b) => data.beat.has(`${a}|${b}`),
+    metRequired: (a, b) => data.met.has(`${a}|${b}`),
+    teamAtPlace,
+    results: (t) => data.results.get(t) ?? [],
+    victories: (t) => data.victories.get(t) ?? 0,
+    classOrder: (t) => data.classOrder.get(t) ?? null,
+    rating: (t) => data.rating.get(t) ?? 0,
+  };
 }
 
 /**
  * Standings order for one region, best first.
  *
- * The actual ordering lives in tiebreak.ts, shared with the playoff
+ * The ordering itself lives in tiebreak.ts, shared with the playoff
  * simulation. It used to live here too, differently — this one went from the
  * record straight to the rating and never looked at head-to-head — so the
  * standings page and the odds page could disagree about who was in a playoff
@@ -185,16 +243,13 @@ export function regionHeadToHead(
 export function orderRegionStandings(
   teams: RatingRow[],
   reg: Map<string, Record2>,
-  h2h: Set<string>,
+  data: TieData,
 ): RatingRow[] {
   const by = new Map(teams.map((t) => [t.name, t]));
   const order = orderRegion(
     teams.map((t) => t.name),
     (name) => reg.get(name) ?? { wins: 0, losses: 0 },
-    {
-      beat: (a, b) => h2h.has(`${a}|${b}`),
-      rating: (name) => by.get(name)?.rating ?? 0,
-    },
+    (teamAtPlace) => tieContext(data, teamAtPlace),
   );
   return order.map((n) => by.get(n) as RatingRow);
 }

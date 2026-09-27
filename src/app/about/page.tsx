@@ -114,6 +114,15 @@ export default function AboutPage() {
               chance happened about 70% of the time.
             </p>
             <p>
+              Teams level in a region are separated by the AHSAA&rsquo;s
+              published procedure, (a) through (q) — head-to-head, then
+              records against each ranked team in the region, then non-region
+              common opponents, then the strength of the teams they beat. The
+              final step is a coin flip administered by the association; the
+              Index rating stands in for it here, so a tie does not reshuffle
+              itself every time the board is published.
+            </p>
+            <p>
               How many teams each region sends differs by classification: 6A
               sends six, Class AA sends every team it has &mdash; so its
               bracket is about seeding rather than qualifying &mdash; and the

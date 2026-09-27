@@ -31,6 +31,7 @@ import { officialWinner } from "./result";
 import { orderRegion, type TieContext } from "./tiebreak";
 import {
   CLS_FILTER_ORDER,
+  CLS_ORDER,
   type Classification,
   type Game,
   type RatingRow,
@@ -319,11 +320,77 @@ export function computeOdds(
     const simW = new Int32Array(names.length);
     const simL = new Int32Array(names.length);
     const trialH2H = new Set<string>();
-    const tieCtx: TieContext = {
-      // Results already on file, plus the ones this trial just invented.
-      beat: (a, b) => h2h.has(`${a}|${b}`) || trialH2H.has(`${a}|${b}`),
-      rating: (n) => rating.get(n) ?? 0,
+
+    // Everything the association's later factors reach for. Region results
+    // change every trial; nothing else does, so the rest is built once.
+    //
+    // Two approximations live here, and both are confined to factors (k)
+    // through (p) — the ones reached only after head-to-head and eight
+    // ranked-team comparisons have all failed to separate anybody, which is
+    // to say almost never. Non-region games are not simulated at all, because
+    // they have no bearing on a region table, so a team's non-region record
+    // is the one it holds today. And an opponent's victory total is its
+    // current one, not the one it would finish that simulated season with.
+    const nonRegion = new Map<string, { opponent: string; won: boolean }[]>();
+    const regionFixtures = new Map<string, string[]>();
+    for (const t of field) {
+      nonRegion.set(t.name, []);
+      regionFixtures.set(t.name, []);
+    }
+    for (const g of games) {
+      const a = meta.get(g.t1);
+      const b = meta.get(g.t2);
+      if (a?.c !== cls && b?.c !== cls) continue;
+      if (g.type === "playoff") continue;
+      if (isRegionGame(g, meta)) {
+        if (a?.c !== cls) continue;
+        regionFixtures.get(g.t1)?.push(g.t2);
+        regionFixtures.get(g.t2)?.push(g.t1);
+        continue;
+      }
+      const w = officialWinner(g);
+      if (!w) continue;
+      nonRegion.get(g.t1)?.push({ opponent: g.t2, won: w === "t1" });
+      nonRegion.get(g.t2)?.push({ opponent: g.t1, won: w === "t2" });
+    }
+
+    // Wins outside the region are fixed; wins inside it are this trial's.
+    const nonRegionWins = new Map<string, number>();
+    for (const t of field) {
+      nonRegionWins.set(
+        t.name,
+        (nonRegion.get(t.name) ?? []).filter((g) => g.won).length,
+      );
+    }
+
+    const classOrderOf = (n: string) => {
+      const m = meta.get(n);
+      return m ? (CLS_ORDER[m.c] ?? null) : null;
     };
+    const beatIn = (a: string, b: string) =>
+      h2h.has(`${a}|${b}`) || trialH2H.has(`${a}|${b}`);
+
+    const makeCtx = (
+      teamAtPlace: (place: number) => string | null,
+    ): TieContext => ({
+      beat: beatIn,
+      // Every region fixture is either played or simulated, so a pairing on
+      // the schedule has always met by the time the seeds are read.
+      metRequired: (a, b) => (regionFixtures.get(a) ?? []).includes(b),
+      teamAtPlace,
+      results: (t) => [
+        ...(nonRegion.get(t) ?? []).map((g) => ({ ...g, required: false })),
+        ...(regionFixtures.get(t) ?? []).map((o) => ({
+          opponent: o,
+          won: beatIn(t, o),
+          required: true,
+        })),
+      ],
+      victories: (t) =>
+        (nonRegionWins.get(t) ?? 0) + simW[idx.get(t) as number],
+      classOrder: classOrderOf,
+      rating: (n) => rating.get(n) ?? 0,
+    });
 
     for (let trial = 0; trial < trials; trial++) {
       simW.fill(0);
@@ -357,7 +424,7 @@ export function computeOdds(
             const i = idx.get(name) as number;
             return { wins: simW[i], losses: simL[i] };
           },
-          tieCtx,
+          makeCtx,
         );
         seeded.push(list.slice(0, qualifiers));
       }

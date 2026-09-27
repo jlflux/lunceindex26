@@ -2,7 +2,13 @@
 
 import { useMemo, useState } from "react";
 import BracketView from "@/components/bracket/BracketView";
-import { defaultSlots, type ResolvedBracket, type SeededTeam } from "@/lib/bracket";
+import {
+  applyPinnedOrder,
+  assignPlaces,
+  defaultSlots,
+  type ResolvedBracket,
+  type SeededTeam,
+} from "@/lib/bracket";
 import {
   STATUS_KEYS,
   STATUS_LABELS,
@@ -29,6 +35,20 @@ export type EditorClass = {
 };
 
 type Tab = "seeding" | "bracket" | "projections" | "settings";
+
+/**
+ * Which row a drop came from.
+ *
+ * The dragged index is carried on the drag itself and kept in state as well.
+ * The state copy is what React re-renders from; the dataTransfer copy is what
+ * survives when state has been reset out from under an in-flight drag, and is
+ * what makes the drag start at all in Firefox. Whichever is readable wins.
+ */
+function readIndex(dt: DataTransfer, fallback: number | null): number | null {
+  const raw = dt.getData("text/plain");
+  const n = Number.parseInt(raw, 10);
+  return Number.isInteger(n) ? n : fallback;
+}
 
 /**
  * The bracket editor.
@@ -64,6 +84,33 @@ export default function BracketEditor({
   );
 
   const block = classes.find((c) => c.classification === cls) ?? classes[0];
+
+  /**
+   * The regions as they stand *now*, including edits not yet saved.
+   *
+   * `block.regions` is resolved by the server component and frozen for the
+   * page's life. Rendering it directly was the bug: a drag wrote the new order
+   * into state, the region went "pinned", and the list on screen never moved —
+   * because it was never reading state in the first place. Worse, each drag
+   * recomputed from that same frozen array, so a second drag quietly discarded
+   * the first.
+   *
+   * `applyPinnedOrder` and `assignPlaces` are the same two calls
+   * `seededRegions` makes on the server, so the order and the place numbers
+   * here are the ones that will be published.
+   */
+  const liveRegions = useMemo(
+    () =>
+      (block?.regions ?? []).map((r) => {
+        const order = state.classes[cls]?.regions?.[String(r.region)]?.order;
+        if (!order?.length) return r;
+        return {
+          ...r,
+          shown: assignPlaces(cls, applyPinnedOrder(r.computed, order)),
+        };
+      }),
+    [block, state, cls],
+  );
 
   const pinnedCount = useMemo(
     () =>
@@ -230,7 +277,7 @@ export default function BracketEditor({
 
       {tab === "seeding" && block && (
         <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
-          {block.regions.map((r) => (
+          {liveRegions.map((r) => (
             <RegionEditor
               key={r.region}
               cls={cls}
@@ -245,7 +292,7 @@ export default function BracketEditor({
       {tab === "bracket" && block && (
         <SlotEditor
           cls={cls}
-          regions={block.regions}
+          regions={liveRegions}
           slots={state.classes[cls]?.slots ?? []}
           onSlots={(slots) => editClass(cls, (cs) => ({ ...cs, slots }))}
           bracket={block.bracket}
@@ -360,10 +407,23 @@ function RegionEditor({
           <li
             key={t.slug}
             draggable
-            onDragStart={() => setDrag(i)}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={() => {
-              if (drag !== null && drag !== i) move(drag, i);
+            // Firefox refuses to start a drag at all unless dataTransfer
+            // carries something, so this is not decoration — without it the
+            // feature simply does not exist outside Chrome.
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", String(i));
+              setDrag(i);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+            }}
+            onDragEnd={() => setDrag(null)}
+            onDrop={(e) => {
+              e.preventDefault();
+              const from = readIndex(e.dataTransfer, drag);
+              if (from !== null && from !== i) move(from, i);
               setDrag(null);
             }}
             className="flex items-center gap-2 border-b px-2.5 py-1.5 last:border-0"
@@ -530,10 +590,20 @@ function SlotEditor({
             <div
               key={i}
               draggable
-              onDragStart={() => setDrag(i)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => {
-                if (drag !== null && drag !== i) swap(drag, i);
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", String(i));
+                setDrag(i);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }}
+              onDragEnd={() => setDrag(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                const from = readIndex(e.dataTransfer, drag);
+                if (from !== null && from !== i) swap(from, i);
                 setDrag(null);
               }}
               className="flex cursor-grab items-center gap-2 rounded-md border px-2 py-1.5"

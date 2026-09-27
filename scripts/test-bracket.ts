@@ -14,6 +14,7 @@
  */
 import {
   applyPinnedOrder,
+  assignPlaces,
   buildTree,
   defaultSlots,
   placesFor,
@@ -117,7 +118,7 @@ function stateWith(slots: BracketState["classes"]["5A"]): BracketState {
   return s;
 }
 
-const base = () => ({
+const base_ = () => ({
   alignment: [1, 2],
   slots: defaultSlots("5A" as Classification, 2),
   results: {},
@@ -156,7 +157,7 @@ console.log("\n2. Seeding follows the standings, and a pin overrides it");
   check("region records came through", r1[0].region_w === 3 && r1[0].region_l === 0);
 
   const pinned = emptyBracketState();
-  pinned.classes["5A"] = { ...base(), regions: { "1": { note: "", order: ["R1T4", "R1T1"] } } };
+  pinned.classes["5A"] = { ...base_(), regions: { "1": { note: "", order: ["R1T4", "R1T1"] } } };
   const p = seededRegions(ratings, games, undefined, pinned).get(regionKey("5A", 1))!;
   check("a pin puts the named teams first, in order",
     p.map((t) => t.name).join() === "R1T4,R1T1,R1T2,R1T3",
@@ -184,7 +185,7 @@ console.log("\n4. Byes advance without being played");
   const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
   // Four slots, one of them a bye: R1T1 walks into round two.
   const st = stateWith({
-    ...base(),
+    ...base_(),
     slots: [{ region: 1, place: 1 }, null, { region: 1, place: 2 }, { region: 2, place: 1 }],
   });
   const b = resolveBracket(st, "5A", seeded, games)!;
@@ -197,7 +198,7 @@ console.log("\n4. Byes advance without being played");
   );
   check(
     "a bye against a bye advances nobody",
-    resolveBracket(stateWith({ ...base(), slots: [null, null, null, null] }), "5A", seeded, games)!
+    resolveBracket(stateWith({ ...base_(), slots: [null, null, null, null] }), "5A", seeded, games)!
       .rounds[1][0].top.team === null,
   );
 }
@@ -216,7 +217,7 @@ console.log("\n5. A real result beats a projection, in both directions");
   ];
   // Projected: the better seed wins r1g0. Actual: it lost.
   const st = stateWith({
-    ...base(),
+    ...base_(),
     slots,
     projected: { r1g0: "top", r1g1: "top" },
   });
@@ -250,7 +251,7 @@ console.log("\n5. A real result beats a projection, in both directions");
   );
 
   // The gate: projections stay private until published.
-  const shut = stateWith({ ...base(), slots, projected: { r1g1: "top" } });
+  const shut = stateWith({ ...base_(), slots, projected: { r1g1: "top" } });
   shut.showProjections = false;
   const hidden = resolveBracket(shut, "5A", seeded, games, { projected: true })!;
   check(
@@ -265,7 +266,7 @@ console.log("\n6. A forfeit in the bracket follows the ruling");
   const games = roundRobin();
   const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
   const st = stateWith({
-    ...base(),
+    ...base_(),
     slots: [{ region: 1, place: 1 }, { region: 2, place: 4 }, { region: 1, place: 2 }, { region: 2, place: 3 }],
   });
   const vacated = [
@@ -305,7 +306,7 @@ console.log("\n8. A seed nobody holds is reported rather than drawn");
   const games = roundRobin();
   const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
   const st = stateWith({
-    ...base(),
+    ...base_(),
     slots: [{ region: 1, place: 1 }, { region: 1, place: 9 }, { region: 2, place: 1 }, { region: 2, place: 2 }],
   });
   const b = resolveBracket(st, "5A", seeded, games)!;
@@ -345,7 +346,97 @@ console.log("\n10. The default shapes");
   check("an eight-region class pairs into thirty-two", five.length === 32);
 }
 
-console.log("\n11. The explainer is stored HTML, so it is sanitised");
+console.log("\n11. Reordering in the editor matches what gets published");
+{
+  // The bug this exists for: the editor rendered a server-computed array and
+  // never looked at its own edits, so a drag marked the region pinned and left
+  // the list exactly where it was. No unit test would have caught the frozen
+  // prop — but the contract underneath it is a pure function, and this is it:
+  // reordering the way the editor reorders has to produce what the server
+  // produces when that order is saved. Name for name, and place for place.
+  const ratings = world();
+  const games = roundRobin();
+  const base = seededRegions(ratings, games, undefined, emptyBracketState());
+  const region = base.get(regionKey("5A", 1))!;
+
+  // Drag the last team to the front, the way `move()` does.
+  const names = region.map((t) => t.name);
+  names.unshift(names.pop() as string);
+
+  // What the editor now shows.
+  const inEditor = assignPlaces("5A", applyPinnedOrder(region, names));
+
+  // What the server produces once that pin is saved.
+  const pinnedState = emptyBracketState();
+  pinnedState.classes["5A"] = {
+    ...base_(),
+    regions: { "1": { note: "", order: names } },
+  };
+  const published = seededRegions(ratings, games, undefined, pinnedState).get(
+    regionKey("5A", 1),
+  )!;
+
+  check(
+    "the same teams, in the same order",
+    inEditor.map((t) => t.name).join() === published.map((t) => t.name).join(),
+    `${inEditor.map((t) => t.name).join()} vs ${published.map((t) => t.name).join()}`,
+  );
+  check(
+    "numbered the same",
+    inEditor.map((t) => t.place).join() === published.map((t) => t.place).join(),
+    `${inEditor.map((t) => t.place).join()} vs ${published.map((t) => t.place).join()}`,
+  );
+  check(
+    "and agreeing on who is in a place",
+    inEditor.map((t) => t.qualifies).join() ===
+      published.map((t) => t.qualifies).join(),
+  );
+  check(
+    "the drag actually moved somebody",
+    inEditor[0].name !== region[0].name,
+    `${region[0].name} → ${inEditor[0].name}`,
+  );
+  check("and the new first team is first", inEditor[0].place === 1);
+
+  // Moving a team and moving it back is the order the season computes.
+  const there = applyPinnedOrder(region, names);
+  const backNames = there.map((t) => t.name);
+  backNames.push(backNames.shift() as string);
+  check(
+    "moving a team back restores the computed order",
+    applyPinnedOrder(region, backNames)
+      .map((t) => t.name)
+      .join() === region.map((t) => t.name).join(),
+  );
+
+  // Places skip a barred team wherever it is dragged to.
+  const withBarred = world().map((t) =>
+    t.name === "R1T2" ? { ...t, postseason_ineligible: true } : t,
+  );
+  const b = seededRegions(withBarred, games, undefined, emptyBracketState()).get(
+    regionKey("5A", 1),
+  )!;
+  const dragged = b.map((t) => t.name);
+  dragged.unshift(dragged.splice(dragged.indexOf("R1T2"), 1)[0]);
+  const renumbered = assignPlaces("5A", applyPinnedOrder(b, dragged));
+  check(
+    "a barred team dragged to the top still holds no place",
+    renumbered[0].name === "R1T2" &&
+      renumbered[0].place === 0 &&
+      !renumbered[0].qualifies,
+    JSON.stringify(renumbered.map((t) => `${t.name}:${t.place}`)),
+  );
+  check(
+    "and the teams under it are numbered from one, densely",
+    renumbered
+      .filter((t) => !t.ineligible)
+      .map((t) => t.place)
+      .join() === "1,2,3",
+    renumbered.map((t) => t.place).join(),
+  );
+}
+
+console.log("\n12. The explainer is stored HTML, so it is sanitised");
 {
   const keeps = (a: string, b: string) => sanitizeHtml(a) === b;
   check("ordinary markup survives",

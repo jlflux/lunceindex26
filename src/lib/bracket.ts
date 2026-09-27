@@ -150,44 +150,92 @@ export function seededRegions(
       if (pinned?.length) ordered = applyPinnedOrder(ordered, pinned);
 
       const overrides = state.classes[cls]?.regions?.[String(r)]?.status ?? {};
-      const eligible = ordered.filter((t) => !t.postseason_ineligible).length;
-      const places = placesFor(cls, eligible);
 
-      let place = 0;
+      // Built without places, then numbered by `assignPlaces` — the same call
+      // the admin makes when a drag reorders a region, so what the editor
+      // shows while you are dragging is what gets published.
+      const rows: SeededTeam[] = ordered.map((t) => {
+        const record = reg.get(t.name) ?? { wins: 0, losses: 0, ties: 0 };
+        const ineligible = t.postseason_ineligible === true;
+        const o = byName.get(t.name);
+        return {
+          name: t.name,
+          slug: t.slug,
+          place: 0,
+          wins: t.wins,
+          losses: t.losses,
+          region_w: record.wins,
+          region_l: record.losses,
+          region_t: record.ties,
+          // Status does not depend on where in the region a team sits, with
+          // one exception: without odds loaded there is nothing to read but
+          // the record, and then "is it in a place" is the only signal there
+          // is. `assignPlaces` fills that in afterwards.
+          status: overrides[t.name] ?? (o ? statusFromOdds(o) : "medium"),
+          playoff: o ? o.playoff : null,
+          qualifies: false,
+          ineligible,
+        };
+      });
+
       out.set(
         regionKey(cls, r),
-        ordered.map((t) => {
-          const record = reg.get(t.name) ?? { wins: 0, losses: 0, ties: 0 };
-          const ineligible = t.postseason_ineligible === true;
-          // A barred team occupies no place, so it does not consume one.
-          if (!ineligible) place++;
-          const qualifies = !ineligible && place <= places;
-          const o = byName.get(t.name);
-          const computed = o
-            ? statusFromOdds(o)
-            : ineligible
-              ? "ineligible"
-              : statusFromRecord(record, qualifies);
-          return {
-            name: t.name,
-            slug: t.slug,
-            place: ineligible ? 0 : place,
-            wins: t.wins,
-            losses: t.losses,
-            region_w: record.wins,
-            region_l: record.losses,
-            region_t: record.ties,
-            status: overrides[t.name] ?? computed,
-            playoff: o ? o.playoff : null,
-            qualifies,
-            ineligible,
-          };
+        assignPlaces(cls, rows, {
+          // Only where the odds have not been published yet.
+          fallbackStatus: !byName.size,
+          overrides,
         }),
       );
     }
   }
 
   return out;
+}
+
+/**
+ * Numbers a region: first place, second place, and who is inside the
+ * allocation.
+ *
+ * Pulled out of `seededRegions` so the admin can call it too. The editor
+ * reorders a region locally on every drag and has to renumber it the same way
+ * the server would, or the places shown while dragging are not the places that
+ * get published — and a second copy of "barred teams do not consume a place"
+ * is exactly the kind of duplication that has already bitten this codebase
+ * twice.
+ */
+export function assignPlaces(
+  cls: Classification,
+  ordered: SeededTeam[],
+  opts: {
+    /** Recompute status from the record, for boards with no odds yet. */
+    fallbackStatus?: boolean;
+    overrides?: Record<string, StatusKey>;
+  } = {},
+): SeededTeam[] {
+  const eligible = ordered.filter((t) => !t.ineligible).length;
+  const places = placesFor(cls, eligible);
+
+  let place = 0;
+  return ordered.map((t) => {
+    // A barred team occupies no place, so it does not consume one.
+    if (!t.ineligible) place++;
+    const qualifies = !t.ineligible && place <= places;
+    const status: StatusKey = t.ineligible
+      ? "ineligible"
+      : (opts.overrides?.[t.name] ??
+        (opts.fallbackStatus
+          ? statusFromRecord(
+              { wins: t.region_w, losses: t.region_l, ties: t.region_t },
+              qualifies,
+            )
+          : t.status));
+    return {
+      ...t,
+      place: t.ineligible ? 0 : place,
+      qualifies,
+      status,
+    };
+  });
 }
 
 /**

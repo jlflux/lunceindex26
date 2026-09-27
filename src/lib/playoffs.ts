@@ -28,6 +28,7 @@
  * to us, and it differs by classification. See QUALIFIERS.
  */
 import { officialWinner } from "./result";
+import { orderRegion, type TieContext } from "./tiebreak";
 import {
   CLS_FILTER_ORDER,
   type Classification,
@@ -139,6 +140,12 @@ export interface TeamOdds {
   /** Proved, not simulated: cannot miss / cannot reach the playoffs. */
   clinched: boolean;
   eliminated: boolean;
+  /**
+   * The team's region has no games left, so its finishing place is settled
+   * and its seed is a fact rather than a forecast. What lets the page print
+   * a flat 100% instead of ">99%".
+   */
+  settled: boolean;
 }
 
 export interface ClassOdds {
@@ -312,6 +319,11 @@ export function computeOdds(
     const simW = new Int32Array(names.length);
     const simL = new Int32Array(names.length);
     const trialH2H = new Set<string>();
+    const tieCtx: TieContext = {
+      // Results already on file, plus the ones this trial just invented.
+      beat: (a, b) => h2h.has(`${a}|${b}`) || trialH2H.has(`${a}|${b}`),
+      rating: (n) => rating.get(n) ?? 0,
+    };
 
     for (let trial = 0; trial < trials; trial++) {
       simW.fill(0);
@@ -336,22 +348,17 @@ export function computeOdds(
         trialH2H.add(`${w}|${l}`);
       }
 
-      // 2. Seed each region.
+      // 2. Seed each region, by the same chain the standings page uses.
       const seeded: string[][] = [];
       for (let r = 1; r <= regions; r++) {
-        const list = (byRegion.get(r) ?? []).slice().sort((a, b) => {
-          const ia = idx.get(a)!;
-          const ib = idx.get(b)!;
-          const pa = simW[ia] + simL[ia] ? simW[ia] / (simW[ia] + simL[ia]) : 0;
-          const pb = simW[ib] + simL[ib] ? simW[ib] / (simW[ib] + simL[ib]) : 0;
-          if (pa !== pb) return pb - pa;
-          if (simW[ia] !== simW[ib]) return simW[ib] - simW[ia];
-          // Head-to-head, this season's result or the one just simulated.
-          const aBeatB = h2h.has(`${a}|${b}`) || trialH2H.has(`${a}|${b}`);
-          const bBeatA = h2h.has(`${b}|${a}`) || trialH2H.has(`${b}|${a}`);
-          if (aBeatB !== bBeatA) return aBeatB ? -1 : 1;
-          return (rating.get(b) ?? 0) - (rating.get(a) ?? 0);
-        });
+        const list = orderRegion(
+          byRegion.get(r) ?? [],
+          (name) => {
+            const i = idx.get(name) as number;
+            return { wins: simW[i], losses: simL[i] };
+          },
+          tieCtx,
+        );
         seeded.push(list.slice(0, qualifiers));
       }
 
@@ -453,6 +460,7 @@ export function computeOdds(
         rounds: roundHits.map((a) => a[i] / trials),
         clinched: done ? share === 1 : rivals.length - below < qualifiers,
         eliminated: done ? share === 0 : above >= qualifiers,
+        settled: done,
       };
     });
 

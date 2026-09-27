@@ -376,6 +376,61 @@ console.log("\n7. A season with nothing left to play is already decided");
   check("the title is still open", (c.teams[0].rounds.at(-1) ?? 0) < 1);
 }
 
+console.log("\n7b. A settled region is the only place a seed is a fact");
+{
+  const teams = field("2A", 8, 4);
+  const mid = roundRobin(teams).map((g, i) =>
+    // Half the region schedule played, half still to come.
+    i % 2 === 0 ? { ...g, s1: 28, s2: 7, status: "final" } : g,
+  );
+  const r = computeOdds(teams, mid, { trials: 200, seed: 13 });
+  const c = r.classes.find((x) => x.classification === "2A")!;
+  check(
+    "nothing is settled while games remain",
+    c.teams.every((t) => !t.settled),
+    `${c.teams.filter((t) => t.settled).length} settled`,
+  );
+  // A team can be uncatchable and still not settled: its own games are done
+  // and nobody can reach it, but the region below it is still being played.
+  // That is the case the ">99%" rule exists for — the seed is certain in
+  // every trial, and the page must still not call it a fact.
+  const r1 = teams.filter((t) => t.region === 1).map((t) => t.name);
+  const locked = [
+    // The leader has played everybody and beaten them.
+    game(r1[0], r1[1], 42, 0),
+    game(r1[0], r1[2], 42, 0),
+    game(r1[0], r1[3], 42, 0),
+    // The rest have not played each other yet.
+    game(r1[1], r1[2], null, null),
+    game(r1[1], r1[3], null, null),
+    game(r1[2], r1[3], null, null),
+  ];
+  const r3 = computeOdds(teams, locked, { trials: 300, seed: 17 });
+  const lead = r3.classes
+    .find((x) => x.classification === "2A")!
+    .teams.find((t) => t.name === r1[0])!;
+  check("an uncatchable leader takes the 1 seed in every season",
+    lead.seeds[0] === 1, `${lead.seeds[0]}`);
+  check("and is proved into the playoffs", lead.clinched);
+  check(
+    "but its seed is not settled while the region is still playing",
+    !lead.settled,
+  );
+
+  const done = roundRobin(teams).map((g) => ({ ...g, s1: 28, s2: 7, status: "final" }));
+  const r2 = computeOdds(teams, done, { trials: 50, seed: 13 });
+  const c2 = r2.classes.find((x) => x.classification === "2A")!;
+  check("with the schedule finished every team is settled",
+    c2.teams.every((t) => t.settled));
+  check(
+    "and each team holds exactly one seed outright",
+    c2.teams.every((t) => {
+      const ones = t.seeds.filter((p) => p === 1).length;
+      return t.playoff === 1 ? ones === 1 : ones === 0;
+    }),
+  );
+}
+
 console.log("\n8. The same data gives the same page twice");
 {
   const teams = field("4A", 8, 5);

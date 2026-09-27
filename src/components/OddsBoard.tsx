@@ -120,6 +120,22 @@ function columnsOf(block: ClassOdds) {
   ];
 }
 
+/**
+ * Whether a column's extreme is a fact about this team rather than a count of
+ * trials.
+ *
+ * Qualifying has a proof either way — clinched and eliminated both come from
+ * what the games left to play make arithmetically possible. A seed becomes a
+ * fact once the region has no games left. Winning a round never does: the
+ * bracket is played out by the same weighted coins as everything else, so
+ * even the best team in the state only ever reaches ">99".
+ */
+const isCertain = (t: TeamOdds, key: string): boolean => {
+  if (key === "playoff") return t.clinched || t.eliminated;
+  if (key.startsWith("seed")) return t.settled;
+  return false;
+};
+
 const valueOf = (t: TeamOdds, key: string): number => {
   if (key === "playoff") return t.playoff;
   if (key.startsWith("seed")) return t.seeds[Number(key.slice(4))] ?? 0;
@@ -257,10 +273,11 @@ function ClassTable({ block, query }: { block: ClassOdds; query: string }) {
                     </span>
                   </Td>
                   {cols.map((c) => (
-                    <Td key={c.key} first={i === 0} cut={cut} className="!px-1">
+                    <Td key={c.key} first={j === 0} cut={cut} className="!px-1">
                       <Pill
                         v={valueOf(t, c.key)}
                         peak={peak.get(c.key) as number}
+                        certain={isCertain(t, c.key)}
                       />
                     </Td>
                   ))}
@@ -334,16 +351,38 @@ function Td({
  * side of the middle a team is on. A one-hue ramp renders the whole bottom of
  * a sixty-team classification as the same near-empty wash, which is where most
  * of the teams are and where most of the questions are.
+ *
+ * `certain` decides whether the extremes may be printed flat. Ten thousand
+ * seasons out of ten thousand is not the same claim as "cannot fail", and a
+ * team that could still play its way out should not be told it is through —
+ * so without a proof the ends read ">99" and "<1" rather than 100 and 0.
  */
-function Pill({ v, peak }: { v: number; peak: number }) {
+function Pill({
+  v,
+  peak,
+  certain,
+}: {
+  v: number;
+  peak: number;
+  /** Settled by arithmetic, not merely by every trial agreeing. */
+  certain?: boolean;
+}) {
   const shown =
-    v >= 0.9995 ? "100" : v <= 0 ? "0" : (v * 100).toFixed(v < 0.095 ? 1 : 0);
+    v >= 0.9995
+      ? certain
+        ? "100"
+        : ">99"
+      : v <= 0.0005
+        ? certain
+          ? "0"
+          : "<1"
+        : (v * 100).toFixed(v < 0.095 ? 1 : 0);
   const tail = <span className="text-[9px] opacity-60">%</span>;
 
   // Never happened in any season. Still the bad end of the scale, but flat —
   // at ten columns a wall of full-strength red is the first thing the eye
   // lands on, and "did not happen" is the least interesting cell there is.
-  if (v <= 0) {
+  if (v <= 0.0005) {
     return (
       <StatPill className="w-full !text-[12.5px] !py-1" strength={0} hot={false} empty>
         {shown}

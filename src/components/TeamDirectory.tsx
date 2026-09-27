@@ -7,7 +7,12 @@ import { useMemo, useState } from "react";
 import Icon from "./Icon";
 import { fmt, ordinal, record } from "@/lib/format";
 import { qualifiersFor } from "@/lib/playoffs";
-import { regionRecords, standingsCompare, type Record2 } from "@/lib/season";
+import {
+  orderRegionStandings,
+  regionHeadToHead,
+  regionRecords,
+  type Record2,
+} from "@/lib/season";
 import {
   CLS_FILTER_ORDER,
   type Classification,
@@ -60,6 +65,7 @@ export default function TeamDirectory({
   // ordering inside each region box — ahead of the rating, which has no
   // bearing on qualification at all.
   const reg = useMemo(() => regionRecords(rows, games), [rows, games]);
+  const h2h = useMemo(() => regionHeadToHead(rows, games), [rows, games]);
 
   // Grouped and ordered from the whole class, then narrowed for display. A
   // team's place in its region and the playoff line under the qualifiers have
@@ -76,12 +82,12 @@ export default function TeamDirectory({
       byClass.set(r.classification, regions);
     }
     for (const regions of byClass.values()) {
-      for (const list of regions.values()) {
-        list.sort((a, b) => standingsCompare(a, b, reg));
+      for (const [n, list] of regions) {
+        regions.set(n, orderRegionStandings(list, reg, h2h));
       }
     }
     return byClass;
-  }, [rows, cls, reg]);
+  }, [rows, cls, reg, h2h]);
 
   const q = query.trim().toLowerCase();
   const matches = (t: RatingRow) => !q || t.name.toLowerCase().includes(q);

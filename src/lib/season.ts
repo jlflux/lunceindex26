@@ -5,6 +5,7 @@
  * touching when the calendar moves.
  */
 import { officialWinner } from "./result";
+import { orderRegion } from "./tiebreak";
 import type { Classification, Game, RatingRow } from "./types";
 
 /** The key ScheduleBrowser uses to identify a week or a playoff round. */
@@ -152,28 +153,48 @@ export function regionRecords(
   return out;
 }
 
+/** Who beat whom in region play, for the tiebreakers. */
+export function regionHeadToHead(
+  ratings: Pick<RatingRow, "name" | "classification" | "region">[],
+  games: Pick<Game, "t1" | "t2" | "s1" | "s2" | "type" | "forfeit_by">[],
+): Set<string> {
+  const meta = new Map<string, { c: Classification; r: number }>();
+  for (const t of ratings) meta.set(t.name, { c: t.classification, r: t.region });
+  const out = new Set<string>();
+  for (const g of games) {
+    if (g.type === "playoff") continue;
+    const a = meta.get(g.t1);
+    const b = meta.get(g.t2);
+    if (!a || !b || a.c !== b.c || a.r !== b.r) continue;
+    const w = officialWinner(g);
+    if (!w) continue;
+    out.add(w === "t1" ? `${g.t1}|${g.t2}` : `${g.t2}|${g.t1}`);
+  }
+  return out;
+}
+
 /**
- * Standings order: region record first, then rating, then overall record.
+ * Standings order for one region, best first.
  *
- * Region record is compared by win percentage before win count, which is how a
- * standings table reads — 1-0 leads 3-1 — with the count breaking ties so 2-0
- * sits above 1-0. A team yet to open region play counts as neutral rather than
- * as a loss, so it is not buried beneath teams that have started and lost.
+ * The actual ordering lives in tiebreak.ts, shared with the playoff
+ * simulation. It used to live here too, differently — this one went from the
+ * record straight to the rating and never looked at head-to-head — so the
+ * standings page and the odds page could disagree about who was in a playoff
+ * place. They now cannot.
  */
-export function standingsCompare(
-  a: RatingRow,
-  b: RatingRow,
+export function orderRegionStandings(
+  teams: RatingRow[],
   reg: Map<string, Record2>,
-): number {
-  const ra = reg.get(a.name) ?? { wins: 0, losses: 0 };
-  const rb = reg.get(b.name) ?? { wins: 0, losses: 0 };
-  const pct = (r: Record2) =>
-    r.wins + r.losses ? r.wins / (r.wins + r.losses) : 0.5;
-  if (pct(ra) !== pct(rb)) return pct(rb) - pct(ra);
-  if (ra.wins !== rb.wins) return rb.wins - ra.wins;
-  if (a.rating !== b.rating) return b.rating - a.rating;
-  const opct = (t: RatingRow) =>
-    t.wins + t.losses ? t.wins / (t.wins + t.losses) : 0;
-  if (opct(a) !== opct(b)) return opct(b) - opct(a);
-  return a.name.localeCompare(b.name);
+  h2h: Set<string>,
+): RatingRow[] {
+  const by = new Map(teams.map((t) => [t.name, t]));
+  const order = orderRegion(
+    teams.map((t) => t.name),
+    (name) => reg.get(name) ?? { wins: 0, losses: 0 },
+    {
+      beat: (a, b) => h2h.has(`${a}|${b}`),
+      rating: (name) => by.get(name)?.rating ?? 0,
+    },
+  );
+  return order.map((n) => by.get(n) as RatingRow);
 }

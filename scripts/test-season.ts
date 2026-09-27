@@ -8,8 +8,8 @@
 import {
   currentWeekKey,
   parseGameDate,
+  orderRegionStandings,
   regionRecords,
-  standingsCompare,
   weekKey,
   weekOrder,
 } from "../src/lib/season";
@@ -159,55 +159,70 @@ console.log("\n5. Region record counts region games and nothing else");
 
 console.log("\n6. Standings order puts region record ahead of rating");
 {
-  const reg = new Map([
-    ["Good rating", { wins: 0, losses: 1 }],
-    ["Good region", { wins: 1, losses: 0 }],
-  ]);
-  const a = row("Good rating", "5A", 1, 90);
-  const b = row("Good region", "5A", 1, 10);
+  // One helper: order a region the way the page does, and report the names.
+  const order = (
+    teams: [string, number][],
+    rec: Record<string, [number, number]>,
+    beats: string[] = [],
+  ) =>
+    orderRegionStandings(
+      teams.map(([n, rating]) => row(n, "5A", 1, rating)),
+      new Map(
+        Object.entries(rec).map(([k, [w, l]]) => [k, { wins: w, losses: l }]),
+      ),
+      new Set(beats),
+    ).map((t) => t.name);
+
   check(
     "a 1-0 region team outranks a far better rating at 0-1",
-    standingsCompare(a, b, reg) > 0,
+    order([["Good rating", 90], ["Good region", 10]], {
+      "Good rating": [0, 1],
+      "Good region": [1, 0],
+    })[0] === "Good region",
   );
 
   // Percentage before count, the way a standings table reads.
-  const r2 = new Map([
-    ["One and none", { wins: 1, losses: 0 }],
-    ["Three and one", { wins: 3, losses: 1 }],
-  ]);
   check(
     "1-0 leads 3-1",
-    standingsCompare(row("One and none", "5A", 1, 0), row("Three and one", "5A", 1, 0), r2) < 0,
+    order([["One and none", 0], ["Three and one", 0]], {
+      "One and none": [1, 0],
+      "Three and one": [3, 1],
+    })[0] === "One and none",
   );
 
   // ...with the count breaking a tie on percentage.
-  const r3 = new Map([
-    ["Two and none", { wins: 2, losses: 0 }],
-    ["One and none", { wins: 1, losses: 0 }],
-  ]);
   check(
     "2-0 leads 1-0",
-    standingsCompare(row("Two and none", "5A", 1, 0), row("One and none", "5A", 1, 0), r3) < 0,
+    order([["Two and none", 0], ["One and none", 0]], {
+      "Two and none": [2, 0],
+      "One and none": [1, 0],
+    })[0] === "Two and none",
   );
 
   // A team yet to start region play is neutral, not last.
-  const r4 = new Map([
-    ["Not started", { wins: 0, losses: 0 }],
-    ["Lost one", { wins: 0, losses: 1 }],
-  ]);
   check(
     "0-0 in region sits above 0-1",
-    standingsCompare(row("Not started", "5A", 1, 0), row("Lost one", "5A", 1, 50), r4) < 0,
+    order([["Not started", 0], ["Lost one", 50]], {
+      "Not started": [0, 0],
+      "Lost one": [0, 1],
+    })[0] === "Not started",
   );
 
-  // Rating only speaks once the region records match.
-  const r5 = new Map([
-    ["Higher", { wins: 1, losses: 0 }],
-    ["Lower", { wins: 1, losses: 0 }],
-  ]);
   check(
-    "equal region records fall through to rating",
-    standingsCompare(row("Higher", "5A", 1, 40), row("Lower", "5A", 1, 20), r5) < 0,
+    "head-to-head beats the rating when records are level",
+    order(
+      [["Worse rating", 10], ["Better rating", 90]],
+      { "Worse rating": [2, 1], "Better rating": [2, 1] },
+      ["Worse rating|Better rating"],
+    )[0] === "Worse rating",
+  );
+
+  check(
+    "the rating separates a tie nobody has played",
+    order([["Higher", 50], ["Lower", 10]], {
+      Higher: [1, 0],
+      Lower: [1, 0],
+    })[0] === "Higher",
   );
 }
 

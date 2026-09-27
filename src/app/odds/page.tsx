@@ -67,8 +67,13 @@ export default async function OddsPage() {
                   from the ratings.
                 </>
               )}{" "}
-              Ties in a region are broken the way the association breaks them:
-              head-to-head first, then the rating.
+              Teams level in a region are separated by head-to-head among the
+              tied group, which is the first tiebreaker the association
+              applies. Anything it cannot separate falls through to the Index
+              rating, which stands in for the coin flip at the end of the
+              association&rsquo;s list — the same order the standings page
+              uses, so the two cannot disagree about who is in a playoff
+              place.
             </p>
             <p className="mt-2">
               The one number behind all of it is how often a rating gap turns
@@ -77,6 +82,13 @@ export default async function OddsPage() {
               week cold, which picks about four winners in five and whose
               stated probabilities land within two points of what actually
               happened at every level of confidence.
+            </p>
+            <p className="mt-2">
+              A figure reads <strong>&gt;99%</strong> rather than 100% when
+              every simulated season agreed but the arithmetic has not closed
+              the door — a team can win ten thousand out of ten thousand and
+              still, in principle, play its way out. Only a place that cannot
+              be lost is printed flat.
             </p>
             <p className="mt-2">
               Odds move only when results do. They are recomputed when the board

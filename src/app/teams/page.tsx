@@ -13,7 +13,7 @@ export default async function TeamsPage() {
     <AppShell generated={data.generated}>
       <PageHeader
         title="Standings"
-        subtitle="Every AHSAA football program, grouped by classification and region. Records read overall first, then region — and region order is what decides the playoffs."
+        subtitle="Every AHSAA football program, grouped by classification and region. The shaded record is the region one, which is what decides the playoffs — the rule in each box is the line the qualifiers sit above."
       />
       {data.ratings.length === 0 ? (
         <EmptyState

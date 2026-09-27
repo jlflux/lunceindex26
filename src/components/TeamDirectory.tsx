@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import ForfeitMark from "./ForfeitMark";
+import StatPill from "./StatPill";
 import { useMemo, useState } from "react";
 import Icon from "./Icon";
 import { fmt, ordinal, record } from "@/lib/format";
-import { regionRecords, standingsCompare } from "@/lib/season";
+import { qualifiersFor } from "@/lib/playoffs";
+import { regionRecords, standingsCompare, type Record2 } from "@/lib/season";
 import {
   CLS_FILTER_ORDER,
   type Classification,
@@ -13,10 +15,35 @@ import {
   type RatingRow,
 } from "@/lib/types";
 
-/** Region record, or a dash when region play has not started. */
-function regionLabel(r: { wins: number; losses: number } | undefined): string {
-  if (!r || r.wins + r.losses === 0) return "0-0";
-  return `${r.wins}-${r.losses}`;
+/**
+ * A region record as a shaded pill.
+ *
+ * Scaled against .500 rather than against the best record on the page. A
+ * winning record means the same thing in every region in the state, so an
+ * absolute scale is the honest one here — unlike the odds board, where each
+ * column has to be read against its own range. 0-0 is drawn flat: a team that
+ * has not started region play has not lost anything.
+ */
+function RegionPill({ r }: { r: Record2 | undefined }) {
+  const w = r?.wins ?? 0;
+  const l = r?.losses ?? 0;
+  const played = w + l;
+  const pct = played ? w / played : 0.5;
+  return (
+    <StatPill
+      className="!text-[12px]"
+      empty={played === 0}
+      hot={pct >= 0.5}
+      strength={Math.abs(pct - 0.5) * 2}
+      title={
+        played
+          ? `${w}-${l} in region play`
+          : "No region games played yet"
+      }
+    >
+      {w}-{l}
+    </StatPill>
+  );
 }
 
 export default function TeamDirectory({
@@ -34,29 +61,38 @@ export default function TeamDirectory({
   // bearing on qualification at all.
   const reg = useMemo(() => regionRecords(rows, games), [rows, games]);
 
+  // Grouped and ordered from the whole class, then narrowed for display. A
+  // team's place in its region and the playoff line under the qualifiers have
+  // to keep meaning what they say while a search is running — filtering first
+  // would renumber the region and move the line to wherever the matches fell.
   const grouped = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = rows.filter((r) => {
-      if (cls !== "all" && r.classification !== cls) return false;
-      if (q && !r.name.toLowerCase().includes(q)) return false;
-      return true;
-    });
-
-    // Classification → region → teams, each ordered by rating.
     const byClass = new Map<Classification, Map<number, RatingRow[]>>();
-    for (const r of filtered) {
+    for (const r of rows) {
+      if (cls !== "all" && r.classification !== cls) continue;
       const regions = byClass.get(r.classification) ?? new Map();
       const list = regions.get(r.region) ?? [];
       list.push(r);
       regions.set(r.region, list);
       byClass.set(r.classification, regions);
     }
+    for (const regions of byClass.values()) {
+      for (const list of regions.values()) {
+        list.sort((a, b) => standingsCompare(a, b, reg));
+      }
+    }
     return byClass;
-  }, [rows, query, cls]);
+  }, [rows, cls, reg]);
+
+  const q = query.trim().toLowerCase();
+  const matches = (t: RatingRow) => !q || t.name.toLowerCase().includes(q);
 
   const total = [...grouped.values()].reduce(
     (n, regions) =>
-      n + [...regions.values()].reduce((m, list) => m + list.length, 0),
+      n +
+      [...regions.values()].reduce(
+        (m, list) => m + list.filter(matches).length,
+        0,
+      ),
     0,
   );
 
@@ -99,11 +135,16 @@ export default function TeamDirectory({
         <span className="font-semibold" style={{ color: "rgb(var(--text))" }}>
           {total}
         </span>{" "}
-        team{total === 1 ? "" : "s"}
+        team{total === 1 ? "" : "s"} · the rule in each box is the playoff line,
+        and the shaded record is the one that decides it
       </p>
 
       {CLS_FILTER_ORDER.filter((c) => grouped.has(c)).map((c) => {
         const regions = grouped.get(c)!;
+        const shown = [...regions.keys()]
+          .sort((a, b) => a - b)
+          .filter((n) => regions.get(n)!.some(matches));
+        if (!shown.length) return null;
         return (
           <section key={c}>
             <h2 className="mb-2.5 flex items-center gap-2">
@@ -114,14 +155,19 @@ export default function TeamDirectory({
                 className="text-xs"
                 style={{ color: "rgb(var(--text-faint))" }}
               >
-                {[...regions.values()].reduce((n, l) => n + l.length, 0)} teams
+                {[...regions.values()].reduce(
+                  (n, l) => n + l.filter(matches).length,
+                  0,
+                )}{" "}
+                teams · top {qualifiersFor(c)} of each region qualify
               </span>
             </h2>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {[...regions.keys()]
-                .sort((a, b) => a - b)
-                .map((regionNo) => (
+              {shown.map((regionNo) => {
+                const list = regions.get(regionNo)!;
+                const qualifiers = qualifiersFor(c, list.length);
+                return (
                   <div key={regionNo} className="card overflow-hidden">
                     <div
                       className="border-b px-3 py-2 text-[11px] font-bold uppercase tracking-wider"
@@ -133,16 +179,38 @@ export default function TeamDirectory({
                     >
                       Region {regionNo}
                     </div>
-                    <ul className="divide-y" style={{ borderColor: "rgb(var(--border))" }}>
-                      {[...regions.get(regionNo)!]
-                        .sort((a, b) => standingsCompare(a, b, reg))
-                        .map((t) => (
-                          <li key={t.slug}>
+                    <ul>
+                      {list.filter(matches).map((t) => {
+                        const place = list.indexOf(t);
+                        // The rule only goes under the last qualifier, and
+                        // only when the team below it is on screen to be
+                        // separated from.
+                        const after = list.filter(matches);
+                        const next = after[after.indexOf(t) + 1];
+                        const cut =
+                          place + 1 === qualifiers &&
+                          next !== undefined &&
+                          list.indexOf(next) >= qualifiers;
+                        return (
+                          <li
+                            key={t.slug}
+                            style={{
+                              borderBottom: cut
+                                ? "2px solid rgb(var(--brand) / 0.55)"
+                                : "1px solid rgb(var(--border))",
+                            }}
+                          >
                             <Link
                               href={`/team/${t.slug}`}
-                              className="row-hover flex items-center justify-between gap-2 px-3 py-2 transition-colors"
+                              className="row-hover flex items-center gap-2 px-3 py-2 transition-colors"
                             >
-                              <span className="min-w-0">
+                              <span
+                                className="w-3.5 shrink-0 text-[11px] tnum"
+                                style={{ color: "rgb(var(--text-faint))" }}
+                              >
+                                {place + 1}
+                              </span>
+                              <span className="min-w-0 flex-1">
                                 <span className="block truncate text-[13px] font-semibold">
                                   {t.name}
                                 </span>
@@ -150,23 +218,24 @@ export default function TeamDirectory({
                                   className="text-[11px]"
                                   style={{ color: "rgb(var(--text-faint))" }}
                                 >
-                                  {ordinal(t.rank)} ·{" "}
-                                  {record(t.wins, t.losses)}
-                                  <ForfeitMark n={t.forfeits} />{" "}
-                                  <span style={{ color: "rgb(var(--text-muted))" }}>
-                                    ({regionLabel(reg.get(t.name))})
+                                  {ordinal(t.rank)} · {record(t.wins, t.losses)}
+                                  <ForfeitMark n={t.forfeits} /> ·{" "}
+                                  <span
+                                    style={{ color: "rgb(var(--text-muted))" }}
+                                  >
+                                    {fmt(t.rating, 1)}
                                   </span>
                                 </span>
                               </span>
-                              <span className="shrink-0 text-[13px] font-bold tnum">
-                                {fmt(t.rating, 1)}
-                              </span>
+                              <RegionPill r={reg.get(t.name)} />
                             </Link>
                           </li>
-                        ))}
+                        );
+                      })}
                     </ul>
                   </div>
-                ))}
+                );
+              })}
             </div>
           </section>
         );

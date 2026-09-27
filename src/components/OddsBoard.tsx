@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Fragment, useMemo, useState } from "react";
 import Icon from "./Icon";
+import StatPill from "./StatPill";
 import type { ClassOdds, OddsReport, TeamOdds } from "@/lib/playoffs";
 import { CLS_FILTER_ORDER, type Classification } from "@/lib/types";
 
@@ -335,49 +336,35 @@ function Td({
  * of the teams are and where most of the questions are.
  */
 function Pill({ v, peak }: { v: number; peak: number }) {
+  const shown =
+    v >= 0.9995 ? "100" : v <= 0 ? "0" : (v * 100).toFixed(v < 0.095 ? 1 : 0);
+  const tail = <span className="text-[9px] opacity-60">%</span>;
+
   // Never happened in any season. Still the bad end of the scale, but flat —
   // at ten columns a wall of full-strength red is the first thing the eye
   // lands on, and "did not happen" is the least interesting cell there is.
   if (v <= 0) {
     return (
-      <span
-        className="inline-block w-full rounded-md px-1.5 py-1 text-center text-[12.5px] font-bold tnum"
-        style={{
-          background: "rgb(var(--odds-lo) / 0.14)",
-          color: "rgb(var(--text-faint))",
-        }}
-      >
-        0<span className="text-[9px] opacity-60">%</span>
-      </span>
+      <StatPill className="w-full !text-[12.5px] !py-1" strength={0} hot={false} empty>
+        {shown}
+        {tail}
+      </StatPill>
     );
   }
+
   const t = Math.max(0, Math.min(1, v / peak));
   // Pulled apart at the bottom: most of a classification lives under a tenth
   // of the leader, and a linear ramp gives all of it the same colour.
   const k = Math.sqrt(t);
-  const hot = k >= 0.5;
-  // 0 → full red, 0.5 → neutral, 1 → full blue.
-  const strength = Math.abs(k - 0.5) * 2;
-  const hue = hot ? "var(--odds-hi)" : "var(--odds-lo)";
-  const shown =
-    v >= 0.9995 ? "100" : v <= 0 ? "0" : (v * 100).toFixed(v < 0.095 ? 1 : 0);
-
   return (
-    <span
-      className="inline-block w-full rounded-md px-1.5 py-1 text-center text-[12.5px] font-bold tnum"
-      style={{
-        background: `rgb(${hue} / ${(0.12 + strength * 0.78).toFixed(3)})`,
-        color:
-          strength > 0.55
-            ? "#fff"
-            : hot
-              ? "rgb(var(--odds-hi))"
-              : "rgb(var(--text-muted))",
-      }}
+    <StatPill
+      className="w-full !text-[12.5px] !py-1"
+      hot={k >= 0.5}
+      strength={Math.abs(k - 0.5) * 2}
     >
       {shown}
-      <span className="text-[9px] opacity-60">%</span>
-    </span>
+      {tail}
+    </StatPill>
   );
 }
 

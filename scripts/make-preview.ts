@@ -9,6 +9,10 @@
  *             full schedule rather than the single Week 0 game
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import {
+  emptyBracketState,
+  type BracketState,
+} from "../src/lib/bracket-types";
 import { computeRatings } from "../src/lib/engine";
 import { computeOdds, WIN_SCALE } from "../src/lib/playoffs";
 import { parseCsvText } from "../src/lib/csv";
@@ -16,6 +20,7 @@ import { loadRosterCsv } from "../src/lib/roster-csv";
 import { parseSchedulePdf, toGames } from "../src/lib/schedule-pdf";
 import {
   DEFAULT_CONFIG,
+  type Classification,
   type Game,
   type PlayoffRound,
   type RatingsPayload,
@@ -209,7 +214,20 @@ async function main() {
   };
 
   mkdirSync("scripts/out", { recursive: true });
-  writeFileSync("scripts/out/preview.json", JSON.stringify(payload));
+
+  // The bracket layer, if the old site's export is sitting where the importer
+  // expects it. Purely so /bracketology renders offline like every other page;
+  // nothing here reaches a database.
+  const out: Record<string, unknown> = { ...payload };
+  const BRACKET_SRC = "/home/user/jlflux/jlflux.github.io/data/data.json";
+  try {
+    out.bracket = bracketFrom(BRACKET_SRC);
+    console.log(`Bracket layer attached from ${BRACKET_SRC}`);
+  } catch {
+    // Absent is the normal case on any machine but the one that has the clone.
+  }
+
+  writeFileSync("scripts/out/preview.json", JSON.stringify(out));
 
   console.log(
     `Wrote scripts/out/preview.json — ${payload.ratings.length} teams, ` +
@@ -228,3 +246,47 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
+
+/**
+ * The old bracketology export, reshaped for the preview file.
+ *
+ * A deliberately thin copy of what `scripts/import-bracket.ts` does — enough
+ * to render, not enough to be the real import. The importer is the one that
+ * verifies, reports and writes; this only has to put something on screen.
+ */
+function bracketFrom(path: string): BracketState {
+  const old = JSON.parse(readFileSync(path, "utf8")) as Record<string, any>;
+  const state = emptyBracketState(String(old?.meta?.season ?? "2026"));
+  state.newsNote = String(old.newsNote ?? "");
+  state.aboutHtml = String(old.aboutHtml ?? "");
+  state.aboutBanner = {
+    enabled: old.aboutBanner?.enabled === true,
+    text: String(old.aboutBanner?.text ?? ""),
+  };
+  state.showProjections =
+    old.showProjections === true ||
+    String(old.showProjections).toLowerCase() === "true";
+
+  for (const [cls, oc] of Object.entries(old.classifications ?? {})) {
+    const c = oc as Record<string, any>;
+    const regions: Record<string, { note: string }> = {};
+    for (const [rid, r] of Object.entries(c.regions ?? {})) {
+      const note = String((r as Record<string, unknown>).note ?? "");
+      if (note) regions[rid] = { note };
+    }
+    state.classes[cls as Classification] = {
+      alignment: (c.bracket?.alignment ?? []).map(Number),
+      slots: (c.bracket?.slots ?? []).map((x: any) =>
+        x ? { region: Number(x.region), place: Number(x.place) } : null,
+      ),
+      results: Object.fromEntries(
+        Object.entries(c.bracket?.results ?? {}).filter(
+          ([, v]) => Object.keys(v as object).length > 0,
+        ),
+      ) as Record<string, never>,
+      projected: (c.bracket?.projected ?? {}) as Record<string, "top" | "bottom">,
+      regions,
+    };
+  }
+  return state;
+}

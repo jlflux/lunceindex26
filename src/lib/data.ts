@@ -9,6 +9,7 @@ import { computeOdds, WIN_SCALE } from "./playoffs";
 import "server-only";
 
 import { computeBoard, modelOf } from "./board";
+import { emptyBracketState, type BracketState } from "./bracket-types";
 import { publicClient, serviceClient } from "./db";
 import type { AswaEntry, CompositeEntry } from "./rankings";
 import {
@@ -113,6 +114,57 @@ async function previewSlice<T>(key: "composite" | "aswa"): Promise<T[] | null> {
   const parsed = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
   const slice = parsed[key];
   return Array.isArray(slice) ? (slice as T[]) : [];
+}
+
+/** The same hatch for the bracket, which is one document rather than a list. */
+async function previewObject<T>(key: string): Promise<T | null> {
+  const path = process.env.ALPREPS_PREVIEW_DATA;
+  if (!path) return null;
+  const { readFileSync } = await import("node:fs");
+  const parsed = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+  const slice = parsed[key];
+  return slice && typeof slice === "object" ? (slice as T) : null;
+}
+
+/**
+ * The hand-authored bracket layer.
+ *
+ * Returns an empty state rather than throwing when the table is missing, for
+ * the same reason the composite and ASWA boards do: a deployment that has not
+ * run 006 yet still has a whole site to render, and the bracket page can say
+ * so itself.
+ */
+export async function loadBracket(admin = false): Promise<BracketState> {
+  const preview = await previewObject<BracketState>("bracket");
+  if (preview) return { ...emptyBracketState(), ...preview };
+  try {
+    const c = admin ? serviceClient() : publicClient();
+    const { data, error } = await c
+      .from("bracket")
+      .select("data")
+      .eq("id", 1)
+      .maybeSingle();
+    if (error) {
+      if (admin && !isMissingTable(error)) throw new Error(error.message);
+      return emptyBracketState();
+    }
+    const stored = (data?.data ?? {}) as Partial<BracketState>;
+    return { ...emptyBracketState(), ...stored };
+  } catch (e) {
+    if (admin) throw e;
+    return emptyBracketState();
+  }
+}
+
+export async function saveBracket(state: BracketState): Promise<void> {
+  const { error } = await serviceClient()
+    .from("bracket")
+    .upsert({ id: 1, data: state }, { onConflict: "id" });
+  if (error) {
+    throw new Error(
+      `${error.message} — if the table is missing, run supabase/migrations/006_bracket.sql.`,
+    );
+  }
 }
 
 /**

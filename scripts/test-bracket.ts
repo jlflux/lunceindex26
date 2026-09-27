@@ -1,0 +1,387 @@
+/**
+ * The bracket resolver.
+ *
+ * The thing worth testing is the join. The stored bracket names no team — it
+ * names places — so everything depends on "who holds R4-2" being answered the
+ * same way the standings answer it, and on a winner travelling up the tree
+ * with the seed it came in on.
+ *
+ * Section 5 is the one that matters most: a real result beats a projection,
+ * always and in both directions. Get that wrong and the board quietly shows a
+ * projected team advancing out of a game somebody actually lost.
+ *
+ * Usage: npx tsx scripts/test-bracket.ts
+ */
+import {
+  applyPinnedOrder,
+  buildTree,
+  defaultSlots,
+  placesFor,
+  regionKey,
+  resolveBracket,
+  seedLabel,
+  seededRegions,
+  statusFromOdds,
+  type SeededTeam,
+} from "../src/lib/bracket";
+import { emptyBracketState, type BracketState } from "../src/lib/bracket-types";
+import { renderRichText, sanitizeHtml } from "../src/lib/sanitize";
+import type { Classification, Game, RatingRow } from "../src/lib/types";
+
+let failures = 0;
+function check(label: string, cond: boolean, detail = "") {
+  if (cond) console.log(`  ok   ${label}`);
+  else {
+    failures++;
+    console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ""}`);
+  }
+}
+
+let nextId = 1;
+const g = (
+  t1: string,
+  t2: string,
+  s1: number | null,
+  s2: number | null,
+  opts: Partial<Game> = {},
+): Game => ({
+  id: nextId++,
+  t1,
+  s1,
+  t2,
+  s2,
+  week: 1,
+  type: "regular",
+  round: null,
+  date: null,
+  status: s1 === null ? "scheduled" : "final",
+  neutral_site: false,
+  forfeit_by: null,
+  ...opts,
+});
+
+const row = (
+  name: string,
+  region: number,
+  rating: number,
+  opts: Partial<RatingRow> = {},
+): RatingRow =>
+  ({
+    name,
+    slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    classification: "5A",
+    region,
+    wins: 0,
+    losses: 0,
+    rating,
+    massey: 0,
+    sos: 0,
+    o_eff: 0,
+    d_eff: 0,
+    ppg: 0,
+    papg: 0,
+    prior_blend: 0,
+    rank: 0,
+    class_rank: 0,
+    ...opts,
+  }) as RatingRow;
+
+/** Two 5A regions of four, rated so the computed order is predictable. */
+function world() {
+  const ratings: RatingRow[] = [];
+  for (let r = 1; r <= 2; r++) {
+    for (let p = 1; p <= 4; p++) {
+      ratings.push(row(`R${r}T${p}`, r, 100 - (r - 1) * 10 - p));
+    }
+  }
+  return ratings;
+}
+
+/** A region game between two teams, won by the first. */
+const beat = (w: string, l: string) => g(w, l, 21, 7);
+
+/** Round-robin results that put T1 > T2 > T3 > T4 in each region. */
+function roundRobin(): Game[] {
+  const out: Game[] = [];
+  for (let r = 1; r <= 2; r++) {
+    for (let a = 1; a <= 4; a++) {
+      for (let b = a + 1; b <= 4; b++) out.push(beat(`R${r}T${a}`, `R${r}T${b}`));
+    }
+  }
+  return out;
+}
+
+function stateWith(slots: BracketState["classes"]["5A"]): BracketState {
+  const s = emptyBracketState();
+  s.classes["5A"] = slots;
+  return s;
+}
+
+const base = () => ({
+  alignment: [1, 2],
+  slots: defaultSlots("5A" as Classification, 2),
+  results: {},
+  projected: {},
+  regions: {},
+});
+
+console.log("\n1. The tree");
+{
+  const rounds = buildTree(defaultSlots("5A", 2));
+  check("eight slots make three rounds", rounds.length === 3, String(rounds.length));
+  check("four games, then two, then one",
+    rounds.map((r) => r.length).join() === "4,2,1",
+    rounds.map((r) => r.length).join());
+  check("ids are positional", rounds[1][0].id === "r2g0" && rounds[2][0].id === "r3g0");
+  check(
+    "a second-round game takes its sides from two first-round games",
+    rounds[1][0].top.kind === "game" && rounds[1][0].top.ref === "r1g0",
+  );
+  check("an empty bracket makes no rounds", buildTree([]).length === 0);
+  check("a seed label reads as the old site wrote it",
+    seedLabel({ region: 4, place: 2 }) === "R4-2");
+}
+
+console.log("\n2. Seeding follows the standings, and a pin overrides it");
+{
+  const ratings = world();
+  const games = roundRobin();
+  const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
+  const r1 = seeded.get(regionKey("5A", 1))!;
+  check("the region is ordered by its record",
+    r1.map((t) => t.name).join() === "R1T1,R1T2,R1T3,R1T4",
+    r1.map((t) => t.name).join());
+  check("places are 1-based and dense", r1.map((t) => t.place).join() === "1,2,3,4");
+  check("the top four qualify when four go", r1.every((t) => t.qualifies));
+  check("region records came through", r1[0].region_w === 3 && r1[0].region_l === 0);
+
+  const pinned = emptyBracketState();
+  pinned.classes["5A"] = { ...base(), regions: { "1": { note: "", order: ["R1T4", "R1T1"] } } };
+  const p = seededRegions(ratings, games, undefined, pinned).get(regionKey("5A", 1))!;
+  check("a pin puts the named teams first, in order",
+    p.map((t) => t.name).join() === "R1T4,R1T1,R1T2,R1T3",
+    p.map((t) => t.name).join());
+  check("and renumbers the places", p[0].place === 1 && p[0].name === "R1T4");
+}
+
+console.log("\n3. A pin cannot empty a bracket");
+{
+  const computed = [{ name: "A" }, { name: "B" }, { name: "C" }];
+  check("an unknown name is skipped, not honoured",
+    applyPinnedOrder(computed, ["Nobody", "C"]).map((t) => t.name).join() === "C,A,B");
+  check("a duplicate is used once",
+    applyPinnedOrder(computed, ["B", "B"]).map((t) => t.name).join() === "B,A,C");
+  check("a team the pin forgets keeps its place behind the named ones",
+    applyPinnedOrder(computed, ["C"]).map((t) => t.name).join() === "C,A,B");
+  check("an empty pin changes nothing",
+    applyPinnedOrder(computed, []).map((t) => t.name).join() === "A,B,C");
+}
+
+console.log("\n4. Byes advance without being played");
+{
+  const ratings = world();
+  const games = roundRobin();
+  const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
+  // Four slots, one of them a bye: R1T1 walks into round two.
+  const st = stateWith({
+    ...base(),
+    slots: [{ region: 1, place: 1 }, null, { region: 1, place: 2 }, { region: 2, place: 1 }],
+  });
+  const b = resolveBracket(st, "5A", seeded, games)!;
+  check("the bye slot is marked", b.rounds[0][0].bottom.bye);
+  check("its opponent is named", b.rounds[0][0].top.team === "R1T1");
+  check(
+    "and reaches the next round with nothing played",
+    b.rounds[1][0].top.team === "R1T1",
+    String(b.rounds[1][0].top.team),
+  );
+  check(
+    "a bye against a bye advances nobody",
+    resolveBracket(stateWith({ ...base(), slots: [null, null, null, null] }), "5A", seeded, games)!
+      .rounds[1][0].top.team === null,
+  );
+}
+
+console.log("\n5. A real result beats a projection, in both directions");
+{
+  const ratings = world();
+  const games = roundRobin();
+  const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
+
+  const slots = [
+    { region: 1, place: 1 },
+    { region: 2, place: 4 },
+    { region: 1, place: 2 },
+    { region: 2, place: 3 },
+  ];
+  // Projected: the better seed wins r1g0. Actual: it lost.
+  const st = stateWith({
+    ...base(),
+    slots,
+    projected: { r1g0: "top", r1g1: "top" },
+  });
+  st.showProjections = true;
+
+  const upset = [...games, g("R1T1", "R2T4", 7, 35, { type: "playoff", round: "r1" })];
+
+  const actual = resolveBracket(st, "5A", seeded, upset)!;
+  check("without projections the played game decides",
+    actual.rounds[1][0].top.team === "R2T4",
+    String(actual.rounds[1][0].top.team));
+  check("the loser is marked", actual.rounds[0][0].top.loser && actual.rounds[0][0].bottom.winner);
+  check("the score comes off the games table",
+    actual.rounds[0][0].top.score === 7 && actual.rounds[0][0].bottom.score === 35);
+  check("the game is locked", actual.rounds[0][0].locked);
+
+  const proj = resolveBracket(st, "5A", seeded, upset, { projected: true })!;
+  check(
+    "and a projection cannot overturn it",
+    proj.rounds[1][0].top.team === "R2T4",
+    String(proj.rounds[1][0].top.team),
+  );
+  check(
+    "while an unplayed game does follow the projection",
+    proj.rounds[0][1].top.team === "R1T2" && proj.rounds[1][0].bottom.team === "R1T2",
+  );
+  check("and says so", proj.rounds[1][0].bottom.projected);
+  check(
+    "the real result is not labelled a projection",
+    !proj.rounds[1][0].top.projected,
+  );
+
+  // The gate: projections stay private until published.
+  const shut = stateWith({ ...base(), slots, projected: { r1g1: "top" } });
+  shut.showProjections = false;
+  const hidden = resolveBracket(shut, "5A", seeded, games, { projected: true })!;
+  check(
+    "an unpublished projection is not shown even when asked for",
+    hidden.rounds[1][0].bottom.team === null,
+  );
+}
+
+console.log("\n6. A forfeit in the bracket follows the ruling");
+{
+  const ratings = world();
+  const games = roundRobin();
+  const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
+  const st = stateWith({
+    ...base(),
+    slots: [{ region: 1, place: 1 }, { region: 2, place: 4 }, { region: 1, place: 2 }, { region: 2, place: 3 }],
+  });
+  const vacated = [
+    ...games,
+    g("R1T1", "R2T4", 48, 7, { type: "playoff", round: "r1", forfeit_by: "t1" }),
+  ];
+  const b = resolveBracket(st, "5A", seeded, vacated)!;
+  check("the side that forfeited does not advance", b.rounds[1][0].top.team === "R2T4");
+  check("but the scoreline is still shown",
+    b.rounds[0][0].top.score === 48 && b.rounds[0][0].bottom.score === 7);
+}
+
+console.log("\n7. A barred team never reaches a slot");
+{
+  const ratings = world().map((t) =>
+    t.name === "R1T1" ? { ...t, postseason_ineligible: true } : t,
+  );
+  const games = roundRobin();
+  const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
+  const r1 = seeded.get(regionKey("5A", 1))!;
+  const barred = r1.find((t) => t.name === "R1T1")!;
+  check("it is flagged", barred.ineligible);
+  check("it holds no place", barred.place === 0);
+  check("it qualifies for nothing", !barred.qualifies);
+  check("and is sorted last", r1[r1.length - 1].name === "R1T1", r1.map((t) => t.name).join());
+  check(
+    "so the first seed is the best team that can actually go",
+    r1[0].name === "R1T2",
+    r1[0].name,
+  );
+  check("a region of four sending four now sends three", placesFor("5A", 3) === 3);
+}
+
+console.log("\n8. A seed nobody holds is reported rather than drawn");
+{
+  const ratings = world();
+  const games = roundRobin();
+  const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
+  const st = stateWith({
+    ...base(),
+    slots: [{ region: 1, place: 1 }, { region: 1, place: 9 }, { region: 2, place: 1 }, { region: 2, place: 2 }],
+  });
+  const b = resolveBracket(st, "5A", seeded, games)!;
+  check("the missing seed is named", b.unresolved.join() === "R1-9", b.unresolved.join());
+  check("its slot keeps the label and no team",
+    b.rounds[0][0].bottom.seed === "R1-9" && b.rounds[0][0].bottom.team === null);
+  check("and it is not a bye — a bye is a decision, this is a gap",
+    !b.rounds[0][0].bottom.bye);
+}
+
+console.log("\n9. Status");
+{
+  const s = (o: Partial<Parameters<typeof statusFromOdds>[0]>) =>
+    statusFromOdds({ clinched: false, eliminated: false, ineligible: false, playoff: 0, ...o });
+  check("barred outranks everything", s({ ineligible: true, clinched: true }) === "ineligible");
+  check("clinched is a proof, not a probability", s({ clinched: true, playoff: 1 }) === "clinched");
+  check("eliminated reads out", s({ eliminated: true }) === "out");
+  check("high at three quarters", s({ playoff: 0.75 }) === "high");
+  check("medium at four tenths", s({ playoff: 0.4 }) === "medium");
+  check("low below it", s({ playoff: 0.39 }) === "low");
+}
+
+console.log("\n10. The default shapes");
+{
+  const aa = defaultSlots("AA", 2);
+  check("AA is sixteen slots from two regions", aa.length === 16);
+  check("its two champions are as far apart as the bracket allows",
+    seedLabel(aa[0]!) === "R1-1" && seedLabel(aa[14]!) === "R2-1",
+    `${seedLabel(aa[0]!)} / ${seedLabel(aa[14]!)}`);
+  const sixA = defaultSlots("6A", 4);
+  check("6A is thirty-two slots", sixA.length === 32);
+  check("with eight byes for twenty-four teams",
+    sixA.filter((s) => s === null).length === 8);
+  check("the byes sit beside the top two seeds of each region",
+    sixA[0] !== null && sixA[1] === null && sixA[4] !== null && sixA[5] === null);
+  const five = defaultSlots("5A", 8);
+  check("an eight-region class pairs into thirty-two", five.length === 32);
+}
+
+console.log("\n11. The explainer is stored HTML, so it is sanitised");
+{
+  const keeps = (a: string, b: string) => sanitizeHtml(a) === b;
+  check("ordinary markup survives",
+    keeps("<h2>Hi</h2><p>There <strong>now</strong></p>",
+          "<h2>Hi</h2><p>There <strong>now</strong></p>"));
+  check("a script goes, contents and all",
+    keeps("<p>a</p><script>alert(1)</script><p>b</p>", "<p>a</p><p>b</p>"));
+  check("an unknown tag is unwrapped, keeping its words",
+    keeps("<p>Keep <marquee>this</marquee></p>", "<p>Keep this</p>"));
+  check("an event handler is dropped",
+    sanitizeHtml('<p onclick="steal()">x</p>') === "<p>x</p>");
+  check("a javascript: link loses its href",
+    sanitizeHtml('<a href="javascript:alert(1)">x</a>') === "<a>x</a>");
+  check("an ordinary link keeps it",
+    sanitizeHtml('<a href="https://ahsaa.com">x</a>').startsWith('<a href="https://ahsaa.com"'));
+  check("and is not left able to reach back through the opener",
+    sanitizeHtml('<a href="https://ahsaa.com">x</a>').includes('rel="noopener noreferrer"'));
+  check("a relative link is fine", sanitizeHtml('<a href="/teams">x</a>') === '<a href="/teams">x</a>');
+  check("unbalanced markup is closed rather than leaking",
+    sanitizeHtml("<p><strong>x") === "<p><strong>x</strong></p>");
+  check("a stray close tag closes nothing", sanitizeHtml("</p>text") === "text");
+  check("a comment cannot smuggle a tag", !sanitizeHtml("<!-- <script>x</script> -->").includes("script"));
+  check("bare text is escaped", sanitizeHtml("a < b & c") === "a &lt; b &amp; c");
+  check("empty in, empty out", sanitizeHtml("") === "");
+
+  // The live explainer is authored with newlines and no block tags at all.
+  check("a newline becomes a break, because that is how it was typed",
+    renderRichText("a\nb") === "a<br>b");
+  check("a blank line becomes two", renderRichText("a\n\nb") === "a<br><br>b");
+  check("and the markup around it still survives",
+    renderRichText("<b>a</b>\n- x") === "<b>a</b><br>- x");
+  check("a script still cannot get through that path",
+    !renderRichText("<script>x</script>\ny").includes("script"));
+}
+
+console.log(
+  failures === 0 ? "\nThe bracket behaves.\n" : `\n${failures} check(s) failed.\n`,
+);
+process.exit(failures === 0 ? 0 : 1);

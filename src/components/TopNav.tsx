@@ -29,6 +29,7 @@ const RANKINGS = [
 
 const PAGES = [
   { href: "/teams", label: "Standings" },
+  { href: "/bracketology", label: "Bracketology" },
   { href: "/odds", label: "Playoff Odds" },
   { href: "/schedule", label: "Schedule" },
   { href: "/about", label: "How It Works" },

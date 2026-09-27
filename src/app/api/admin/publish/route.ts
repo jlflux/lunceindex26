@@ -14,6 +14,9 @@ export const POST = withAdmin(async () => {
   const payload = await publishRatings();
 
   revalidatePath("/");
+  // The bracket is seeded from this snapshot, so it is stale the moment a
+  // publish lands and should not wait out the 300s window to say so.
+  revalidatePath("/bracketology");
   revalidatePath("/team/[slug]", "page");
 
   return NextResponse.json({

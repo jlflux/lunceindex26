@@ -118,7 +118,11 @@ Setup reads no data and grants no access; it is a calculator.
    itself and reports schools missing a week everyone else played, and schools
    holding two games in one week. Both are what a name matched to the wrong
    school looks like, and neither is visible by reading the board.
-4. **Publish** — Admin → Dashboard → Recompute & publish. This also simulates
+4. **Update the bracket** — Admin → Bracketology. Seeds, records and status
+   follow from the season, so most weeks this is only the region write-ups and
+   the projections. Saves take effect immediately; they do not wait for a
+   publish.
+5. **Publish** — Admin → Dashboard → Recompute & publish. This also simulates
    the rest of the season ten thousand times to refresh the playoff odds, so it
    takes a few seconds longer than it used to.
 
@@ -135,6 +139,7 @@ full season schedule can be loaded in advance without affecting anything.
 | Dashboard | Counts, current formula, publish button with a top-10 preview |
 | Games | Add, edit and delete games; filter by week, search, show unplayed only. The schedule scan runs on open: swapped sides, a school with two games in one week, and schools missing a week everyone else played |
 | Import | The AHSAA weekly sheet (pasted or as CSV); your own score CSV; the older AHSAA PDF |
+| Bracketology | The bracket, region write-ups, projections and the explainer. Seeds and records are computed; pin a region to override it |
 | Formula | Sliders for every tunable, with a live top-25 preview showing rank movement before you save |
 | Teams | Edit names, classification, region and preseason rating; bulk-import priors |
 
@@ -155,6 +160,8 @@ npm run test:forfeits     # that a vacated win changes the record and not the ra
 npm run test:playoffs     # the odds: bracket, probability invariants, clinch/elimination
 npm run test:tiebreak     # the AHSAA tie-breaking procedure, (a) through (q)
 npm run test:ineligible   # postseason bans: what they void, and what they must not
+npm run test:bracket      # bracket resolution, projections, and the explainer sanitiser
+npm run import:bracket    # brings the old bracketology site's data across
 npm run calibrate:odds    # refits the win-probability curve against the 2025 season
 npm run typecheck
 ```
@@ -186,6 +193,9 @@ src/
 │   ├── score-csv.ts     # weekly score CSV parsing and validation
 │   ├── result.ts        # who won on the field vs who won officially (forfeits)
 │   ├── eligibility.ts   # the one region-game test, and postseason bans
+│   ├── bracket.ts       # seeding a region, and resolving a stored bracket
+│   ├── bracket-types.ts # the hand-authored bracket layer's shape
+│   ├── sanitize.ts      # allowlist sanitiser for the one piece of stored HTML
 │   ├── playoffs.ts      # bracket structure and the Monte Carlo playoff odds
 │   ├── duplicates.ts    # fixtures stored twice; a school with two games in a week
 │   ├── coverage.ts      # schools missing a week everyone else played
@@ -268,6 +278,24 @@ than an error. `PROJECT.md` covers the reasoning.
   is .667 one way and .583 the other, which puts it either side of a 3-2 team.
   Alabama settles games in overtime, so in practice this guards against a 0-0
   entered by mistake, but standings, region order and the odds all read it.
+- **The bracket stores places, not teams.** A slot is `{region: 4, place: 2}`
+  and who that is gets resolved at render time from the standings. That late
+  binding is the whole design: re-seed a region and every slot follows with
+  nothing edited, which is why the hand-made arrangement imported from the old
+  site survives a season of results. Never regenerate `slots` from
+  `defaultSlots` — the live arrangement differs from every template (6A is laid
+  out across regions rather than by block; AA overrides the cross-seeding).
+- **Game ids are positional.** `r2g0` is the first game of the second round, so
+  anything stored against an id — a kickoff time, a projected winner — lands on
+  a different match-up if the bracket changes size. The admin API refuses a
+  save that changes a class's slot count for exactly that reason.
+- **A pin is invisible to readers and must not be invisible to you.** A region
+  with `order` set stops following the season until someone clears it, and by
+  request nothing marks it on the public page. So the admin marks it, shows
+  what the season would have computed, and counts them in the header. The
+  importer deliberately does *not* pin by default: turning every disagreement
+  into a pin at import time would start the season with dozens of them, none
+  deliberate.
 - **A postseason ban voids a region schedule for both sides.** The association
   bars a program from championship play and its region games stop counting for
   anyone: it finishes 0-0 in region, its opponents take an overall result and

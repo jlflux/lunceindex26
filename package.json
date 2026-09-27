@@ -31,7 +31,9 @@
     "test:playoffs": "tsx scripts/test-playoffs.ts",
     "calibrate:odds": "tsx scripts/calibrate-odds.ts",
     "test:tiebreak": "tsx scripts/test-tiebreak.ts",
-    "test:ineligible": "tsx scripts/test-ineligible.ts"
+    "test:ineligible": "tsx scripts/test-ineligible.ts",
+    "test:bracket": "tsx scripts/test-bracket.ts",
+    "import:bracket": "tsx scripts/import-bracket.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

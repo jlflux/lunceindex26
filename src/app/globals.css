@@ -43,6 +43,11 @@
      through an unfilled middle. Deliberately NOT the green used for ratings —
      a rating is a measurement and an odds cell is a forecast, and giving them
      the same colour invites reading one as the other. */
+  /* Bracket geometry. Not colours, so they do not vary by theme — they are
+     here rather than in the component because the connector overlay measures
+     against them and has to agree. */
+  --bkt-col: 224px;
+  --bkt-gap: 42px;
   --odds-hi: 96 165 250;
   --odds-lo: 244 96 112;
 
@@ -500,4 +505,43 @@
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* The bracketology explainer is authored as HTML in the admin, so its markup
+   carries no classes and has to be styled by tag. Scoped to one wrapper so it
+   cannot reach anything else on the site. */
+.prose-bracket h2 {
+  margin-top: 1.4em;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: rgb(var(--text));
+}
+.prose-bracket h2:first-child { margin-top: 0; }
+.prose-bracket h3 {
+  margin-top: 1.2em;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: rgb(var(--text));
+}
+.prose-bracket ul,
+.prose-bracket ol { padding-left: 1.25rem; }
+.prose-bracket ul { list-style: disc; }
+.prose-bracket ol { list-style: decimal; }
+.prose-bracket li { margin: 0.25rem 0; }
+.prose-bracket a {
+  color: rgb(var(--brand));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-bracket strong, .prose-bracket b { color: rgb(var(--text)); font-weight: 650; }
+.prose-bracket blockquote {
+  border-left: 3px solid rgb(var(--border-strong));
+  padding-left: 0.875rem;
+  font-style: italic;
+}
+.prose-bracket hr {
+  border: 0;
+  border-top: 1px solid rgb(var(--border));
+  margin: 1.25em 0;
 }

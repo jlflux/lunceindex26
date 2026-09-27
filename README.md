@@ -17,7 +17,9 @@ Run `supabase/schema.sql` in your Supabase project's SQL editor. It creates the
 tables, the row-level security policies (public reads, service-role writes) and
 the `updated_at` triggers.
 
-Then run everything in `supabase/migrations/` in order. Each one is
+Then run everything in `supabase/migrations/` in order, and
+`supabase/bracket_seed.sql` if you want the brackets carried over from the old
+bracketology site. Each one is
 schema-qualified, idempotent and safe to re-run, and each reports what it did
 rather than succeeding silently. They are not folded into `schema.sql`, so a
 database that has only had `schema.sql` run against it is missing forfeits
@@ -162,6 +164,7 @@ npm run test:tiebreak     # the AHSAA tie-breaking procedure, (a) through (q)
 npm run test:ineligible   # postseason bans: what they void, and what they must not
 npm run test:bracket      # bracket resolution, projections, and the explainer sanitiser
 npm run import:bracket    # brings the old bracketology site's data across
+npm run bracket:sql       # the same, emitted as SQL to paste — no terminal needed
 npm run calibrate:odds    # refits the win-probability curve against the 2025 season
 npm run typecheck
 ```
@@ -278,6 +281,15 @@ than an error. `PROJECT.md` covers the reasoning.
   is .667 one way and .583 the other, which puts it either side of a 3-2 team.
   Alabama settles games in overtime, so in practice this guards against a 0-0
   entered by mistake, but standings, region order and the odds all read it.
+- **There are two rating engines, and a field added to one is not on the
+  other.** `computeBoard` (`src/lib/board.ts:44`) picks between
+  `engine.ts` and `engine-twoway.ts` on `config.model`, so a row field set by
+  only one of them is present or absent depending on a setting. That is how
+  `postseason_ineligible` shipped invisible for a release: it was added to the
+  classic engine, the live config is two-way, and every publish rebuilt the
+  snapshot with the ban stripped. `npm run test:ineligible` now runs both
+  engines and asserts shape parity between their rows — add a field to one and
+  it fails.
 - **The bracket stores places, not teams.** A slot is `{region: 4, place: 2}`
   and who that is gets resolved at render time from the standings. That late
   binding is the whole design: re-seed a region and every slot follows with

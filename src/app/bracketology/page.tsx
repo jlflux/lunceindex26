@@ -117,7 +117,7 @@ export default async function BracketologyPage() {
         <EmptyState
           icon="trophy"
           title="No bracket yet"
-          body="Nothing has been laid out. Import the bracket data, or build one in the admin."
+          body="Nothing has been laid out. Load supabase/bracket_seed.sql to bring the old site's brackets across, or start one from the standard shape under Admin → Bracketology → Bracket."
         />
       )}
     </AppShell>

@@ -288,6 +288,17 @@ export function computeTwoWay(
       wins: a.w,
       losses: a.l,
       forfeits: a.ff,
+      // Carried, never consumed here. A postseason ban is a statement about
+      // the bracket; the rating is a statement about the football, and the two
+      // do not meet. See src/lib/eligibility.ts.
+      //
+      // This is the second engine. `computeBoard` picks between them on
+      // `config.model`, so a field that only one of them sets is a field the
+      // published board has or lacks depending on a setting — which is how
+      // these two went missing for a release. `test:ineligible` now runs both
+      // and compares their shapes.
+      postseason_ineligible: t.postseason_ineligible === true,
+      postseason_note: t.postseason_note ?? null,
       rating: netOf(t.name),
       massey: netOf(t.name),
       sos: a.g ? mean(a.opps.map((n) => netOf(nameOf(n)))) : 0,

@@ -40,6 +40,7 @@ import {
 import { buildTree, placesFor, regionKey, seededRegions } from "../src/lib/bracket";
 import { computeBoard } from "../src/lib/board";
 import { buildIndex, matchTeam } from "../src/lib/names";
+import { readOldExport, type OldFile } from "./lib/bracket-source";
 import {
   CLS_FILTER_ORDER,
   type Classification,
@@ -81,32 +82,6 @@ const PREVIEW = value("preview") ?? (flag("preview") ? "scripts/out/preview.json
  * before the decision — and a region can always be re-pinned by hand.
  */
 const PIN = flag("pin-differences");
-
-/** The old file's shape, as loosely as we need to read it. */
-type OldTeam = { name?: string; status?: string };
-type OldRegion = { note?: string; teams?: OldTeam[] };
-type OldClass = {
-  regions?: Record<string, OldRegion>;
-  bracket?: {
-    alignment?: (string | number)[];
-    slots?: ({ region?: string | number; place?: number } | null)[];
-    results?: Record<string, Record<string, unknown>>;
-    projected?: Record<string, string>;
-  };
-};
-type OldFile = {
-  meta?: { season?: string };
-  newsNote?: string;
-  aboutHtml?: string;
-  aboutBanner?: { enabled?: boolean; text?: string };
-  showProjections?: boolean | string;
-  classifications?: Record<string, OldClass>;
-};
-
-const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
-/** The old admin wrote "True" as a string more than once. */
-const bool = (v: unknown): boolean =>
-  v === true || (typeof v === "string" && v.toLowerCase() === "true");
 
 async function main() {
   console.log(`\nReading ${SOURCE}`);
@@ -152,15 +127,6 @@ async function main() {
   }
   console.log(`  ${roster.length} teams, ${games.length} games`);
 
-  const state: BracketState = emptyBracketState(str(old.meta?.season) || "2026");
-  state.newsNote = str(old.newsNote);
-  state.aboutHtml = typeof old.aboutHtml === "string" ? old.aboutHtml : "";
-  state.aboutBanner = {
-    enabled: bool(old.aboutBanner?.enabled),
-    text: str(old.aboutBanner?.text),
-  };
-  state.showProjections = bool(old.showProjections);
-
   // Names that need the alias resolver, reported so the mapping is visible
   // rather than silent.
   const renamed: string[] = [];
@@ -182,97 +148,13 @@ async function main() {
     return null;
   };
 
-  const handOrder = new Map<string, string[]>();
-  let notes = 0;
+  // The reshaping itself lives in scripts/lib/bracket-source.ts, shared with
+  // make-bracket-sql.ts. Two copies of "what carries over" would be two
+  // chances to disagree about it.
+  const read = readOldExport(old, resolve);
+  const { state, handOrder } = read;
+  const { notes, statuses, projections, editorials, droppedEmpty } = read;
   let pins = 0;
-  let statuses = 0;
-  let projections = 0;
-  let editorials = 0;
-  let droppedEmpty = 0;
-
-  for (const cls of CLS_FILTER_ORDER) {
-    const oc = old.classifications?.[cls];
-    if (!oc) continue;
-
-    const slots: Slot[] = (oc.bracket?.slots ?? []).map((s) =>
-      s && s.region !== undefined && s.place !== undefined
-        ? { region: Number(s.region), place: Number(s.place) }
-        : null,
-    );
-
-    // The old file materialised an empty {} for every game merely by opening
-    // a tab — 104 of 216 of them. They say nothing, so they are not carried.
-    const results: Record<string, GameEditorial> = {};
-    for (const [id, raw] of Object.entries(oc.bracket?.results ?? {})) {
-      const e: GameEditorial = {};
-      if (raw.home === "top" || raw.home === "bottom") e.home = raw.home;
-      if (str(raw.date)) e.date = str(raw.date);
-      if (str(raw.time)) e.time = str(raw.time);
-      if (str(raw.location)) e.location = str(raw.location);
-      if (str(raw.note)) e.note = str(raw.note);
-      if (Object.keys(e).length === 0) {
-        droppedEmpty++;
-        continue;
-      }
-      results[id] = e;
-      editorials++;
-    }
-
-    const projected: Record<string, "top" | "bottom"> = {};
-    for (const [id, side] of Object.entries(oc.bracket?.projected ?? {})) {
-      if (side === "top" || side === "bottom") {
-        projected[id] = side;
-        projections++;
-      }
-    }
-
-    const regions: Record<string, RegionState> = {};
-    for (const [rid, or_] of Object.entries(oc.regions ?? {})) {
-      const rs: RegionState = { note: str(or_.note) };
-      if (rs.note) notes++;
-
-      // In the old site the drag order WAS the seeding, so every region
-      // carries a hand-made order. Importing all of them as pins would leave
-      // nothing following the math, which is the opposite of the point;
-      // importing none would throw away deliberate decisions. So the order is
-      // kept only where it disagrees with what the standings compute — which
-      // is exactly where a decision was made — and the rest is left to follow
-      // the season. `handOrder` is compared against the computed order below,
-      // once the roster is loaded.
-      const order: string[] = [];
-      for (const t of or_.teams ?? []) {
-        const name = resolve(str(t.name));
-        if (name && !order.includes(name)) order.push(name);
-      }
-      if (order.length) handOrder.set(`${cls}:${rid}`, order);
-
-      // Status is carried only where it was moved off the default. Everything
-      // else now follows the odds, which know what "clinched" means.
-      const status: Record<string, StatusKey> = {};
-      for (const t of or_.teams ?? []) {
-        const raw = str(t.name);
-        const key = str(t.status) as StatusKey;
-        if (!raw || !key || key === "medium") continue;
-        const name = resolve(raw);
-        if (!name) continue;
-        status[name] = key;
-        statuses++;
-      }
-      if (Object.keys(status).length) rs.status = status;
-
-      if (rs.note || rs.status) regions[rid] = rs;
-    }
-
-    const cs: ClassState = {
-      alignment: (oc.bracket?.alignment ?? []).map(Number).filter(Number.isFinite),
-      slots,
-      results,
-      projected,
-      regions,
-    };
-    state.classes[cls as Classification] = cs;
-  }
-
   // ---- keep the hand-seeding that disagrees with the math ----------------
   const computed = seededRegions(roster, games, undefined, state);
   const differing: string[] = [];
@@ -281,7 +163,7 @@ async function main() {
     const auto = (computed.get(regionKey(cls as Classification, Number(rid))) ?? [])
       .filter((t) => !t.ineligible)
       .map((t) => t.name);
-    const mine = order.filter((n) => auto.includes(n));
+    const mine = order.filter((n: string) => auto.includes(n));
     if (mine.length !== auto.length) continue;
     if (mine.join("|") === auto.join("|")) continue; // the math already agrees
     const cs = state.classes[cls as Classification];

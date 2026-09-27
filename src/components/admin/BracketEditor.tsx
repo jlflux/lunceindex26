@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import BracketView from "@/components/bracket/BracketView";
-import type { ResolvedBracket, SeededTeam } from "@/lib/bracket";
+import { defaultSlots, type ResolvedBracket, type SeededTeam } from "@/lib/bracket";
 import {
   STATUS_KEYS,
   STATUS_LABELS,
@@ -301,6 +301,14 @@ function RegionEditor({
   const differs =
     pinned && stored?.order?.join("|") !== computedOrder.slice(0, stored?.order?.length).join("|");
 
+  /**
+   * Dragging a team is the act of overriding, so it pins on the first drag
+   * rather than asking first.
+   *
+   * This used to require clicking "Pin order" before a row would move at all,
+   * which is not a sequence anyone would guess — the rows simply looked
+   * broken. The button is still there to undo it.
+   */
   function move(from: number, to: number) {
     const names = list.map((t) => t.name);
     const [x] = names.splice(from, 1);
@@ -328,32 +336,32 @@ function RegionEditor({
             pinned
           </span>
         )}
-        <button
-          className="btn ml-auto !px-2 !py-0.5 !text-[11px]"
-          onClick={() =>
-            onChange((r) =>
-              pinned
-                ? { note: r.note, status: r.status }
-                : { ...r, order: list.map((t) => t.name) },
-            )
-          }
-          title={
-            pinned
-              ? "Drop the pin and let this region follow the season again"
-              : "Freeze this order so results stop changing it"
-          }
-        >
-          {pinned ? "Unpin" : "Pin order"}
-        </button>
+        {pinned ? (
+          <button
+            className="btn ml-auto !px-2 !py-0.5 !text-[11px]"
+            onClick={() => onChange((r) => ({ note: r.note, status: r.status }))}
+            title="Drop the pin and let this region follow the season again"
+          >
+            Follow the season
+          </button>
+        ) : (
+          <span
+            className="ml-auto text-[10.5px]"
+            style={{ color: "rgb(var(--text-faint))" }}
+            title="Drag a team to override the computed order"
+          >
+            drag to reorder
+          </span>
+        )}
       </div>
 
       <ul>
         {list.map((t, i) => (
           <li
             key={t.slug}
-            draggable={pinned}
+            draggable
             onDragStart={() => setDrag(i)}
-            onDragOver={(e) => pinned && e.preventDefault()}
+            onDragOver={(e) => e.preventDefault()}
             onDrop={() => {
               if (drag !== null && drag !== i) move(drag, i);
               setDrag(null);
@@ -362,7 +370,7 @@ function RegionEditor({
             style={{
               borderColor: "rgb(var(--border))",
               opacity: t.ineligible ? 0.55 : 1,
-              cursor: pinned ? "grab" : undefined,
+              cursor: "grab",
             }}
           >
             <span
@@ -371,11 +379,13 @@ function RegionEditor({
             >
               {t.ineligible ? "—" : t.place}
             </span>
-            {pinned && (
-              <span className="shrink-0 text-[11px]" style={{ color: "rgb(var(--text-faint))" }}>
-                ⠿
-              </span>
-            )}
+            <span
+              className="shrink-0 text-[11px]"
+              style={{ color: "rgb(var(--text-faint))" }}
+              aria-hidden
+            >
+              ⠿
+            </span>
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
               {t.name}
             </span>
@@ -483,13 +493,37 @@ function SlotEditor({
 
   return (
     <div className="space-y-4">
-      <p className="text-xs leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
-        Drag a slot onto another to swap them — including onto a bye, which
-        moves the bye. The bracket holds places, not teams, so a seed keeps
-        pointing at whoever holds that place as the season moves. Click a
-        match-up below to set its date, time, location and home side.
-      </p>
+      {slots.length === 0 ? (
+        <div className="card px-4 py-10 text-center">
+          <p className="mb-1 text-sm font-semibold">
+            Class {cls} has no bracket yet.
+          </p>
+          <p
+            className="mx-auto mb-4 max-w-[52ch] text-xs leading-relaxed"
+            style={{ color: "rgb(var(--text-muted))" }}
+          >
+            Start from the shape the association uses for this classification
+            &mdash; {regions.length} region{regions.length === 1 ? "" : "s"},
+            cross-seeded, with byes where the field is short of a power of two.
+            Then drag slots around until it matches what you want.
+          </p>
+          <button
+            className="btn btn-primary"
+            onClick={() => onSlots(defaultSlots(cls, regions.length))}
+          >
+            Start from the standard shape
+          </button>
+        </div>
+      ) : (
+        <p className="text-xs leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
+          Drag a slot onto another to swap them — including onto a bye, which
+          moves the bye. The bracket holds places, not teams, so a seed keeps
+          pointing at whoever holds that place as the season moves. Click a
+          match-up below to set its date, time, location and home side.
+        </p>
+      )}
 
+      {slots.length > 0 && (
       <div className="card table-scroll p-3">
         <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))" }}>
           {slots.map((s, i) => (
@@ -525,6 +559,7 @@ function SlotEditor({
           ))}
         </div>
       </div>
+      )}
 
       {bracket && (
         <div className="card p-3">

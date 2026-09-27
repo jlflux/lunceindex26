@@ -88,6 +88,8 @@ export interface Team {
   postseason_ineligible?: boolean;
   /** Why and when, for the team page. Documentation; nothing reads it. */
   postseason_note?: string | null;
+  /** Maintained by the touch_updated_at trigger. Used to spot unpublished edits. */
+  updated_at?: string;
 }
 
 export interface Game {

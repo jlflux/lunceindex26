@@ -156,6 +156,29 @@ export async function loadBracket(admin = false): Promise<BracketState> {
   }
 }
 
+/**
+ * When the published board was last rebuilt.
+ *
+ * A roster edit — a postseason ban, a region change, a reclassification — does
+ * not reach the public site until the next publish, and for a ban that is
+ * correct rather than incidental: it changes region records and the odds, not
+ * just a badge, so it genuinely needs the recompute. What was missing is any
+ * way to tell. The dashboard compares this against `teams.updated_at`.
+ */
+export async function lastPublishedAt(): Promise<string | null> {
+  try {
+    const { data, error } = await serviceClient()
+      .from("ratings_snapshot")
+      .select("generated")
+      .eq("id", 1)
+      .maybeSingle();
+    if (error) return null;
+    return (data?.generated as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function saveBracket(state: BracketState): Promise<void> {
   const { error } = await serviceClient()
     .from("bracket")

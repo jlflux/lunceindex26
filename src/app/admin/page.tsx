@@ -4,18 +4,19 @@ import { AdminHeader } from "@/components/admin/AdminShell";
 import PublishButton from "@/components/admin/PublishButton";
 import Icon from "@/components/Icon";
 import StatCard from "@/components/StatCard";
-import { loadConfig, loadGames, loadTeams } from "@/lib/data";
+import { lastPublishedAt, loadConfig, loadGames, loadTeams } from "@/lib/data";
 import { isPlayed } from "@/lib/engine";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
-  let teams, games, config;
+  let teams, games, config, publishedAt;
   try {
-    [teams, games, config] = await Promise.all([
+    [teams, games, config, publishedAt] = await Promise.all([
       loadTeams(true),
       loadGames(true),
       loadConfig(true),
+      lastPublishedAt(),
     ]);
   } catch (e) {
     return <AdminError error={e instanceof Error ? e.message : String(e)} />;
@@ -25,6 +26,15 @@ export default async function AdminDashboard() {
   const maxWeek = played.reduce((m, g) => Math.max(m, g.week ?? 0), 0);
   const priorBlend = Math.max(0, 1 - maxWeek / 4);
   const withPriors = teams.filter((t) => t.preseason_prior !== null).length;
+
+  // Roster edits that have not reached the public site yet. Teams only —
+  // games change all week, so the same check over games would never be off and
+  // would stop meaning anything.
+  const since = publishedAt ? Date.parse(publishedAt) : NaN;
+  const stale = Number.isFinite(since)
+    ? teams.filter((t) => t.updated_at && Date.parse(t.updated_at) > since)
+    : [];
+  const barredUnpublished = stale.filter((t) => t.postseason_ineligible);
 
   return (
     <div className="space-y-7">
@@ -79,6 +89,48 @@ export default async function AdminDashboard() {
               Teams
             </Link>{" "}
             page to start the season where last season finished.
+          </p>
+        </div>
+      )}
+
+      {stale.length > 0 && (
+        <div
+          className="card p-4"
+          style={{ borderColor: "rgb(var(--warn) / 0.45)" }}
+        >
+          <h2 className="flex items-center gap-2 text-sm font-bold">
+            <span style={{ color: "rgb(var(--warn))" }}>
+              <Icon name="info" size={15} />
+            </span>
+            {stale.length} team{stale.length === 1 ? "" : "s"} edited since the
+            last publish
+          </h2>
+          <p
+            className="mt-1.5 text-sm leading-relaxed"
+            style={{ color: "rgb(var(--text-muted))" }}
+          >
+            {stale
+              .slice(0, 6)
+              .map((t) => t.name)
+              .join(", ")}
+            {stale.length > 6 ? `, and ${stale.length - 6} more` : ""}.{" "}
+            {barredUnpublished.length > 0 ? (
+              <>
+                That includes{" "}
+                {barredUnpublished.length === 1
+                  ? "a team barred"
+                  : `${barredUnpublished.length} teams barred`}{" "}
+                from the postseason. A ban changes region records and the
+                playoff odds, not just a badge, so it only takes effect once
+                the board is rebuilt.{" "}
+              </>
+            ) : (
+              <>
+                Roster changes reach the public site through the board, so they
+                only take effect once it is rebuilt.{" "}
+              </>
+            )}
+            Publish below.
           </p>
         </div>
       )}

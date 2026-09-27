@@ -33,7 +33,8 @@
     "test:tiebreak": "tsx scripts/test-tiebreak.ts",
     "test:ineligible": "tsx scripts/test-ineligible.ts",
     "test:bracket": "tsx scripts/test-bracket.ts",
-    "import:bracket": "tsx scripts/import-bracket.ts"
+    "import:bracket": "tsx scripts/import-bracket.ts",
+    "bracket:sql": "tsx scripts/make-bracket-sql.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

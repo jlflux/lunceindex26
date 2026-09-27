@@ -18,6 +18,7 @@
  *
  * Usage: npx tsx scripts/test-ineligible.ts
  */
+import { computeBoard } from "../src/lib/board";
 import { computeRatings } from "../src/lib/engine";
 import {
   countsForRegion,
@@ -86,6 +87,7 @@ const team = (
   preseason_prior: prior,
   prior_source: null,
   postseason_ineligible: banned,
+  postseason_note: banned ? "Eligibility ruling" : null,
 });
 
 /** A rating row good enough for the season helpers. */
@@ -367,6 +369,70 @@ console.log("\n6. A tie is half a game won — in the formula that actually runs
   );
 
   check("no games played is neutral, not a loss", standingPct({ wins: 0, losses: 0, ties: 0 }) === 0.5);
+}
+
+console.log("\n7. Both engines, because there are two and only one was taught");
+{
+  // The bug this section exists for: `computeBoard` picks between two engines
+  // on `config.model`, the flag was added to one of them, and the live config
+  // selects the other. Every publish rebuilt the snapshot with the ban stripped
+  // out, so the whole feature was invisible and republishing could not help.
+  //
+  // Testing the engine that was patched proves nothing about the one that was
+  // not. So both run here, and the second check is the general form: whatever
+  // fields the classic row carries, the two-way row carries too. That is what
+  // catches the next field added to one and forgotten in the other.
+  const teams = [
+    team("Barred", "6A", 1, 5, true),
+    team("Alpha", "6A", 1),
+    team("Beta", "6A", 1),
+    team("Gamma", "6A", 1),
+  ];
+  const games = [
+    g("Barred", "Alpha", 40, 0, 1),
+    g("Alpha", "Beta", 21, 14, 2),
+    g("Beta", "Gamma", 20, 7, 3),
+    g("Alpha", "Gamma", 28, 7, 4),
+  ];
+
+  for (const model of ["classic", "twoway"] as const) {
+    const rows = computeBoard(teams, games, { model }).ratings;
+    const barred = rows.find((t) => t.name === "Barred");
+    check(
+      `the ${model} engine carries the ban into the published row`,
+      barred?.postseason_ineligible === true,
+      JSON.stringify(barred?.postseason_ineligible),
+    );
+    check(
+      `the ${model} engine carries the reason with it`,
+      barred?.postseason_note === "Eligibility ruling",
+      JSON.stringify(barred?.postseason_note),
+    );
+    check(
+      `the ${model} engine leaves everyone else alone`,
+      rows.filter((t) => t.postseason_ineligible).length === 1,
+    );
+  }
+
+  // Shape parity. The two-way engine legitimately carries three extra fields;
+  // it must not be missing any the classic one has.
+  const TWOWAY_ONLY = new Set(["adj_o", "adj_d", "sor"]);
+  const classic = computeBoard(teams, games, { model: "classic" }).ratings[0];
+  const twoway = computeBoard(teams, games, { model: "twoway" }).ratings[0];
+  const missing = Object.keys(classic).filter((k) => !(k in twoway));
+  const extra = Object.keys(twoway).filter(
+    (k) => !(k in classic) && !TWOWAY_ONLY.has(k),
+  );
+  check(
+    "the two-way row is missing nothing the classic row has",
+    missing.length === 0,
+    missing.join(", "),
+  );
+  check(
+    "and carries nothing unaccounted for",
+    extra.length === 0,
+    extra.join(", "),
+  );
 }
 
 console.log(

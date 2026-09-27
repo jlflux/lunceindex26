@@ -13,7 +13,7 @@ import {
   emptyBracketState,
   type BracketState,
 } from "../src/lib/bracket-types";
-import { computeRatings } from "../src/lib/engine";
+import { computeBoard } from "../src/lib/board";
 import { computeOdds, WIN_SCALE } from "../src/lib/playoffs";
 import { parseCsvText } from "../src/lib/csv";
 import { loadRosterCsv } from "../src/lib/roster-csv";
@@ -123,6 +123,11 @@ function inventSeason(teams: Team[], existing: Game[]): Game[] {
 async function main() {
   const withResults = process.argv.includes("--played");
   const fullSeason = process.argv.includes("--season");
+  // --twoway builds the preview with the other rating engine, which is what
+  // the live site runs. The two engines have gone out of step once already —
+  // the postseason flag reached only one of them — so being able to render
+  // against either is worth a flag.
+  const twoway = process.argv.includes("--twoway");
 
   const teams = loadRosterCsv("data/AHSAA_Class_List_2026.csv");
 
@@ -194,10 +199,14 @@ async function main() {
     });
   }
 
-  const result = computeRatings(teams, games, DEFAULT_CONFIG);
+  const cfg = twoway
+    ? { ...DEFAULT_CONFIG, model: "twoway" as const }
+    : DEFAULT_CONFIG;
+  const result = computeBoard(teams, games, cfg);
+  console.log(`Engine: ${twoway ? "two-way" : "classic"}`);
   const payload: RatingsPayload = {
     generated: new Date().toISOString(),
-    config: DEFAULT_CONFIG,
+    config: cfg,
     ratings: result.ratings,
     rpi: result.rpi,
     games,

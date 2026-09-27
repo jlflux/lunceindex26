@@ -22,10 +22,11 @@ import {
   resolveBracket,
   seedLabel,
   seededRegions,
-  statusFromOdds,
+  defaultStatus,
   type SeededTeam,
 } from "../src/lib/bracket";
 import { emptyBracketState, type BracketState } from "../src/lib/bracket-types";
+import { computeOdds } from "../src/lib/playoffs";
 import {
   PROSE_COLOURS,
   renderRichText,
@@ -321,16 +322,133 @@ console.log("\n8. A seed nobody holds is reported rather than drawn");
     !b.rounds[0][0].bottom.bye);
 }
 
-console.log("\n9. Status");
+console.log("\n9. The status pill is an opinion, not a reading of the odds");
 {
-  const s = (o: Partial<Parameters<typeof statusFromOdds>[0]>) =>
-    statusFromOdds({ clinched: false, eliminated: false, ineligible: false, playoff: 0, ...o });
-  check("barred outranks everything", s({ ineligible: true, clinched: true }) === "ineligible");
-  check("clinched is a proof, not a probability", s({ clinched: true, playoff: 1 }) === "clinched");
-  check("eliminated reads out", s({ eliminated: true }) === "out");
-  check("high at three quarters", s({ playoff: 0.75 }) === "high");
-  check("medium at four tenths", s({ playoff: 0.4 }) === "medium");
-  check("low below it", s({ playoff: 0.39 }) === "low");
+  // It used to map the chance of *qualifying* onto High/Medium/Low, which is
+  // the wrong quantity in both directions — in a class where everyone goes
+  // through, a side certain to finish last is "High" for the same reason as
+  // the side certain to finish first. And it set "Clinched" from clinching a
+  // *berth*, so every team in such a class read Clinched from the opening
+  // whistle. Both of those are what these check against.
+  const d = (o: Partial<Parameters<typeof defaultStatus>[0]>) =>
+    defaultStatus({ eliminated: false, ineligible: false, ...o });
+
+  check("the default is medium", d({}) === "medium");
+  check("barred outranks everything", d({ ineligible: true, eliminated: true }) === "ineligible");
+  check("mathematically out is a fact, so it is set", d({ eliminated: true }) === "out");
+
+  const ratings = world();
+  const games = roundRobin();
+  const odds = computeOdds(ratings, games, { trials: 200, seed: 3, qualifiers: 4 });
+  const seeded = seededRegions(ratings, games, odds, emptyBracketState());
+  const r1 = seeded.get(regionKey("5A", 1))!;
+
+  check(
+    "a region where everyone qualifies is all medium, not all clinched",
+    r1.every((t) => t.status === "medium"),
+    JSON.stringify(r1.map((t) => `${t.name}:${t.status}`)),
+  );
+  check(
+    "even for a team the simulation is certain about",
+    r1.filter((t) => t.playoff === 1).every((t) => t.status === "medium"),
+  );
+  check("no team is given high or low by the code", !r1.some((t) => t.status === "high" || t.status === "low"));
+
+  // An override beats the lot, including the automatic Out.
+  const over = emptyBracketState();
+  over.classes["5A"] = {
+    ...base_(),
+    regions: { "1": { note: "", status: { R1T1: "clinched", R1T4: "high" } } },
+  };
+  const o1 = seededRegions(ratings, games, odds, over).get(regionKey("5A", 1))!;
+  check("an override wins", o1.find((t) => t.name === "R1T1")?.status === "clinched");
+  check("including one the code would not have chosen", o1.find((t) => t.name === "R1T4")?.status === "high");
+}
+
+console.log("\n9b. A locked place is proved, and proved conservatively");
+{
+  const ratings = world();
+  const played = roundRobin();
+  const odds = computeOdds(ratings, played, { trials: 200, seed: 4, qualifiers: 4 });
+  const seeded = seededRegions(ratings, played, odds, emptyBracketState());
+  const r1 = seeded.get(regionKey("5A", 1))!;
+
+  check(
+    "a region with no games left has every place settled",
+    r1.every((t) => t.place_locked),
+    JSON.stringify(r1.map((t) => `${t.name}:${t.place_locked}`)),
+  );
+  check(
+    "and the range collapses onto the place actually held",
+    r1.every((t) => t.best_place === t.place && t.worst_place === t.place),
+    JSON.stringify(r1.map((t) => `${t.name}:${t.best_place}-${t.worst_place}@${t.place}`)),
+  );
+
+  // Now the realistic wide-open case: the schedule is loaded, nothing played.
+  const scheduled = played.map((x) => ({ ...x, s1: null, s2: null }));
+  const none = computeOdds(ratings, scheduled, { trials: 200, seed: 5, qualifiers: 4 });
+  const open = seededRegions(ratings, scheduled, none, emptyBracketState()).get(
+    regionKey("5A", 1),
+  )!;
+  check(
+    "with everything still to play, nobody is settled",
+    open.every((t) => !t.place_locked),
+    JSON.stringify(open.map((t) => `${t.name}:${t.place_locked}`)),
+  );
+  check(
+    "and every place is still reachable",
+    open.every((t) => t.best_place === 1 && t.worst_place === open.length),
+    JSON.stringify(open.map((t) => `${t.best_place}-${t.worst_place}`)),
+  );
+  check(
+    "the place a team holds is always inside its own range",
+    [...r1, ...open].every((t) => t.best_place <= t.place && t.place <= t.worst_place),
+  );
+
+  // The range is a bound on win totals; the place comes from the tiebreak,
+  // which counts a tie as half a win. Those order teams differently, and a
+  // team sitting 2nd was being told it could finish "3rd to 3rd".
+  const drawn = [
+    g("R1T1", "R1T2", 14, 14),
+    g("R1T1", "R1T3", 21, 7),
+    g("R1T2", "R1T3", 21, 7),
+    g("R1T2", "R1T4", 14, 14),
+    g("R1T3", "R1T4", 21, 7),
+    g("R1T1", "R1T4", 21, 7),
+  ];
+  const tied = seededRegions(
+    ratings,
+    drawn,
+    computeOdds(ratings, drawn, { trials: 200, seed: 8, qualifiers: 4 }),
+    emptyBracketState(),
+  ).get(regionKey("5A", 1))!;
+  check(
+    "with ties in the table the range still contains the place",
+    tied.every((t) => t.best_place <= t.place && t.place <= t.worst_place),
+    JSON.stringify(tied.map((t) => `${t.name}@${t.place}:${t.best_place}-${t.worst_place}`)),
+  );
+  check(
+    "and a settled place is reported as its own range, not a span",
+    tied.filter((t) => t.place_locked).every((t) =>
+      t.best_place === t.place && t.worst_place === t.place),
+    JSON.stringify(tied.map((t) => `${t.name}:${t.place_locked}:${t.best_place}-${t.worst_place}`)),
+  );
+
+  // A region with no region games at all is unknown, not decided — the two
+  // are indistinguishable from "nothing left to play" alone.
+  const empty = computeOdds(ratings, [], { trials: 50, seed: 6, qualifiers: 4 });
+  const blank = seededRegions(ratings, [], empty, emptyBracketState()).get(
+    regionKey("5A", 1),
+  )!;
+  check(
+    "a region that has not played is not reported as settled",
+    blank.every((t) => !t.place_locked),
+    JSON.stringify(blank.map((t) => `${t.name}:${t.place_locked}`)),
+  );
+  check(
+    "and the seed share is the chance of the place it holds",
+    r1.every((t) => t.seed_odds === null || (t.seed_odds >= 0 && t.seed_odds <= 1)),
+  );
 }
 
 console.log("\n10. The default shapes");

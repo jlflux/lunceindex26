@@ -277,6 +277,24 @@ export default function BracketEditor({
       {tab === "settings" && <Settings state={state} setState={setState} />}
 
       {tab === "seeding" && block && (
+        <>
+        <p
+          className="text-xs leading-relaxed"
+          style={{ color: "rgb(var(--text-faint))" }}
+        >
+          The status is your confidence about{" "}
+          <em>where a team finishes</em>, not how good it is &mdash; a side
+          certain to finish last is High for the same reason as one certain to
+          finish first, and three teams who could land in any order are Medium
+          even if all three are going through.{" "}
+          <strong style={{ color: "rgb(var(--text-muted))" }}>Clinched</strong>{" "}
+          means that exact place is locked, not that they are in the bracket; a{" "}
+          <strong style={{ color: "rgb(var(--odds-hi))" }}>locked</strong> chip
+          appears once the arithmetic proves it. Everything is Medium until you
+          say otherwise, except a team that is mathematically out. The
+          percentages on the Playoff Odds board are a separate thing and make no
+          claim about any of this.
+        </p>
         <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
           {liveRegions.map((r) => (
             <RegionEditor
@@ -288,6 +306,7 @@ export default function BracketEditor({
             />
           ))}
         </div>
+        </>
       )}
 
       {tab === "bracket" && block && (
@@ -453,6 +472,36 @@ function RegionEditor({
             <span className="shrink-0 text-[11px] tnum" style={{ color: "rgb(var(--text-faint))" }}>
               {t.ineligible ? "—" : `${t.region_w}-${t.region_l}`}
             </span>
+            {!t.ineligible && t.place_locked && stored?.status?.[t.name] !== "clinched" && (
+              <button
+                className="shrink-0 rounded px-1 py-0.5 text-[9.5px] font-bold uppercase"
+                style={{
+                  background: "rgb(var(--odds-hi) / 0.18)",
+                  color: "rgb(var(--odds-hi))",
+                }}
+                title="This finishing place is arithmetically settled — nobody left can pass them and they can pass nobody. Click to mark it Clinched."
+                onClick={() =>
+                  onChange((r) => ({
+                    ...r,
+                    status: { ...(r.status ?? {}), [t.name]: "clinched" },
+                  }))
+                }
+              >
+                locked
+              </button>
+            )}
+            {!t.ineligible &&
+              !t.place_locked &&
+              t.best_place > 0 &&
+              t.best_place !== t.worst_place && (
+                <span
+                  className="shrink-0 text-[10px] tnum"
+                  style={{ color: "rgb(var(--text-faint))" }}
+                  title="The range this team can still finish in, from the games left to play"
+                >
+                  {t.best_place}&ndash;{t.worst_place}
+                </span>
+              )}
             <select
               className="input !w-auto !px-1.5 !py-0.5 !text-[11px]"
               value={stored?.status?.[t.name] ?? ""}

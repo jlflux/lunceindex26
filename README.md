@@ -290,6 +290,26 @@ than an error. `PROJECT.md` covers the reasoning.
   snapshot with the ban stripped. `npm run test:ineligible` now runs both
   engines and asserts shape parity between their rows — add a field to one and
   it fails.
+- **The percentages and the status pill answer different questions.** The
+  percentages are arithmetic — ten thousand simulated seasons. The pill is the
+  author's confidence about *where a team finishes*, and it is not a goodness
+  scale: in a class where everyone qualifies, a side certain to finish last is
+  "High" for the same reason as one certain to finish first, and three teams
+  who could land in any order are all "Medium". "Clinched" there means that
+  exact place is locked, **not** that the team is in the bracket. `defaultStatus`
+  in `src/lib/bracket.ts` therefore returns a default and never a judgement:
+  Medium for everyone, bar a barred team and one that is mathematically out.
+  It used to map the chance of qualifying onto High/Medium/Low and set
+  Clinched from `TeamOdds.clinched`, which made every team in Class AA read
+  Clinched from the opening whistle.
+- **A locked place is proved from win bounds, and the place comes from the
+  tiebreak.** Those are different orderings — a tie is half a win in the
+  standings and a whole nothing in a win total — so the range one gives can
+  contradict the place the other gives. `placeRange` in `src/lib/bracket.ts`
+  reconciles them, and `regionSettled` in `playoffs.ts` additionally requires
+  that the region has actually played: "nothing left to play" is otherwise
+  indistinguishable from "no schedule loaded", and a class awaiting its
+  fixtures would report every place decided.
 - **The bracket stores places, not teams.** A slot is `{region: 4, place: 2}`
   and who that is gets resolved at render time from the standings. That late
   binding is the whole design: re-seed a region and every slot follows with

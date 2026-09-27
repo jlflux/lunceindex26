@@ -150,6 +150,22 @@ export interface TeamOdds {
   clinched: boolean;
   eliminated: boolean;
   /**
+   * The team's finishing place in its region is arithmetically settled —
+   * not merely its qualification. Distinct from `clinched`, which is only
+   * about reaching the bracket: in a class where every team qualifies, every
+   * team is clinched from the first whistle and none of them has a seed.
+   *
+   * Conservative on purpose. It is proved from win totals, and two teams
+   * level on wins are separated by the AHSAA tiebreak, which win totals know
+   * nothing about — so a genuinely settled place can go unreported, but an
+   * unsettled one can never be claimed. `regionSettled` covers the case the
+   * arithmetic alone would miss.
+   */
+  place_locked: boolean;
+  /** The best and worst this team can still finish, 1-based. */
+  best_place: number;
+  worst_place: number;
+  /**
    * Barred from championship play, so none of the figures above apply. Kept
    * distinct from `eliminated`: this team did not lose its way out, and its
    * region games counted for nobody in the first place.
@@ -523,10 +539,18 @@ export function computeOdds(
     // still not be called clinched on the last weekend of the season.
     const regionSettled = new Map<number, boolean>();
     for (let r = 1; r <= regions; r++) {
-      regionSettled.set(
-        r,
-        !(byRegion.get(r) ?? []).some((n) => (leftCount.get(n) ?? 0) > 0),
-      );
+      const names = byRegion.get(r) ?? [];
+      const nothingLeft = !names.some((n) => (leftCount.get(n) ?? 0) > 0);
+      // A region with no region games at all is not settled, it is unknown —
+      // and the two look identical from "nothing left to play". Without this,
+      // a class whose schedule has not been loaded reports every place as
+      // decided, on a table where every team is 0-0 and the order is whatever
+      // the tiebreak fell back to.
+      const anyGames = names.some((n) => {
+        const s = settled.get(n);
+        return (leftCount.get(n) ?? 0) > 0 || (s ? s.w + s.l + s.t > 0 : false);
+      });
+      regionSettled.set(r, anyGames && nothingLeft);
     }
 
     // 4. Proofs, separate from the simulation.
@@ -554,6 +578,9 @@ export function computeOdds(
           rounds: Array.from({ length: rounds }, () => 0),
           clinched: false,
           eliminated: false,
+          place_locked: false,
+          best_place: 0,
+          worst_place: 0,
           ineligible: true,
           settled: true,
         };
@@ -564,6 +591,10 @@ export function computeOdds(
       // Certain to finish below me: my worst beats their best.
       const below = rivals.filter((n) => bounds.get(n)!.max < mine.min).length;
       const done = regionSettled.get(t.region) === true;
+      // Only the rivals certain to be above me can be above me at my best;
+      // at my worst, everyone not certain to be below me is.
+      const best = above + 1;
+      const worst = rivals.length - below + 1;
       const share = madePlayoffs[i] / trials;
       const s = settled.get(t.name)!;
       return {
@@ -581,6 +612,13 @@ export function computeOdds(
         rounds: roundHits.map((a) => a[i] / trials),
         clinched: done ? share === 1 : rivals.length - below < qualifiers,
         eliminated: done ? share === 0 : above >= qualifiers,
+        // `done` is not redundant with `best === worst`: once the games are
+        // gone the tiebreak has decided, and the tiebreak is invisible to win
+        // bounds, so two teams level on wins would otherwise never be called
+        // settled even with nothing left to play.
+        place_locked: done || best === worst,
+        best_place: best,
+        worst_place: worst,
         ineligible: false,
         settled: done,
       };

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import BracketView from "./BracketView";
 import RegionPicture from "./RegionPicture";
@@ -131,16 +132,32 @@ export default function BracketBoard({
           </div>
         )
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {block.regions.map((r) => (
-            <RegionPicture
-              key={r.region}
-              region={r.region}
-              teams={r.teams}
-              note={r.note}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {block.regions.map((r) => (
+              <RegionPicture
+                key={r.region}
+                region={r.region}
+                teams={r.teams}
+                note={r.note}
+              />
+            ))}
+          </div>
+          <p
+            className="text-xs leading-relaxed"
+            style={{ color: "rgb(var(--text-faint))" }}
+          >
+            The status is a confidence call about <em>where</em> a team
+            finishes, not how good it is &mdash; a side certain to finish last
+            is &ldquo;High&rdquo; for the same reason as one certain to finish
+            first, and &ldquo;Clinched&rdquo; means that exact place is locked
+            rather than that the team is through. The percentages on the{" "}
+            <Link href="/odds" className="underline">
+              Playoff Odds
+            </Link>{" "}
+            board are a separate, purely arithmetic thing.
+          </p>
+        </>
       )}
 
       {tab === "bracket" && block.bracket?.unresolved.length ? (

@@ -136,6 +136,33 @@ export default function AboutPage() {
             </p>
           </Panel>
 
+          <Panel title="Odds and status are not the same thing">
+            <p>
+              The percentages on the Playoff Odds board are arithmetic: the
+              rest of the season played ten thousand times, and the share of
+              those seasons in which a thing happened. Nobody&rsquo;s opinion
+              is in them.
+            </p>
+            <p>
+              The coloured status on the Bracketology page is the opposite &mdash;
+              a judgement about <em>where a team will finish</em>. It is not a
+              ranking of how good a team is. In a classification where every
+              team reaches the bracket, a side certain to finish last is
+              &ldquo;High&rdquo; for exactly the same reason as the side
+              certain to finish first: there is high confidence about where it
+              lands. Three teams who could finish in any order among themselves
+              are all &ldquo;Medium&rdquo;, even when all three are going
+              through.
+            </p>
+            <p>
+              &ldquo;Clinched&rdquo; there means a team has locked up{" "}
+              <em>that particular place</em> &mdash; not that it has reached
+              the playoffs. The two can be far apart, and in a class where
+              everyone qualifies the second is true from the opening whistle
+              while the first may not be settled until the last night.
+            </p>
+          </Panel>
+
           <Panel title="Barred from the postseason">
             <p>
               The association sometimes rules a program out of championship

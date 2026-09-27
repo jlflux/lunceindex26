@@ -20,6 +20,38 @@ const TONE: Record<StatusKey, { bg: string; fg: string }> = {
   ineligible: { bg: "rgb(var(--warn-soft))", fg: "rgb(var(--warn))" },
 };
 
+/**
+ * What the pill means, and what the model separately makes of the same team.
+ *
+ * Both, and named as two different things. The pill is a person's confidence
+ * about where a team finishes; the percentages are what ten thousand
+ * simulated seasons made of its chances. They are allowed to disagree, and a
+ * reader should be able to see where they do — but the tooltip used to print
+ * only the percentage, which read as though it were the reason for the label.
+ *
+ * The seed share rather than the chance of qualifying, because the pill is
+ * about *where* a team finishes, and "87% to reach the playoffs" says nothing
+ * about whether it stays fourth.
+ */
+function statusTitle(t: SeededTeam): string {
+  const label = STATUS_LABELS[t.status];
+  if (t.ineligible) return `${label} — barred from the postseason.`;
+
+  const pct = (v: number) =>
+    `${(v * 100).toFixed(v > 0.005 && v < 0.995 ? 0 : 1)}%`;
+  const math: string[] = [];
+  if (t.playoff !== null) math.push(`${pct(t.playoff)} to qualify`);
+  if (t.seed_odds !== null) math.push(`${pct(t.seed_odds)} to hold this seed`);
+  if (t.place_locked) math.push("this place is already settled");
+  else if (t.best_place && t.worst_place && t.best_place !== t.worst_place) {
+    math.push(`can still finish ${t.best_place}\u2013${t.worst_place}`);
+  }
+
+  return math.length
+    ? `${label} — our confidence in where they finish. The model separately: ${math.join(", ")}.`
+    : `${label} — our confidence in where they finish.`;
+}
+
 export default function RegionPicture({
   region,
   teams,
@@ -105,11 +137,7 @@ export default function RegionPicture({
                       background: TONE[t.status].bg,
                       color: TONE[t.status].fg,
                     }}
-                    title={
-                      t.playoff !== null && !t.ineligible
-                        ? `${(t.playoff * 100).toFixed(t.playoff > 0.005 && t.playoff < 0.995 ? 0 : 1)}% to reach the playoffs`
-                        : undefined
-                    }
+                    title={statusTitle(t)}
                   >
                     {STATUS_LABELS[t.status]}
                   </span>

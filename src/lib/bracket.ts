@@ -49,42 +49,50 @@ export type SeededTeam = {
   status: StatusKey;
   /** Share of simulated seasons reaching the playoffs, when odds are loaded. */
   playoff: number | null;
+  /**
+   * Share of simulated seasons finishing on *this* place — the figure that
+   * actually speaks to whether a team stays where it is, which the chance of
+   * qualifying does not. Null without odds, or for a place no seed covers.
+   */
+  seed_odds: number | null;
+  /** This finishing place is arithmetically settled. See TeamOdds. */
+  place_locked: boolean;
+  /** The best and worst this team can still finish, 1-based. 0 without odds. */
+  best_place: number;
+  worst_place: number;
   /** Inside this region's allocation of places. */
   qualifies: boolean;
   ineligible: boolean;
 };
 
-/** Where a status comes from when nobody has overridden it. */
-export const STATUS_CUTOFFS = { high: 0.75, medium: 0.4 } as const;
-
 /**
- * A team's status from its odds.
+ * The status a team starts on before anybody has an opinion about it.
  *
- * `clinched` and `eliminated` are proofs rather than counts — they come from
- * what the remaining games make arithmetically possible — so they are taken
- * as given. The middle three are a reading of a probability, and the cutoffs
- * are a judgement rather than a fact. They live here so there is one place to
- * argue with.
+ * Deliberately not a reading of the odds. The pill and the percentages answer
+ * different questions: the percentages are what the simulation makes of a
+ * team's chances, while the pill is a person's confidence about *where it
+ * finishes*. Those come apart badly. It is not even a goodness scale — in a
+ * class where every team qualifies, a side certain to finish last is "High"
+ * for exactly the same reason as the side certain to finish first, and a team
+ * sitting fourth can be "High" while the three above it are "Medium" because
+ * those three could land in any order.
+ *
+ * So this returns a default, not a judgement. It used to map the chance of
+ * qualifying onto High/Medium/Low, which was the wrong quantity in both
+ * directions, and to set "Clinched" from `TeamOdds.clinched` — which means a
+ * berth, not a seed. That made every team in a class where all of them
+ * qualify read "Clinched" from the opening whistle.
+ *
+ * Two exceptions, both facts rather than opinions: a barred team, and one that
+ * is mathematically out. An override beats either.
  */
-export function statusFromOdds(o: {
-  clinched: boolean;
+export function defaultStatus(o: {
   eliminated: boolean;
   ineligible: boolean;
-  playoff: number;
 }): StatusKey {
   if (o.ineligible) return "ineligible";
-  if (o.clinched) return "clinched";
   if (o.eliminated) return "out";
-  if (o.playoff >= STATUS_CUTOFFS.high) return "high";
-  if (o.playoff >= STATUS_CUTOFFS.medium) return "medium";
-  return "low";
-}
-
-/** Without odds — a fallback good enough to render before the first publish. */
-function statusFromRecord(r: Record2, qualifying: boolean): StatusKey {
-  const played = r.wins + r.losses + r.ties;
-  if (!played) return "medium";
-  return qualifying ? "high" : "low";
+  return "medium";
 }
 
 export const regionKey = (c: Classification, r: number) => `${c}:${r}`;
@@ -120,7 +128,16 @@ export function seededRegions(
 
   const byName = new Map<
     string,
-    { clinched: boolean; eliminated: boolean; ineligible: boolean; playoff: number }
+    {
+      clinched: boolean;
+      eliminated: boolean;
+      ineligible: boolean;
+      playoff: number;
+      seeds: number[];
+      place_locked: boolean;
+      best_place: number;
+      worst_place: number;
+    }
   >();
   for (const c of odds?.classes ?? []) {
     for (const t of c.teams) {
@@ -129,6 +146,10 @@ export function seededRegions(
         eliminated: t.eliminated,
         ineligible: t.ineligible,
         playoff: t.playoff,
+        seeds: t.seeds,
+        place_locked: t.place_locked,
+        best_place: t.best_place,
+        worst_place: t.worst_place,
       });
     }
   }
@@ -167,24 +188,33 @@ export function seededRegions(
           region_w: record.wins,
           region_l: record.losses,
           region_t: record.ties,
-          // Status does not depend on where in the region a team sits, with
-          // one exception: without odds loaded there is nothing to read but
-          // the record, and then "is it in a place" is the only signal there
-          // is. `assignPlaces` fills that in afterwards.
-          status: overrides[t.name] ?? (o ? statusFromOdds(o) : "medium"),
+          // The author's call if there is one, otherwise a default — never a
+          // reading of the odds. See `defaultStatus`.
+          status:
+            overrides[t.name] ??
+            defaultStatus({
+              eliminated: o?.eliminated === true,
+              ineligible,
+            }),
           playoff: o ? o.playoff : null,
+          seed_odds: null,
+          place_locked: o?.place_locked === true,
+          best_place: o?.best_place ?? 0,
+          worst_place: o?.worst_place ?? 0,
           qualifies: false,
           ineligible,
         };
       });
 
+      // Seed share and the finishing range are read after numbering, since
+      // both are about the place the team has just been given.
       out.set(
         regionKey(cls, r),
-        assignPlaces(cls, rows, {
-          // Only where the odds have not been published yet.
-          fallbackStatus: !byName.size,
-          overrides,
-        }),
+        assignPlaces(cls, rows).map((t) => ({
+          ...t,
+          seed_odds: byName.get(t.name)?.seeds?.[t.place - 1] ?? null,
+          ...placeRange(t),
+        })),
       );
     }
   }
@@ -203,14 +233,35 @@ export function seededRegions(
  * is exactly the kind of duplication that has already bitten this codebase
  * twice.
  */
+/**
+ * Reconciles the finishing range with the place a team actually holds.
+ *
+ * The range arrives from `computeOdds` as a bound on win totals, while the
+ * place comes from the association's tie-breaking procedure — and those are
+ * not the same ordering. A tie counts as half a win in the standings, so a
+ * 2-1-2 team and a 3-2 team are level on percentage and separated by
+ * head-to-head, while by raw win count one is plainly above the other. Left
+ * alone, that produces a team sitting second and told it can finish "3rd to
+ * 3rd", which is not a statement about anything.
+ *
+ * So: a settled place is its own range, and otherwise the range is widened to
+ * contain the place. Both directions keep it a true bound and stop it
+ * contradicting the table it sits in. Real Alabama football decides games in
+ * overtime, so this mostly guards a 0-0 typed in by mistake — but a range
+ * that disagrees with the row it is printed on is worth ruling out outright.
+ */
+function placeRange(t: SeededTeam): Pick<SeededTeam, "best_place" | "worst_place"> {
+  if (t.ineligible || !t.best_place) return { best_place: 0, worst_place: 0 };
+  if (t.place_locked) return { best_place: t.place, worst_place: t.place };
+  return {
+    best_place: Math.min(t.best_place, t.place),
+    worst_place: Math.max(t.worst_place, t.place),
+  };
+}
+
 export function assignPlaces(
   cls: Classification,
   ordered: SeededTeam[],
-  opts: {
-    /** Recompute status from the record, for boards with no odds yet. */
-    fallbackStatus?: boolean;
-    overrides?: Record<string, StatusKey>;
-  } = {},
 ): SeededTeam[] {
   const eligible = ordered.filter((t) => !t.ineligible).length;
   const places = placesFor(cls, eligible);
@@ -219,21 +270,10 @@ export function assignPlaces(
   return ordered.map((t) => {
     // A barred team occupies no place, so it does not consume one.
     if (!t.ineligible) place++;
-    const qualifies = !t.ineligible && place <= places;
-    const status: StatusKey = t.ineligible
-      ? "ineligible"
-      : (opts.overrides?.[t.name] ??
-        (opts.fallbackStatus
-          ? statusFromRecord(
-              { wins: t.region_w, losses: t.region_l, ties: t.region_t },
-              qualifies,
-            )
-          : t.status));
     return {
       ...t,
       place: t.ineligible ? 0 : place,
-      qualifies,
-      status,
+      qualifies: !t.ineligible && place <= places,
     };
   });
 }

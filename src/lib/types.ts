@@ -81,6 +81,13 @@ export interface Team {
   preseason_prior: number | null;
   /** Which prior-season team name the prior was drawn from, for auditing. */
   prior_source: string | null;
+  /**
+   * Barred from championship play. Voids the team's region schedule for both
+   * sides — see `src/lib/eligibility.ts`. Never touches the rating.
+   */
+  postseason_ineligible?: boolean;
+  /** Why and when, for the team page. Documentation; nothing reads it. */
+  postseason_note?: string | null;
 }
 
 export interface Game {
@@ -235,6 +242,12 @@ export interface RatingRow {
    * almost everyone; when it is not, the record above needs a footnote.
    */
   forfeits?: number;
+  /**
+   * Barred from championship play. Region games against this team count for
+   * nobody, and it cannot take a playoff place. The rating is unaffected.
+   */
+  postseason_ineligible?: boolean;
+  postseason_note?: string | null;
   rating: number;
   massey: number;
   sos: number;

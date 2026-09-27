@@ -4,6 +4,13 @@
  * Both are derived from the games rather than configured, so neither needs
  * touching when the calendar moves.
  */
+import {
+  countsForRegion,
+  countsForTiebreak,
+  isBanned,
+  regionMetaOf,
+  splitEligible,
+} from "./eligibility";
 import { officialWinner } from "./result";
 import {
   orderRegion,
@@ -135,25 +142,27 @@ export interface Record2 {
  * is why it is worth showing beside a rating that has no bearing on it.
  */
 export function regionRecords(
-  ratings: Pick<RatingRow, "name" | "classification" | "region">[],
+  ratings: Pick<
+    RatingRow,
+    "name" | "classification" | "region" | "postseason_ineligible"
+  >[],
   games: Pick<Game, "t1" | "t2" | "s1" | "s2" | "type" | "forfeit_by">[],
 ): Map<string, Record2> {
-  const meta = new Map<string, { c: Classification; r: number }>();
-  for (const t of ratings) meta.set(t.name, { c: t.classification, r: t.region });
+  const meta = regionMetaOf(ratings);
 
   const out = new Map<string, Record2>();
   for (const t of ratings) out.set(t.name, { wins: 0, losses: 0, ties: 0 });
 
   for (const g of games) {
-    if (g.type === "playoff") continue;
     // A forfeit counts here even with no score behind it — a team that does
     // not field a side still loses the region game, and this is the table
     // that decides who plays in November.
     if (!g.forfeit_by && (g.s1 === null || g.s2 === null)) continue;
-    const a = meta.get(g.t1);
-    const b = meta.get(g.t2);
-    if (!a || !b) continue; // one side is out of state
-    if (a.c !== b.c || a.r !== b.r) continue; // not a region game
+    // Playoff games, out-of-state games, cross-region games, and every game
+    // involving a team barred from the postseason. A banned team needs no
+    // special case to read 0-0: every team starts there, and its games are
+    // simply never counted.
+    if (!countsForRegion(g, meta)) continue;
     const winner = officialWinner(g);
     if (!winner) {
       // Played and level. It counts as half a game won on each side.
@@ -179,11 +188,18 @@ export function regionRecords(
  * not only the region ones.
  */
 export function tieDataFor(
-  ratings: Pick<RatingRow, "name" | "classification" | "region" | "wins" | "rating">[],
+  ratings: Pick<
+    RatingRow,
+    | "name"
+    | "classification"
+    | "region"
+    | "wins"
+    | "rating"
+    | "postseason_ineligible"
+  >[],
   games: Pick<Game, "t1" | "t2" | "s1" | "s2" | "type" | "forfeit_by">[],
 ): TieData {
-  const meta = new Map<string, { c: Classification; r: number }>();
-  for (const t of ratings) meta.set(t.name, { c: t.classification, r: t.region });
+  const meta = regionMetaOf(ratings);
 
   const results = new Map<string, TieGame[]>();
   const beat = new Set<string>();
@@ -191,12 +207,14 @@ export function tieDataFor(
   for (const t of ratings) results.set(t.name, []);
 
   for (const g of games) {
-    if (g.type === "playoff") continue;
+    // A game against a banned team is dropped rather than marked non-region.
+    // Marking would be worse than doing nothing: "non-region" is a category
+    // factors (k) and (l) actively read, so it would hand the banned team
+    // straight back to them as a common opponent.
+    if (!countsForTiebreak(g, meta)) continue;
     const winner = officialWinner(g);
     if (!winner) continue; // unplayed or drawn
-    const a = meta.get(g.t1);
-    const b = meta.get(g.t2);
-    const required = Boolean(a && b && a.c === b.c && a.r === b.r);
+    const required = countsForRegion(g, meta);
     const w = winner === "t1" ? g.t1 : g.t2;
     const l = winner === "t1" ? g.t2 : g.t1;
     results.get(g.t1)?.push({ opponent: g.t2, won: winner === "t1", required });
@@ -210,11 +228,20 @@ export function tieDataFor(
 
   const victories = new Map<string, number>();
   const rating = new Map<string, number>();
-  const classOrder = new Map<string, number>();
+  const classOrder = new Map<string, number | null>();
   for (const t of ratings) {
-    victories.set(t.name, t.wins);
+    const banned = isBanned(t.name, meta);
+    // Factors (m) through (p) weigh the victories of the teams you beat. A
+    // banned team's wins are worth nothing to anyone, so they are zeroed
+    // rather than left to leak in through a path that skipped the filter.
+    victories.set(t.name, banned ? 0 : t.wins);
     rating.set(t.name, t.rating);
-    classOrder.set(t.name, CLS_ORDER[t.classification] ?? 0);
+    // Null is this file's existing word for "not eligible for championship
+    // play" — it is what an out-of-state opponent gets, per rule 7, and
+    // `defeatedOpponentWins` already skips anyone carrying it. A banned team
+    // is the in-state version of the same idea. Belt and braces behind the
+    // filter above, which is the real mechanism.
+    classOrder.set(t.name, banned ? null : (CLS_ORDER[t.classification] ?? 0));
   }
 
   return { results, beat, met, victories, rating, classOrder };
@@ -226,7 +253,8 @@ export interface TieData {
   met: Set<string>;
   victories: Map<string, number>;
   rating: Map<string, number>;
-  classOrder: Map<string, number>;
+  /** Null for a school that cannot reach championship play. */
+  classOrder: Map<string, number | null>;
 }
 
 /** Turns the gathered season into the context the chain reads. */
@@ -259,11 +287,23 @@ export function orderRegionStandings(
   reg: Map<string, Record2>,
   data: TieData,
 ): RatingRow[] {
-  const by = new Map(teams.map((t) => [t.name, t]));
+  // Teams barred from the postseason come out before the ordering runs, and
+  // go back on the end. Leaving one in would not merely mislabel it: it is
+  // 0-0, `orderRegion` scores a team with no games at .500, and it would sort
+  // above everyone with a losing record and push a real contender below the
+  // playoff line. Removing it first also stops factors (c) through (j)
+  // treating it as "the No. N ranked team in the region".
+  const meta = regionMetaOf(teams);
+  const { eligible, banned } = splitEligible(teams, meta);
+
+  const by = new Map(eligible.map((t) => [t.name, t]));
   const order = orderRegion(
-    teams.map((t) => t.name),
+    eligible.map((t) => t.name),
     (name) => reg.get(name) ?? { wins: 0, losses: 0, ties: 0 },
     (teamAtPlace) => tieContext(data, teamAtPlace),
   );
-  return order.map((n) => by.get(n) as RatingRow);
+  return [
+    ...order.map((n) => by.get(n) as RatingRow),
+    ...banned.sort((a, b) => b.rating - a.rating),
+  ];
 }

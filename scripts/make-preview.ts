@@ -143,6 +143,23 @@ async function main() {
   }
   console.log(`Priors attached: ${matched}/${teams.length}`);
 
+  // The real postseason bans, so the preview renders what the site renders.
+  // --no-bans drops them, which is how to see what the boards looked like
+  // before and is the quickest way to check the feature is doing anything.
+  if (!process.argv.includes("--no-bans")) {
+    const BARRED: Record<string, string> = {
+      "Mary Montgomery": "Eligibility ruling",
+      Jacksonville: "Eligibility ruling",
+    };
+    for (const t of teams) {
+      const why = BARRED[t.name];
+      if (!why) continue;
+      t.postseason_ineligible = true;
+      t.postseason_note = why;
+      console.log(`Barred from the postseason: ${t.name}`);
+    }
+  }
+
   const report = await parseSchedulePdf(
     new Uint8Array(readFileSync("data/2026_Week_0_Football.pdf")),
     teams,

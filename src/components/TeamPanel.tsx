@@ -133,6 +133,19 @@ export default function TeamPanel({
                 >
                   Region {t.region}
                 </span>
+                {t.postseason_ineligible && (
+                  <span
+                    className="chip !px-2 !py-1 !text-[11px] !font-bold"
+                    style={{
+                      background: "rgb(var(--warn-soft))",
+                      color: "rgb(var(--warn))",
+                    }}
+                    title="Region games against this team count for neither side, and it cannot take a playoff place. The rating is unaffected."
+                  >
+                    Barred from the postseason
+                    {t.postseason_note ? ` · ${t.postseason_note}` : ""}
+                  </span>
+                )}
               </div>
             </div>
 

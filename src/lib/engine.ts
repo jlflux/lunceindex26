@@ -417,6 +417,11 @@ export function computeRatings(
       wins: a.offW,
       losses: a.offL,
       forfeits: a.forfeits,
+      // Carried, never consumed here. A postseason ban is a statement about
+      // the bracket; the rating above is a statement about the football, and
+      // the two do not meet. See src/lib/eligibility.ts.
+      postseason_ineligible: t.postseason_ineligible === true,
+      postseason_note: t.postseason_note ?? null,
       rating: composite,
       massey: m,
       sos,

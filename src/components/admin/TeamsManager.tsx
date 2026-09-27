@@ -30,11 +30,24 @@ export default function TeamsManager({ initial }: { initial: Team[] }) {
   }, [teams, query, cls]);
 
   const withoutPriors = teams.filter((t) => t.preseason_prior === null).length;
+  const barred = teams.filter((t) => t.postseason_ineligible).length;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-[24px] font-bold leading-tight">Teams</h1>
+        {barred > 0 && (
+          <span
+            className="rounded-md px-2 py-1 text-[11px] font-semibold"
+            style={{
+              background: "rgb(var(--warn-soft))",
+              color: "rgb(var(--warn))",
+            }}
+            title="These teams are out of the bracket and their region games count for nobody"
+          >
+            {barred} barred from the postseason
+          </span>
+        )}
         <button
           className="btn !py-1.5 !text-xs"
           onClick={() => setShowPriors((v) => !v)}
@@ -51,6 +64,8 @@ export default function TeamsManager({ initial }: { initial: Team[] }) {
               region: 1,
               preseason_prior: null,
               prior_source: null,
+              postseason_ineligible: false,
+              postseason_note: null,
             })
           }
         >
@@ -147,7 +162,25 @@ export default function TeamsManager({ initial }: { initial: Team[] }) {
                   className="border-b last:border-0"
                   style={{ borderColor: "rgb(var(--border))" }}
                 >
-                  <td className="px-3 py-2 text-sm font-semibold">{t.name}</td>
+                  <td className="px-3 py-2 text-sm font-semibold">
+                    {t.name}
+                    {t.postseason_ineligible && (
+                      <span
+                        className="ml-1.5 rounded px-1 py-0.5 text-[9.5px] font-bold uppercase"
+                        style={{
+                          background: "rgb(var(--warn-soft))",
+                          color: "rgb(var(--warn))",
+                        }}
+                        title={
+                          t.postseason_note
+                            ? `Barred from the postseason — ${t.postseason_note}`
+                            : "Barred from the postseason"
+                        }
+                      >
+                        barred
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     <ClassBadge
                       classification={t.classification}
@@ -199,6 +232,8 @@ function TeamForm({
     region: String(team.region),
     preseason_prior:
       team.preseason_prior === null ? "" : String(team.preseason_prior),
+    postseason_ineligible: team.postseason_ineligible === true,
+    postseason_note: team.postseason_note ?? "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -298,6 +333,63 @@ function TeamForm({
             }
           />
         </label>
+      </div>
+
+      <div
+        className="rounded-lg border px-3 py-3"
+        style={{
+          borderColor: form.postseason_ineligible
+            ? "rgb(var(--warn) / 0.45)"
+            : "rgb(var(--border))",
+          background: form.postseason_ineligible
+            ? "rgb(var(--warn-soft))"
+            : "transparent",
+        }}
+      >
+        <label className="flex cursor-pointer items-start gap-2.5">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[rgb(var(--brand))]"
+            checked={form.postseason_ineligible}
+            onChange={(e) =>
+              setForm({ ...form, postseason_ineligible: e.target.checked })
+            }
+          />
+          <span>
+            <span className="block text-[13px] font-semibold">
+              Barred from the postseason
+            </span>
+            <span
+              className="block text-xs leading-relaxed"
+              style={{ color: "rgb(var(--text-muted))" }}
+            >
+              Voids this team&rsquo;s region schedule for the whole season and
+              for both sides: it finishes 0-0 in region, the teams that played
+              it take an overall result and no region result, and the
+              tiebreakers ignore those games. The rating does not move &mdash;
+              the football still happened.
+            </span>
+          </span>
+        </label>
+
+        {form.postseason_ineligible && (
+          <label className="mt-3 block">
+            <span
+              className="mb-1.5 block text-xs font-semibold uppercase tracking-wider"
+              style={{ color: "rgb(var(--text-faint))" }}
+            >
+              Reason
+            </span>
+            <input
+              className="input"
+              value={form.postseason_note}
+              placeholder="e.g. Eligibility ruling, Week 4"
+              onChange={(e) =>
+                setForm({ ...form, postseason_note: e.target.value })
+              }
+            />
+          </label>
+        )}
       </div>
 
       {team.id && form.name !== team.name && (

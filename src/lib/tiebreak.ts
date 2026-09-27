@@ -294,12 +294,19 @@ export function decidingFactor(
  * play counts as neutral rather than as a loss, so mid-season it is not buried
  * beneath teams that have started and lost.
  */
-function standingKey(r: Record2): [number, number] {
+export function standingPct(r: Record2): number {
   const n = r.wins + r.losses + r.ties;
   // A tie is half a game won, not a game that never happened. Dividing by
   // wins-plus-losses alone would let a team with three of them reach .500 on
   // two wins while everyone else needed three and a half.
-  return [n ? (r.wins + r.ties / 2) / n : 0.5, r.wins];
+  //
+  // This lived here as `standingKey` and was called by nothing — `orderRegion`
+  // below had its own copy of the formula that left ties out of the
+  // denominator, so the fix sat in dead code while the live path went on
+  // ignoring them. It is exported and used now, and `test:tiebreak` has a case
+  // that tells the two formulas apart: 2-1-3 is .667 one way and .583 the
+  // other, which puts it either side of a 3-2 team.
+  return n ? (r.wins + r.ties / 2) / n : 0.5;
 }
 
 /**
@@ -324,8 +331,7 @@ export function orderRegion(
   const wins = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     const r = regionRecord(teams[i]);
-    const played = r.wins + r.losses;
-    pct[i] = played ? r.wins / played : 0.5;
+    pct[i] = standingPct(r);
     wins[i] = r.wins;
   }
 

@@ -27,6 +27,12 @@ function readTeam(body: Record<string, unknown>) {
     throw new Error("Preseason prior must be a number, or left empty.");
   }
 
+  // A postseason ban voids the team's region schedule for everyone it plays
+  // and keeps it out of the bracket. It never touches the rating. The note is
+  // free text for why and when — documentation, read by nothing but the team
+  // page — so it is trimmed and otherwise taken as given.
+  const note = String(body.postseason_note ?? "").trim();
+
   return {
     name,
     slug: slugify(name),
@@ -34,6 +40,8 @@ function readTeam(body: Record<string, unknown>) {
     region,
     preseason_prior,
     prior_source: body.prior_source ? String(body.prior_source) : null,
+    postseason_ineligible: body.postseason_ineligible === true,
+    postseason_note: note || null,
   };
 }
 

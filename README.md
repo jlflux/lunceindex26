@@ -17,6 +17,12 @@ Run `supabase/schema.sql` in your Supabase project's SQL editor. It creates the
 tables, the row-level security policies (public reads, service-role writes) and
 the `updated_at` triggers.
 
+Then run everything in `supabase/migrations/` in order. Each one is
+schema-qualified, idempotent and safe to re-run, and each reports what it did
+rather than succeeding silently. They are not folded into `schema.sql`, so a
+database that has only had `schema.sql` run against it is missing forfeits
+(004) and postseason bans (005).
+
 ### 2. Environment
 
 Copy `.env.example` to `.env.local` and fill in the Supabase URL, anon key and
@@ -148,6 +154,7 @@ npm run test:coverage     # the missing-week scan, including the bye/noise rules
 npm run test:forfeits     # that a vacated win changes the record and not the rating
 npm run test:playoffs     # the odds: bracket, probability invariants, clinch/elimination
 npm run test:tiebreak     # the AHSAA tie-breaking procedure, (a) through (q)
+npm run test:ineligible   # postseason bans: what they void, and what they must not
 npm run calibrate:odds    # refits the win-probability curve against the 2025 season
 npm run typecheck
 ```
@@ -178,6 +185,7 @@ src/
 │   ├── schedule-pdf.ts  # AHSAA schedule PDF parser (superseded, still used)
 │   ├── score-csv.ts     # weekly score CSV parsing and validation
 │   ├── result.ts        # who won on the field vs who won officially (forfeits)
+│   ├── eligibility.ts   # the one region-game test, and postseason bans
 │   ├── playoffs.ts      # bracket structure and the Monte Carlo playoff odds
 │   ├── duplicates.ts    # fixtures stored twice; a school with two games in a week
 │   ├── coverage.ts      # schools missing a week everyone else played
@@ -251,10 +259,28 @@ than an error. `PROJECT.md` covers the reasoning.
   applies to any new percentage column.
 - **A tie is half a game won.** Standing order is
   `(W + T/2) / (W + L + T)`, not `W / (W + L)` — leaving ties out of the
-  denominator lets three ties carry a 2-2 team past a 3-4 one. `standingKey` in
-  `src/lib/tiebreak.ts`. Alabama settles football games in overtime, so in
-  practice this is a guard against a 0-0 entered by mistake, but the standings,
-  the region order and the odds all read it.
+  denominator lets three ties carry a 2-2 team past a 3-4 one. `standingPct` in
+  `src/lib/tiebreak.ts`, called by `orderRegion`. It shipped once as
+  `standingKey`, which nothing called: `orderRegion` had its own copy of the
+  formula inline, so the fix sat in dead code while the live path went on
+  ignoring ties, and the test passed because the case it used gave the same
+  answer either way. Any test of this has to *tell the formulas apart* — 2-1-3
+  is .667 one way and .583 the other, which puts it either side of a 3-2 team.
+  Alabama settles games in overtime, so in practice this guards against a 0-0
+  entered by mistake, but standings, region order and the odds all read it.
+- **A postseason ban voids a region schedule for both sides.** The association
+  bars a program from championship play and its region games stop counting for
+  anyone: it finishes 0-0 in region, its opponents take an overall result and
+  no region one, and the tiebreakers act as though the games never happened.
+  The rating reads them exactly as before, because the football was played.
+  The region test used to be written three times — twice in `season.ts`, once
+  in `playoffs.ts` feeding four separate loops — so it now lives once, in
+  `src/lib/eligibility.ts`, and everything asks it. Note `countsForTiebreak` is
+  not the negation of `countsForRegion`: a game against a banned team is
+  dropped, *not* demoted to a non-region game, because "non-region" is a
+  category factors (k) and (l) actively read. A banned team is also removed
+  before `orderRegion` runs — left in, its 0-0 record scores .500 and sorts it
+  above everyone with a losing record.
 - **A forfeit changes the record, never the rating.** `forfeit_by` names which
   side gave a game up; the scores stay as played. Everything record-shaped
   (standings, region order, RPI, Résumé) reads the ruling, and the Index reads

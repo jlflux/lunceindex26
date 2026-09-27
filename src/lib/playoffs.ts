@@ -27,6 +27,12 @@
  * How many teams each region sends is not derived from anything — it is told
  * to us, and it differs by classification. See QUALIFIERS.
  */
+import {
+  countsForRegion,
+  countsForTiebreak,
+  isEligible,
+  regionMetaOf,
+} from "./eligibility";
 import { officialWinner } from "./result";
 import { orderRegion, type TieContext } from "./tiebreak";
 import {
@@ -144,6 +150,12 @@ export interface TeamOdds {
   clinched: boolean;
   eliminated: boolean;
   /**
+   * Barred from championship play, so none of the figures above apply. Kept
+   * distinct from `eliminated`: this team did not lose its way out, and its
+   * region games counted for nobody in the first place.
+   */
+  ineligible: boolean;
+  /**
    * The team's region has no games left, so its finishing place is settled
    * and its seed is a fact rather than a forecast. What lets the page print
    * a flat 100% instead of ">99%".
@@ -180,17 +192,6 @@ function mulberry32(seed: number): () => number {
 }
 
 const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
-
-/** A region game: same classification, same region, regular season. */
-function isRegionGame(
-  g: Pick<Game, "t1" | "t2" | "type">,
-  meta: Map<string, { c: Classification; r: number }>,
-): boolean {
-  if (g.type === "playoff") return false;
-  const a = meta.get(g.t1);
-  const b = meta.get(g.t2);
-  return Boolean(a && b && a.c === b.c && a.r === b.r);
-}
 
 /**
  * What each team's region record can still become.
@@ -229,12 +230,9 @@ export function computeOdds(
   const hfa = opts.hfa ?? 2;
   const rnd = mulberry32(opts.seed ?? 20260826);
 
-  const meta = new Map<string, { c: Classification; r: number }>();
+  const meta = regionMetaOf(ratings);
   const rating = new Map<string, number>();
-  for (const t of ratings) {
-    meta.set(t.name, { c: t.classification as Classification, r: t.region });
-    rating.set(t.name, t.rating);
-  }
+  for (const t of ratings) rating.set(t.name, t.rating);
 
   let remainingTotal = 0;
   const classes: ClassOdds[] = [];
@@ -247,10 +245,13 @@ export function computeOdds(
     const pods = podsFor(regions);
     if (!pods.length) continue;
     // Smallest region in the class caps it: a region cannot send more teams
-    // than it holds.
+    // than it holds — and a team barred from the postseason is not one it can
+    // send. Counting the banned team here would let a region promise more
+    // places than it has eligible sides to fill.
     const smallest = Math.min(
       ...Array.from({ length: regions }, (_, i) =>
-        field.filter((t) => t.region === i + 1).length,
+        field.filter((t) => t.region === i + 1 && isEligible(t.name, meta))
+          .length,
       ).filter((n) => n > 0),
     );
     const qualifiers = opts.qualifiers ?? qualifiersFor(cls, smallest);
@@ -267,7 +268,7 @@ export function computeOdds(
     }
 
     for (const g of games) {
-      if (!isRegionGame(g, meta)) continue;
+      if (!countsForRegion(g, meta)) continue;
       if (meta.get(g.t1)?.c !== cls) continue;
       const winner = officialWinner(g);
       const decided = g.s1 !== null && g.s2 !== null;
@@ -293,9 +294,14 @@ export function computeOdds(
     }
     remainingTotal += left.length;
 
-    // Teams grouped by region, and the head-to-head results already on file.
+    // Teams grouped by region — eligible ones only. This map is what gets
+    // seeded, what `rivals` is drawn from, and what the clinch proof counts
+    // against. A banned team left in it would be a rival nobody is racing:
+    // finishing above it would help prove a place that it was never competing
+    // for, and "clinched" would stop meaning what it says.
     const byRegion = new Map<number, string[]>();
     for (const t of field) {
+      if (!isEligible(t.name, meta)) continue;
       const list = byRegion.get(t.region) ?? [];
       list.push(t.name);
       byRegion.set(t.region, list);
@@ -321,7 +327,7 @@ export function computeOdds(
     // association breaks it rather than by rating. Keyed "winner|loser".
     const h2h = new Set<string>();
     for (const g of games) {
-      if (!isRegionGame(g, meta)) continue;
+      if (!countsForRegion(g, meta)) continue;
       const w = officialWinner(g);
       if (!w) continue;
       h2h.add(w === "t1" ? `${g.t1}|${g.t2}` : `${g.t2}|${g.t1}`);
@@ -351,8 +357,13 @@ export function computeOdds(
       const a = meta.get(g.t1);
       const b = meta.get(g.t2);
       if (a?.c !== cls && b?.c !== cls) continue;
-      if (g.type === "playoff") continue;
-      if (isRegionGame(g, meta)) {
+      // Games against a banned team leave the tiebreak data altogether. They
+      // must not simply fail the region test and fall through — the bucket
+      // below is the non-region one, which is precisely what factors (k) and
+      // (l) read, so falling through would hand the banned team back to them
+      // as a common opponent.
+      if (!countsForTiebreak(g, meta)) continue;
+      if (countsForRegion(g, meta)) {
         if (a?.c !== cls) continue;
         regionFixtures.get(g.t1)?.push(g.t2);
         regionFixtures.get(g.t2)?.push(g.t1);
@@ -373,9 +384,12 @@ export function computeOdds(
       );
     }
 
+    // Null means "cannot reach championship play", which is what rule 7 says
+    // of an out-of-state school and what a ban makes true of an in-state one.
     const classOrderOf = (n: string) => {
       const m = meta.get(n);
-      return m ? (CLS_ORDER[m.c] ?? null) : null;
+      if (!m || m.banned) return null;
+      return CLS_ORDER[m.c] ?? null;
     };
     const beatIn = (a: string, b: string) =>
       h2h.has(`${a}|${b}`) || trialH2H.has(`${a}|${b}`);
@@ -519,7 +533,32 @@ export function computeOdds(
     const teams: TeamOdds[] = field.map((t) => {
       const i = idx.get(t.name)!;
       const mine = bounds.get(t.name)!;
+      // `byRegion` already holds only eligible teams, so a banned side is
+      // nobody's rival and has none of its own.
       const rivals = (byRegion.get(t.region) ?? []).filter((n) => n !== t.name);
+      if (!isEligible(t.name, meta)) {
+        const empty = {
+          slug: t.slug,
+          name: t.name,
+          classification: t.classification as Classification,
+          region: t.region,
+          // 0-0, and not because they lost nothing: their region schedule
+          // counted for neither side.
+          region_w: 0,
+          region_l: 0,
+          region_t: 0,
+          proj_w: 0,
+          proj_l: 0,
+          playoff: 0,
+          seeds: Array.from({ length: qualifiers }, () => 0),
+          rounds: Array.from({ length: rounds }, () => 0),
+          clinched: false,
+          eliminated: false,
+          ineligible: true,
+          settled: true,
+        };
+        return empty;
+      }
       // Certain to finish above me: their worst beats my best.
       const above = rivals.filter((n) => bounds.get(n)!.min > mine.max).length;
       // Certain to finish below me: my worst beats their best.
@@ -542,6 +581,7 @@ export function computeOdds(
         rounds: roundHits.map((a) => a[i] / trials),
         clinched: done ? share === 1 : rivals.length - below < qualifiers,
         eliminated: done ? share === 0 : above >= qualifiers,
+        ineligible: false,
         settled: done,
       };
     });
@@ -552,6 +592,8 @@ export function computeOdds(
     teams.sort(
       (a, b) =>
         a.region - b.region ||
+        // Below the cut line and below everyone, whatever their rating says.
+        Number(a.ineligible) - Number(b.ineligible) ||
         b.proj_w - a.proj_w ||
         b.playoff - a.playoff ||
         (b.rounds.at(-1) ?? 0) - (a.rounds.at(-1) ?? 0) ||

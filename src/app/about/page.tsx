@@ -136,6 +136,24 @@ export default function AboutPage() {
             </p>
           </Panel>
 
+          <Panel title="Barred from the postseason">
+            <p>
+              The association sometimes rules a program out of championship
+              play for the season. That does more than keep it out of the
+              bracket: its region schedule is void for everyone. The barred
+              team finishes 0-0 in region, and the teams that played it take an
+              overall win or loss and no region result at all. For the
+              tie-breaking procedure those games are not there.
+            </p>
+            <p>
+              The rating does not move. The football was played, and it is
+              still the best evidence of how good a team is &mdash; so the
+              Index reads those games exactly as it reads any other. This is
+              the same split as a forfeit, asked of a different question:
+              not who won, but whether the game counted toward the bracket.
+            </p>
+          </Panel>
+
           <Panel title="Forfeits">
             <p>
               A forfeit is a ruling about the record, not about the football. A

@@ -95,9 +95,16 @@ export default function OddsBoard({ report }: { report: OddsReport }) {
   );
 }
 
-/** True when the classification takes everybody — AA, as it stands. */
+/**
+ * True when the classification takes everybody — AA, as it stands.
+ *
+ * Barred teams are not counted. They sit at 0% by definition, and one of them
+ * would otherwise make it look as though AA had become a qualifying question
+ * when for every team that can actually enter it is still a seeding one.
+ */
 function everyoneQualifies(block: ClassOdds): boolean {
-  return block.teams.every((t) => t.playoff === 1);
+  const eligible = block.teams.filter((t) => !t.ineligible);
+  return eligible.length > 0 && eligible.every((t) => t.playoff === 1);
 }
 
 /**
@@ -233,17 +240,26 @@ function ClassTable({ block, query }: { block: ClassOdds; query: string }) {
             )}
           <tbody>
             {g.shown.map((t, j) => {
-              const i = g.teams.indexOf(t);
+              // Barred teams are sorted to the end of their region and can
+              // take no place, so they sit outside the numbering and outside
+              // the count the cut line is drawn against.
+              const eligible = g.teams.filter((x) => !x.ineligible);
+              const i = eligible.indexOf(t);
+              const below = g.shown[j + 1];
               // The line qualification is drawn at: under fourth place. Only
               // when the row below it is actually on screen.
               const cut =
+                !t.ineligible &&
                 i + 1 === block.qualifiers &&
                 j + 1 < g.shown.length &&
-                g.teams.indexOf(g.shown[j + 1]) >= block.qualifiers;
+                (below.ineligible ||
+                  eligible.indexOf(below) >= block.qualifiers);
               return (
                 <tr
                   key={t.slug}
-                  style={{ opacity: t.eliminated ? 0.5 : 1 }}
+                  style={{
+                    opacity: t.eliminated || t.ineligible ? 0.5 : 1,
+                  }}
                 >
                   {j === 0 && (
                     <td
@@ -267,7 +283,7 @@ function ClassTable({ block, query }: { block: ClassOdds; query: string }) {
                       className="mr-1.5 inline-block w-4 text-[11px] tnum"
                       style={{ color: "rgb(var(--text-faint))" }}
                     >
-                      {i + 1}
+                      {t.ineligible ? "—" : i + 1}
                     </span>
                     <Link
                       href={`/team/${t.slug}`}
@@ -277,19 +293,23 @@ function ClassTable({ block, query }: { block: ClassOdds; query: string }) {
                     </Link>
                     {t.clinched && <Flag kind="x" />}
                     {t.eliminated && <Flag kind="e" />}
+                    {t.ineligible && <Flag kind="i" />}
                   </Td>
                   <Td first={j === 0} cut={cut} className="!text-center">
                     <span
                       className="text-[12px] tnum"
                       style={{ color: "rgb(var(--text-muted))" }}
                     >
-                      {t.region_w}-{t.region_l}
-                      {t.region_t ? `-${t.region_t}` : ""}
+                      {t.ineligible
+                        ? "—"
+                        : `${t.region_w}-${t.region_l}${t.region_t ? `-${t.region_t}` : ""}`}
                     </span>
                   </Td>
                   <Td first={j === 0} cut={cut} className="!text-center">
                     <span className="text-[12px] font-semibold tnum">
-                      {t.proj_w.toFixed(1)}-{t.proj_l.toFixed(1)}
+                      {t.ineligible
+                        ? "—"
+                        : `${t.proj_w.toFixed(1)}-${t.proj_l.toFixed(1)}`}
                     </span>
                   </Td>
                   {cols.map((c) => (
@@ -299,6 +319,7 @@ function ClassTable({ block, query }: { block: ClassOdds; query: string }) {
                         scale={c.scale}
                         peak={peak.get(c.key)}
                         certain={isCertain(t, c.key)}
+                        blank={t.ineligible}
                       />
                     </Td>
                   ))}
@@ -426,6 +447,7 @@ function Pill({
   scale,
   peak,
   certain,
+  blank,
 }: {
   v: number;
   scale: Scale;
@@ -433,10 +455,23 @@ function Pill({
   peak?: number;
   /** Settled by arithmetic, not merely by every trial agreeing. */
   certain?: boolean;
+  /** The question does not apply to this team at all. */
+  blank?: boolean;
 }) {
   const shown = label(v, certain);
   const tail = <span className="text-[9px] opacity-60">%</span>;
   const cls = "w-full !text-[12.5px] !py-1";
+
+  // A team barred from the postseason is not at 0% the way a team that played
+  // its way out is. Nought per cent is an outcome; this is the absence of a
+  // question, and a row of zeroes would read as the former.
+  if (blank) {
+    return (
+      <StatPill className={cls} strength={0} hot empty>
+        &mdash;
+      </StatPill>
+    );
+  }
 
   // Never happened in any season, in a column where that is simply the absence
   // of a chance rather than a bad outcome. Flat: the distinction between 0.0%
@@ -468,23 +503,31 @@ function Pill({
   );
 }
 
-function Flag({ kind }: { kind: "x" | "e" }) {
+const FLAGS = {
+  x: {
+    tone: { background: "rgb(var(--good-soft))", color: "rgb(var(--good))" },
+    title: "Clinched a playoff place — cannot be caught",
+  },
+  e: {
+    tone: {
+      background: "rgb(var(--surface-3))",
+      color: "rgb(var(--text-faint))",
+    },
+    title: "Eliminated — cannot finish high enough in its region",
+  },
+  i: {
+    tone: { background: "rgb(var(--warn-soft))", color: "rgb(var(--warn))" },
+    title:
+      "Barred from the postseason — its region games counted for neither side",
+  },
+} as const;
+
+function Flag({ kind }: { kind: keyof typeof FLAGS }) {
   return (
     <span
       className="ml-1.5 rounded px-1 py-0.5 text-[9.5px] font-bold uppercase"
-      style={
-        kind === "x"
-          ? { background: "rgb(var(--good-soft))", color: "rgb(var(--good))" }
-          : {
-              background: "rgb(var(--surface-3))",
-              color: "rgb(var(--text-faint))",
-            }
-      }
-      title={
-        kind === "x"
-          ? "Clinched a playoff place — cannot be caught"
-          : "Eliminated — cannot finish in its region's top four"
-      }
+      style={FLAGS[kind].tone}
+      title={FLAGS[kind].title}
     >
       {kind}
     </span>
@@ -493,6 +536,7 @@ function Flag({ kind }: { kind: "x" | "e" }) {
 
 function Legend({ block }: { block: ClassOdds }) {
   const all = everyoneQualifies(block);
+  const barred = block.teams.filter((t) => t.ineligible);
   return (
     <p
       className="text-xs leading-relaxed"
@@ -514,6 +558,17 @@ function Legend({ block }: { block: ClassOdds }) {
           play rather than read off the simulation, so neither can be wrong.
         </>
       )}{" "}
+      {barred.length > 0 && (
+        <>
+          <strong style={{ color: "rgb(var(--warn))" }}>i</strong>{" "}
+          {barred.map((t) => t.name).join(" and ")}{" "}
+          {barred.length > 1 ? "are" : "is"} barred from the postseason, so{" "}
+          {barred.length > 1 ? "their" : "its"} region games count for neither
+          side &mdash; {barred.length > 1 ? "they read" : "it reads"} 0-0 and{" "}
+          {barred.length > 1 ? "their" : "its"} opponents took an overall result
+          and no region one. The rating is untouched; the football happened.{" "}
+        </>
+      )}
       {!all && (
         <>
           The playoff column is the only one with a wrong side, so it is the

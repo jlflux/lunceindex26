@@ -30,7 +30,8 @@
     "test:forfeits": "tsx scripts/test-forfeits.ts",
     "test:playoffs": "tsx scripts/test-playoffs.ts",
     "calibrate:odds": "tsx scripts/calibrate-odds.ts",
-    "test:tiebreak": "tsx scripts/test-tiebreak.ts"
+    "test:tiebreak": "tsx scripts/test-tiebreak.ts",
+    "test:ineligible": "tsx scripts/test-ineligible.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

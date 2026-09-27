@@ -39,12 +39,36 @@ import {
  * thing in every region in the state — so red here marks a team in trouble
  * rather than merely a small number. See `src/lib/shade.ts`.
  */
-function RegionPill({ r }: { r: Record2 | undefined }) {
+function RegionPill({
+  r,
+  barred,
+}: {
+  r: Record2 | undefined;
+  barred?: boolean;
+}) {
   const w = r?.wins ?? 0;
   const l = r?.losses ?? 0;
   const t = r?.ties ?? 0;
   const { hot, strength, played } = recordShade(w, l, t);
   const text = t ? `${w}-${l}-${t}` : `${w}-${l}`;
+
+  // A barred team is 0-0 because its region games counted for nobody, not
+  // because it has not started. Printing "0-0" against the neutral shade
+  // would read as a team yet to play, so it says nothing at all instead.
+  if (barred) {
+    return (
+      <StatPill
+        className="!text-[12px]"
+        empty
+        hot={false}
+        strength={0}
+        title="No region record — this team is barred from the postseason, so its region games count for neither side"
+      >
+        &mdash;
+      </StatPill>
+    );
+  }
+
   return (
     <StatPill
       className="!text-[12px]"
@@ -55,6 +79,26 @@ function RegionPill({ r }: { r: Record2 | undefined }) {
     >
       {text}
     </StatPill>
+  );
+}
+
+/** The marker beside a team barred from championship play. */
+function BarredMark({ note }: { note?: string | null }) {
+  return (
+    <span
+      className="ml-1.5 rounded px-1 py-0.5 text-[9px] font-bold uppercase align-middle"
+      style={{
+        background: "rgb(var(--warn-soft))",
+        color: "rgb(var(--warn))",
+      }}
+      title={
+        note
+          ? `Barred from the postseason — ${note}`
+          : "Barred from the postseason"
+      }
+    >
+      barred
+    </span>
   );
 }
 
@@ -180,7 +224,11 @@ export default function TeamDirectory({
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {shown.map((regionNo) => {
                 const list = regions.get(regionNo)!;
-                const qualifiers = qualifiersFor(c, list.length);
+                // A team barred from the postseason is sorted to the end by
+                // orderRegionStandings and cannot take a place, so it counts
+                // toward neither the region's size nor the place numbers.
+                const eligible = list.filter((t) => !t.postseason_ineligible);
+                const qualifiers = qualifiersFor(c, eligible.length);
                 return (
                   <div key={regionNo} className="card overflow-hidden">
                     <div
@@ -195,20 +243,24 @@ export default function TeamDirectory({
                     </div>
                     <ul>
                       {list.filter(matches).map((t) => {
-                        const place = list.indexOf(t);
+                        const barred = t.postseason_ineligible === true;
+                        const place = eligible.indexOf(t);
                         // The rule only goes under the last qualifier, and
                         // only when the team below it is on screen to be
                         // separated from.
                         const after = list.filter(matches);
                         const next = after[after.indexOf(t) + 1];
                         const cut =
+                          !barred &&
                           place + 1 === qualifiers &&
                           next !== undefined &&
-                          list.indexOf(next) >= qualifiers;
+                          (next.postseason_ineligible === true ||
+                            eligible.indexOf(next) >= qualifiers);
                         return (
                           <li
                             key={t.slug}
                             style={{
+                              opacity: barred ? 0.55 : 1,
                               borderBottom: cut
                                 ? "2px solid rgb(var(--brand) / 0.55)"
                                 : "1px solid rgb(var(--border))",
@@ -222,11 +274,12 @@ export default function TeamDirectory({
                                 className="w-3.5 shrink-0 text-[11px] tnum"
                                 style={{ color: "rgb(var(--text-faint))" }}
                               >
-                                {place + 1}
+                                {barred ? "\u2014" : place + 1}
                               </span>
                               <span className="min-w-0 flex-1">
                                 <span className="block truncate text-[13px] font-semibold">
                                   {t.name}
+                                  {barred && <BarredMark note={t.postseason_note} />}
                                 </span>
                                 <span
                                   className="text-[11px]"
@@ -241,7 +294,7 @@ export default function TeamDirectory({
                                   </span>
                                 </span>
                               </span>
-                              <RegionPill r={reg.get(t.name)} />
+                              <RegionPill r={reg.get(t.name)} barred={barred} />
                             </Link>
                           </li>
                         );

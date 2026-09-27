@@ -96,6 +96,13 @@ export interface TeamOdds {
   /** Region record as it stands, before any simulation. */
   region_w: number;
   region_l: number;
+  /**
+   * Mean region record across the simulated seasons — where this team is
+   * heading rather than where it is. The analogue of a projected points total,
+   * and what the region groups are ordered by.
+   */
+  proj_w: number;
+  proj_l: number;
   /** Share of simulated seasons in which the team reaches the playoffs. */
   playoff: number;
   /** Share finishing 1st, 2nd, 3rd and 4th in its region. */
@@ -247,6 +254,8 @@ export function computeOdds(
 
     // Tallies.
     const madePlayoffs = new Int32Array(names.length);
+    const sumW = new Float64Array(names.length);
+    const sumL = new Float64Array(names.length);
     const seedHits = Array.from({ length: 4 }, () => new Int32Array(names.length));
     const roundHits = Array.from({ length: rounds }, () => new Int32Array(names.length));
 
@@ -325,6 +334,10 @@ export function computeOdds(
         }
       }
 
+      for (let i = 0; i < names.length; i++) {
+        sumW[i] += simW[i];
+        sumL[i] += simL[i];
+      }
       for (const n of seeded.flat()) madePlayoffs[idx.get(n)!]++;
       for (let r = 1; r <= regions; r++) {
         const list = seeded[r - 1];
@@ -390,6 +403,8 @@ export function computeOdds(
         region: t.region,
         region_w: s.w,
         region_l: s.l,
+        proj_w: sumW[i] / trials,
+        proj_l: sumL[i] / trials,
         playoff: share,
         seeds: seedHits.map((a) => a[i] / trials),
         rounds: roundHits.map((a) => a[i] / trials),
@@ -398,8 +413,13 @@ export function computeOdds(
       };
     });
 
+    // Grouped by region on the page, so sort by region first and then by
+    // where each team is heading — projected record, with the odds breaking
+    // ties. That ordering is what the playoff cut line is drawn against.
     teams.sort(
       (a, b) =>
+        a.region - b.region ||
+        b.proj_w - a.proj_w ||
         b.playoff - a.playoff ||
         (b.rounds.at(-1) ?? 0) - (a.rounds.at(-1) ?? 0) ||
         a.name.localeCompare(b.name),

@@ -39,6 +39,13 @@
   --hero-from: 13 23 42;
   --hero-to: 8 13 23;
 
+  /* The odds scale: one hue for the good end, one for the bad, diverging
+     through an unfilled middle. Deliberately NOT the green used for ratings —
+     a rating is a measurement and an odds cell is a forecast, and giving them
+     the same colour invites reading one as the other. */
+  --odds-hi: 96 165 250;
+  --odds-lo: 244 96 112;
+
   --c-6A: 167 139 250;
   --c-5A: 96 165 250;
   --c-4A: 56 189 248;
@@ -85,6 +92,10 @@
   --hero-from: 23 37 64;
   --hero-to: 15 23 42;
 
+  /* Deeper than the dark-mode pair, which washes out on white. */
+  --odds-hi: 37 99 235;
+  --odds-lo: 225 60 80;
+
   /* Darkened so they carry on white; the dark values wash out entirely. */
   --c-6A: 109 40 217;
   --c-5A: 29 78 216;
@@ -130,6 +141,13 @@
   --rating: 74 222 128;
   --hero-from: 13 23 42;
   --hero-to: 8 13 23;
+
+  /* The odds scale: one hue for the good end, one for the bad, diverging
+     through an unfilled middle. Deliberately NOT the green used for ratings —
+     a rating is a measurement and an odds cell is a forecast, and giving them
+     the same colour invites reading one as the other. */
+  --odds-hi: 96 165 250;
+  --odds-lo: 244 96 112;
 
   --c-6A: 167 139 250;
   --c-5A: 96 165 250;

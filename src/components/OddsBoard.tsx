@@ -7,15 +7,17 @@ import type { ClassOdds, OddsReport, TeamOdds } from "@/lib/playoffs";
 import { CLS_FILTER_ORDER, type Classification } from "@/lib/types";
 
 /**
- * The odds board.
+ * The odds board, grouped by region.
+ *
+ * Region is the right grouping for the same reason a division is in hockey:
+ * it is the thing qualification actually runs on. Four teams out of each
+ * region go, so each region gets its own block with a cut line ruled under
+ * fourth place, and a reader can see who is above the line at a glance
+ * instead of reconciling a flat list against a seed column.
  *
  * One classification at a time, because the columns genuinely differ between
  * them — a four-region class plays one round fewer than an eight-region class,
  * so a single table would either invent a round or drop one.
- *
- * Every cell is shaded by its own value. A page of three-figure percentages is
- * unreadable as numbers alone; the shading is what lets a reader find the
- * contenders in a sixty-team classification without reading a single figure.
  */
 export default function OddsBoard({ report }: { report: OddsReport }) {
   const available = useMemo(
@@ -32,15 +34,15 @@ export default function OddsBoard({ report }: { report: OddsReport }) {
     report.classes.find((c) => c.classification === cls) ?? report.classes[0];
   if (!block) return null;
 
-  const q = query.trim().toLowerCase();
-  const rows = q
-    ? block.teams.filter((t) => t.name.toLowerCase().includes(q))
-    : block.teams;
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-xl border px-3 py-3 lg:flex-row lg:items-center"
-        style={{ background: "rgb(var(--surface))", borderColor: "rgb(var(--border))" }}>
+      <div
+        className="flex flex-col gap-3 rounded-xl border px-3 py-3 lg:flex-row lg:items-center"
+        style={{
+          background: "rgb(var(--surface))",
+          borderColor: "rgb(var(--border))",
+        }}
+      >
         <div className="relative lg:w-64">
           <span
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
@@ -81,128 +83,278 @@ export default function OddsBoard({ report }: { report: OddsReport }) {
           className="ml-auto shrink-0 text-xs tnum"
           style={{ color: "rgb(var(--text-muted))" }}
         >
-          {block.regions} regions · {block.qualifiers * block.regions} qualify
+          {block.regions} regions · top {block.qualifiers} in each qualify
         </span>
       </div>
 
-      <ClassTable block={block} rows={rows} />
-
-      <Legend />
+      <ClassTable block={block} query={query.trim().toLowerCase()} />
+      <Legend qualifiers={block.qualifiers} />
     </div>
   );
 }
 
-function ClassTable({ block, rows }: { block: ClassOdds; rows: TeamOdds[] }) {
+/** Every numeric column, so each can be scaled against its own range. */
+function columnsOf(block: ClassOdds) {
+  return [
+    { key: "playoff", label: "Playoffs", wide: true },
+    ...Array.from({ length: block.qualifiers }, (_, i) => ({
+      key: `seed${i}`,
+      label: i === 0 ? "1 seed" : `${i + 1}`,
+      wide: false,
+    })),
+    ...block.roundNames.map((n, i) => ({
+      key: `round${i}`,
+      label: shortRound(n),
+      wide: false,
+    })),
+  ];
+}
+
+const valueOf = (t: TeamOdds, key: string): number => {
+  if (key === "playoff") return t.playoff;
+  if (key.startsWith("seed")) return t.seeds[Number(key.slice(4))] ?? 0;
+  return t.rounds[Number(key.slice(5))] ?? 0;
+};
+
+function ClassTable({ block, query }: { block: ClassOdds; query: string }) {
+  const cols = columnsOf(block);
+
+  // Each column is scaled against its own best. A 12% title chance is the
+  // strongest number in that column and should read that way, while 12% of
+  // making the playoffs is close to hopeless — the same figure meaning
+  // opposite things is exactly what a shared scale would hide.
+  const peak = new Map<string, number>();
+  for (const c of cols) {
+    peak.set(
+      c.key,
+      Math.max(0.02, ...block.teams.map((t) => valueOf(t, c.key))),
+    );
+  }
+
+  // Grouped from the full field first, so a team's position inside its region
+  // and the cut line under fourth place stay true while a search narrows the
+  // rows on screen. Filtering before grouping would renumber everything and
+  // move the line to wherever the fourth match happened to be.
+  const regions: { region: number; teams: TeamOdds[]; shown: TeamOdds[] }[] = [];
+  for (const t of block.teams) {
+    const last = regions[regions.length - 1];
+    if (last && last.region === t.region) last.teams.push(t);
+    else regions.push({ region: t.region, teams: [t], shown: [] });
+  }
+  for (const g of regions) {
+    g.shown = query
+      ? g.teams.filter((t) => t.name.toLowerCase().includes(query))
+      : g.teams;
+  }
+  const visible = regions.filter((g) => g.shown.length);
+
   return (
     <div className="card table-scroll">
-      <table className="w-full min-w-[840px]">
+      <table className="w-full min-w-[880px] border-separate border-spacing-0">
         <thead>
-          <tr
-            className="border-b"
-            style={{
-              borderColor: "rgb(var(--border))",
-              background: "rgb(var(--surface-2))",
-            }}
-          >
-            <th className="th !px-2">Team</th>
-            <th className="th !text-center">Region</th>
-            <th className="th !text-center">Playoffs</th>
-            {[1, 2, 3, 4].slice(0, block.qualifiers).map((s) => (
-              <th key={s} className="th !text-center" title={`Finishes ${s} in its region`}>
-                {s === 1 ? "1 seed" : `${s}`}
-              </th>
-            ))}
-            {block.roundNames.map((n) => (
-              <th key={n} className="th !text-center" title={`Wins the ${n}`}>
-                {shortRound(n)}
-              </th>
+          <tr style={{ background: "rgb(var(--surface-2))" }}>
+            <Th className="w-[46px] !text-center">Rgn</Th>
+            <Th className="!text-left">Team</Th>
+            <Th className="!text-center" title="Region record so far">
+              Reg W-L
+            </Th>
+            <Th
+              className="!text-center"
+              title="Where that record is heading, averaged over every simulated season"
+            >
+              Proj W-L
+            </Th>
+            {cols.map((c) => (
+              <Th key={c.key} className="!text-center">
+                {c.label}
+              </Th>
             ))}
           </tr>
         </thead>
-        <tbody>
-          {rows.map((t) => (
-            <tr
-              key={t.slug}
-              className="border-b last:border-0"
-              style={{
-                borderColor: "rgb(var(--border) / 0.7)",
-                opacity: t.eliminated ? 0.45 : 1,
-              }}
-            >
-              <td className={`td !px-2 stripe-${t.classification}`}>
-                <Link
-                  href={`/team/${t.slug}`}
-                  className="text-[13.5px] font-semibold hover:underline"
+        {visible.map((g) => (
+          <tbody key={g.region}>
+            {g.shown.map((t, j) => {
+              const i = g.teams.indexOf(t);
+              // The line qualification is drawn at: under fourth place. Only
+              // when the row below it is actually on screen.
+              const cut =
+                i + 1 === block.qualifiers &&
+                j + 1 < g.shown.length &&
+                g.teams.indexOf(g.shown[j + 1]) >= block.qualifiers;
+              return (
+                <tr
+                  key={t.slug}
+                  style={{ opacity: t.eliminated ? 0.5 : 1 }}
                 >
-                  {t.name}
-                </Link>
-                {t.clinched && <Flag kind="x" />}
-                {t.eliminated && <Flag kind="e" />}
-              </td>
-              <td
-                className="td !text-center text-[12px] tnum"
-                style={{ color: "rgb(var(--text-muted))" }}
-              >
-                {t.region_w}-{t.region_l}
-                <span className="ml-1 text-[10.5px]" style={{ color: "rgb(var(--text-faint))" }}>
-                  R{t.region}
-                </span>
-              </td>
-              <Pct v={t.playoff} strong />
-              {t.seeds.slice(0, block.qualifiers).map((p, i) => (
-                <Pct key={i} v={p} />
-              ))}
-              {t.rounds.map((p, i) => (
-                <Pct key={i} v={p} title={i === t.rounds.length - 1} />
-              ))}
-            </tr>
-          ))}
-        </tbody>
+                  {j === 0 && (
+                    <td
+                      rowSpan={g.shown.length}
+                      className="border-t px-1 text-center align-middle"
+                      style={{
+                        borderColor: "rgb(var(--border-strong))",
+                        borderRight: "1px solid rgb(var(--border))",
+                        background: "rgb(var(--surface-2))",
+                      }}
+                    >
+                      <span
+                        className="text-[12px] font-extrabold tracking-tight"
+                        style={{ color: "rgb(var(--brand))" }}
+                      >
+                        R{g.region}
+                      </span>
+                    </td>
+                  )}
+                  <Td first={j === 0} cut={cut} className="!px-2.5 !text-left">
+                    <span
+                      className="mr-1.5 inline-block w-4 text-[11px] tnum"
+                      style={{ color: "rgb(var(--text-faint))" }}
+                    >
+                      {i + 1}
+                    </span>
+                    <Link
+                      href={`/team/${t.slug}`}
+                      className="text-[13.5px] font-semibold hover:underline"
+                    >
+                      {t.name}
+                    </Link>
+                    {t.clinched && <Flag kind="x" />}
+                    {t.eliminated && <Flag kind="e" />}
+                  </Td>
+                  <Td first={j === 0} cut={cut} className="!text-center">
+                    <span
+                      className="text-[12px] tnum"
+                      style={{ color: "rgb(var(--text-muted))" }}
+                    >
+                      {t.region_w}-{t.region_l}
+                    </span>
+                  </Td>
+                  <Td first={j === 0} cut={cut} className="!text-center">
+                    <span className="text-[12px] font-semibold tnum">
+                      {t.proj_w.toFixed(1)}-{t.proj_l.toFixed(1)}
+                    </span>
+                  </Td>
+                  {cols.map((c) => (
+                    <Td key={c.key} first={i === 0} cut={cut} className="!px-1">
+                      <Pill
+                        v={valueOf(t, c.key)}
+                        peak={peak.get(c.key) as number}
+                      />
+                    </Td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        ))}
       </table>
     </div>
   );
 }
 
-/**
- * A percentage, shaded by itself.
- *
- * The ramp is deliberately not linear. Most of a sixty-team classification
- * sits under ten percent, and a linear ramp renders all of it as the same
- * near-empty wash — the square root pulls the low end apart, which is where
- * the reading actually happens.
- */
-function Pct({
-  v,
-  strong,
+function Th({
+  children,
+  className = "",
   title,
 }: {
-  v: number;
-  strong?: boolean;
-  title?: boolean;
+  children: React.ReactNode;
+  className?: string;
+  title?: string;
 }) {
-  const shown = v >= 0.9995 ? "100" : v <= 0 ? "—" : (v * 100).toFixed(v < 0.095 ? 1 : 0);
-  const a = Math.sqrt(Math.max(0, Math.min(1, v)));
-  const hue = title ? "var(--brand)" : "var(--rating)";
+  return (
+    <th
+      title={title}
+      className={`sticky top-0 whitespace-nowrap border-b px-2 py-2 text-[10.5px] font-bold uppercase tracking-wider ${className}`}
+      style={{
+        borderColor: "rgb(var(--border))",
+        background: "rgb(var(--surface-2))",
+        color: "rgb(var(--text-muted))",
+      }}
+    >
+      {children}
+    </th>
+  );
+}
+
+function Td({
+  children,
+  className = "",
+  first,
+  cut,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  /** First row of a region — takes the heavier rule that separates groups. */
+  first?: boolean;
+  /** Last qualifying row — takes the playoff cut line. */
+  cut?: boolean;
+}) {
   return (
     <td
-      className="td !px-1 !text-center"
-      style={{ background: v > 0 ? `rgb(${hue} / ${(a * 0.26).toFixed(3)})` : undefined }}
+      className={`px-2 py-1.5 ${className}`}
+      style={{
+        borderTop: first ? "1px solid rgb(var(--border-strong))" : undefined,
+        borderBottom: cut
+          ? "2px solid rgb(var(--brand) / 0.55)"
+          : "1px solid rgb(var(--border) / 0.6)",
+      }}
     >
+      {children}
+    </td>
+  );
+}
+
+/**
+ * A percentage as a filled pill, blue through to red.
+ *
+ * Diverging rather than a single hue, because the interesting reading is which
+ * side of the middle a team is on. A one-hue ramp renders the whole bottom of
+ * a sixty-team classification as the same near-empty wash, which is where most
+ * of the teams are and where most of the questions are.
+ */
+function Pill({ v, peak }: { v: number; peak: number }) {
+  // Never happened in any season. Still the bad end of the scale, but flat —
+  // at ten columns a wall of full-strength red is the first thing the eye
+  // lands on, and "did not happen" is the least interesting cell there is.
+  if (v <= 0) {
+    return (
       <span
-        className={`text-[12.5px] tnum ${strong || v >= 0.5 ? "font-bold" : "font-medium"}`}
+        className="inline-block w-full rounded-md px-1.5 py-1 text-center text-[12.5px] font-bold tnum"
         style={{
-          color:
-            v <= 0
-              ? "rgb(var(--text-faint))"
-              : v >= 0.35
-                ? `rgb(${hue})`
-                : "rgb(var(--text))",
+          background: "rgb(var(--odds-lo) / 0.14)",
+          color: "rgb(var(--text-faint))",
         }}
       >
-        {shown}
-        {v > 0 && <span className="text-[9px] opacity-55">%</span>}
+        0<span className="text-[9px] opacity-60">%</span>
       </span>
-    </td>
+    );
+  }
+  const t = Math.max(0, Math.min(1, v / peak));
+  // Pulled apart at the bottom: most of a classification lives under a tenth
+  // of the leader, and a linear ramp gives all of it the same colour.
+  const k = Math.sqrt(t);
+  const hot = k >= 0.5;
+  // 0 → full red, 0.5 → neutral, 1 → full blue.
+  const strength = Math.abs(k - 0.5) * 2;
+  const hue = hot ? "var(--odds-hi)" : "var(--odds-lo)";
+  const shown =
+    v >= 0.9995 ? "100" : v <= 0 ? "0" : (v * 100).toFixed(v < 0.095 ? 1 : 0);
+
+  return (
+    <span
+      className="inline-block w-full rounded-md px-1.5 py-1 text-center text-[12.5px] font-bold tnum"
+      style={{
+        background: `rgb(${hue} / ${(0.12 + strength * 0.78).toFixed(3)})`,
+        color:
+          strength > 0.55
+            ? "#fff"
+            : hot
+              ? "rgb(var(--odds-hi))"
+              : "rgb(var(--text-muted))",
+      }}
+    >
+      {shown}
+      <span className="text-[9px] opacity-60">%</span>
+    </span>
   );
 }
 
@@ -213,11 +365,14 @@ function Flag({ kind }: { kind: "x" | "e" }) {
       style={
         kind === "x"
           ? { background: "rgb(var(--good-soft))", color: "rgb(var(--good))" }
-          : { background: "rgb(var(--surface-3))", color: "rgb(var(--text-faint))" }
+          : {
+              background: "rgb(var(--surface-3))",
+              color: "rgb(var(--text-faint))",
+            }
       }
       title={
         kind === "x"
-          ? "Clinched a playoff place — cannot be caught by five teams in its region"
+          ? "Clinched a playoff place — cannot be caught"
           : "Eliminated — cannot finish in its region's top four"
       }
     >
@@ -226,18 +381,28 @@ function Flag({ kind }: { kind: "x" | "e" }) {
   );
 }
 
-function Legend() {
+function Legend({ qualifiers }: { qualifiers: number }) {
   return (
-    <p className="text-xs leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
-      <strong style={{ color: "rgb(var(--good))" }}>x</strong> clinched a
-      playoff place · <strong>e</strong> eliminated. Both are proved from the
-      games left to play rather than read off the simulation, so neither can be
-      wrong. Everything else is a share of ten thousand simulated seasons and
-      carries about half a point of sampling noise. A dash means it did not
-      happen in any of them.
+    <p
+      className="text-xs leading-relaxed"
+      style={{ color: "rgb(var(--text-faint))" }}
+    >
+      The rule under each region&rsquo;s {ordinalWord(qualifiers)} team is the
+      playoff line — everyone above it qualifies as the region stands.{" "}
+      <strong style={{ color: "rgb(var(--good))" }}>x</strong> clinched,{" "}
+      <strong>e</strong> eliminated; both are proved from the games left to play
+      rather than read off the simulation, so neither can be wrong. Each column
+      is shaded against its own best, so the strongest title chance reads as
+      strongly as the strongest playoff chance. Everything else is a share of
+      ten thousand simulated seasons and carries about half a point of sampling
+      noise.
     </p>
   );
 }
+
+const ordinalWord = (n: number) =>
+  ({ 1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth" })[n] ??
+  `${n}th`;
 
 /** "Quarterfinals" does not fit a column head on a phone. */
 function shortRound(n: string): string {

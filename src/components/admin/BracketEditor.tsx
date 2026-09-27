@@ -17,6 +17,7 @@ import {
   type Slot,
   type StatusKey,
 } from "@/lib/bracket-types";
+import { PROSE_COLOURS } from "@/lib/sanitize";
 import { CLS_FILTER_ORDER, type Classification } from "@/lib/types";
 
 export type EditorRegion = {
@@ -965,6 +966,51 @@ function Settings({
             onChange={(e) => setState((s) => ({ ...s, aboutHtml: e.target.value }))}
           />
         </label>
+
+        {/* Written here because the explainer is authored by hand. Class names
+            that live only in a CSS file are class names nobody can use. */}
+        <div
+          className="rounded-lg border px-3 py-2.5 text-[11.5px] leading-relaxed"
+          style={{
+            borderColor: "rgb(var(--border))",
+            color: "rgb(var(--text-muted))",
+          }}
+        >
+          <span className="font-semibold" style={{ color: "rgb(var(--text))" }}>
+            Colouring text.
+          </span>{" "}
+          Wrap it in a span with one of these, and it will stay readable when a
+          reader switches between light and dark:{" "}
+          {PROSE_COLOURS.map((c, i) => (
+            <span key={c}>
+              {i > 0 && ", "}
+              <code
+                className="rounded px-1 font-mono text-[11px]"
+                style={{ background: "rgb(var(--surface-3))" }}
+              >
+                {c}
+              </code>
+            </span>
+          ))}
+          . So{" "}
+          <code
+            className="rounded px-1 font-mono text-[11px]"
+            style={{ background: "rgb(var(--surface-3))" }}
+          >
+            &lt;span class=&quot;c-brand&quot;&gt;Thompson&lt;/span&gt;
+          </code>
+          . For an exact shade instead, use{" "}
+          <code
+            className="rounded px-1 font-mono text-[11px]"
+            style={{ background: "rgb(var(--surface-3))" }}
+          >
+            style=&quot;color:#e01b1b&quot;
+          </code>{" "}
+          &mdash; that one is the same colour in both themes, so check it
+          against the dark background before you publish. Headings, bold,
+          italic, lists and links all work as ordinary HTML; anything else is
+          stripped when the page renders.
+        </div>
       </div>
     </div>
   );

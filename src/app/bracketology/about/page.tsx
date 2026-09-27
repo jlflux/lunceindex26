@@ -31,7 +31,7 @@ export default async function BracketAboutPage() {
       />
 
       {html ? (
-        <section className="card max-w-[72ch] p-5">
+        <section className="card p-6 sm:p-7">
           <div
             className="prose-bracket space-y-3.5 text-[15px] leading-relaxed"
             style={{ color: "rgb(var(--text-muted))" }}

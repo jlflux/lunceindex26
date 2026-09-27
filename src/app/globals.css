@@ -545,3 +545,15 @@
   border-top: 1px solid rgb(var(--border));
   margin: 1.25em 0;
 }
+
+/* Colours the bracketology explainer may use by name.
+   Each is a theme token rather than a fixed value, so it redefines itself when
+   the light/dark toggle flips — which a hand-picked hex cannot do, and is the
+   whole reason these exist alongside the style="color:…" escape hatch. Scoped
+   to the wrapper so the short names cannot leak into the rest of the site. */
+.prose-bracket .c-brand  { color: rgb(var(--brand)); }
+.prose-bracket .c-good   { color: rgb(var(--good)); }
+.prose-bracket .c-warn   { color: rgb(var(--warn)); }
+.prose-bracket .c-bad    { color: rgb(var(--bad)); }
+.prose-bracket .c-muted  { color: rgb(var(--text-muted)); }
+.prose-bracket .c-strong { color: rgb(var(--text)); }

@@ -26,7 +26,11 @@ import {
   type SeededTeam,
 } from "../src/lib/bracket";
 import { emptyBracketState, type BracketState } from "../src/lib/bracket-types";
-import { renderRichText, sanitizeHtml } from "../src/lib/sanitize";
+import {
+  PROSE_COLOURS,
+  renderRichText,
+  sanitizeHtml,
+} from "../src/lib/sanitize";
 import type { Classification, Game, RatingRow } from "../src/lib/types";
 
 let failures = 0;
@@ -461,6 +465,81 @@ console.log("\n12. The explainer is stored HTML, so it is sanitised");
   check("a comment cannot smuggle a tag", !sanitizeHtml("<!-- <script>x</script> -->").includes("script"));
   check("bare text is escaped", sanitizeHtml("a < b & c") === "a &lt; b &amp; c");
   check("empty in, empty out", sanitizeHtml("") === "");
+}
+
+console.log("\n13. Colour is allowed in, and nothing else is");
+{
+  const S = sanitizeHtml;
+
+  // The two ways to colour something.
+  check("a named theme colour survives",
+    S('<span class="c-brand">x</span>') === '<span class="c-brand">x</span>');
+  check("so does a hex",
+    S('<span style="color:#e01b1b">x</span>') === '<span style="color: #e01b1b">x</span>',
+    S('<span style="color:#e01b1b">x</span>'));
+  check("and a keyword", S('<p style="color: red">x</p>') === '<p style="color: red">x</p>');
+  check("and rgb()",
+    S('<b style="color: rgb(224, 27, 27)">x</b>') === '<b style="color: rgb(224, 27, 27)">x</b>');
+  check("both at once on one tag",
+    S('<span class="c-good" style="color:#fff">x</span>')
+      === '<span class="c-good" style="color: #fff">x</span>',
+    S('<span class="c-good" style="color:#fff">x</span>'));
+
+  // An allowlist, so anything invented is gone.
+  check("an unknown class is dropped, keeping the text",
+    S('<span class="evil">x</span>') === "<span>x</span>");
+  check("a known class among unknown ones is kept alone",
+    S('<span class="evil c-warn other">x</span>') === '<span class="c-warn">x</span>');
+
+  // Everything a style attribute must not be able to carry.
+  check("expression() cannot get through",
+    S('<span style="color:expression(alert(1))">x</span>') === "<span>x</span>",
+    S('<span style="color:expression(alert(1))">x</span>'));
+  check("nor a url()",
+    S('<span style="color:url(javascript:alert(1))">x</span>') === "<span>x</span>");
+  check("a property that is not colour is discarded",
+    S('<span style="background:url(javascript:alert(1))">x</span>') === "<span>x</span>");
+  check("a backslash escape cannot get through",
+    S('<span style="color:\\65 xpression(1)">x</span>') === "<span>x</span>");
+  check("nor a comment",
+    S('<span style="color:/**/red">x</span>') === "<span>x</span>");
+  // Keeps the colour, drops the injection — the same leniency as the
+  // word-processor case below, and what matters is that nothing of the
+  // second declaration reaches the page.
+  check(
+    "a value cannot close its own rule to restyle the page",
+    S('<span style="color:red;} body{display:none}">x</span>') ===
+      '<span style="color: red">x</span>',
+    S('<span style="color:red;} body{display:none}">x</span>'),
+  );
+  check(
+    "and an injection with no valid colour beside it leaves nothing",
+    S('<span style="} body{display:none}">x</span>') === "<span>x</span>",
+    S('<span style="} body{display:none}">x</span>'),
+  );
+
+  // Lenient about its neighbours, strict about itself.
+  check("a word-processor paste keeps the colour and loses the rest",
+    S('<span style="color:#FF0000;font-family:Arial">x</span>')
+      === '<span style="color: #FF0000">x</span>',
+    S('<span style="color:#FF0000;font-family:Arial">x</span>'));
+
+  // Shape of the output itself.
+  check("a quote in a value cannot break out of the attribute",
+    !S('<span style=\'color: "onload=alert(1)\'>x</span>').includes("onload"),
+    S('<span style=\'color: "onload=alert(1)\'>x</span>'));
+  check("colour is not accepted on a structural tag",
+    S('<ul style="color:red" class="c-brand"><li>x</li></ul>') === "<ul><li>x</li></ul>",
+    S('<ul style="color:red" class="c-brand"><li>x</li></ul>'));
+  check("but is on a list item",
+    S('<li class="c-muted">x</li>') === '<li class="c-muted">x</li>');
+  check("a link keeps its href alongside a colour",
+    S('<a href="/teams" class="c-brand">x</a>').includes('href="/teams"') &&
+      S('<a href="/teams" class="c-brand">x</a>').includes('class="c-brand"'));
+  check("every name the admin advertises is actually accepted",
+    PROSE_COLOURS.every(
+      (c) => S(`<span class="${c}">x</span>`) === `<span class="${c}">x</span>`,
+    ));
 
   // The live explainer is authored with newlines and no block tags at all.
   check("a newline becomes a break, because that is how it was typed",

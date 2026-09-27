@@ -27,12 +27,75 @@ const ALLOWED = new Set([
 /** Tags whose entire contents go, not just the tag. */
 const STRIP_CONTENT = new Set(["script", "style", "iframe", "object", "embed", "svg"]);
 
+/**
+ * Tags that may carry a colour.
+ *
+ * Text-bearing ones only. There is no reason to colour a `<ul>` or an `<hr>`,
+ * and every attribute allowed somewhere it is not needed is surface area on
+ * the one piece of markup here that comes out of the database.
+ */
+const COLOURABLE = new Set([
+  "span", "strong", "b", "em", "i", "u",
+  "p", "h2", "h3", "h4", "li", "a", "blockquote",
+]);
+
+/**
+ * Named colours the explainer may use.
+ *
+ * Each is defined in `globals.css` against a theme token, so it redefines
+ * itself when the light/dark toggle flips. A hand-picked hex cannot do that —
+ * it is one colour in both themes — so these exist for the common cases and
+ * the hex escape hatch below exists for the rest.
+ */
+export const PROSE_COLOURS = [
+  "c-brand",
+  "c-good",
+  "c-warn",
+  "c-bad",
+  "c-muted",
+  "c-strong",
+] as const;
+const CLASS_ALLOWED = new Set<string>(PROSE_COLOURS);
+
 const ALLOWED_ATTRS: Record<string, Set<string>> = {
   a: new Set(["href", "title"]),
 };
 
 /** Only these can start an href. Anything else — javascript:, data: — is dropped. */
 const SAFE_HREF = /^(https?:\/\/|mailto:|\/|#)/i;
+
+/**
+ * A colour value we are willing to put back into the document.
+ *
+ * Rebuilt from a match rather than passed through, which is what makes the
+ * rest of a `style` attribute unable to ride along. Three shapes and nothing
+ * else: a hex, a functional notation whose arguments are numeric, or a bare
+ * keyword. `expression(...)`, `url(javascript:...)`, a backslash escape, a
+ * comment, a second declaration — none of them can match any of the three.
+ */
+const COLOUR_VALUE =
+  /^(#[0-9a-f]{3,8}|(?:rgb|rgba|hsl|hsla)\([0-9., %/]+\)|[a-z]{3,20})$/i;
+
+/**
+ * Keeps the colour out of a style attribute and discards everything else.
+ *
+ * Forgiving by design about what surrounds it: a paste out of a word processor
+ * arrives as `color:#FF0000;font-family:Arial`, and refusing the whole
+ * attribute over the second half would throw away the colour the author
+ * actually chose. So declarations are read one at a time and only `color`
+ * survives.
+ */
+function cleanStyle(raw: string): string | null {
+  for (const decl of raw.split(";")) {
+    const i = decl.indexOf(":");
+    if (i === -1) continue;
+    if (decl.slice(0, i).trim().toLowerCase() !== "color") continue;
+    const value = decl.slice(i + 1).trim();
+    if (!COLOUR_VALUE.test(value)) continue;
+    return `color: ${value}`;
+  }
+  return null;
+}
 
 const escapeText = (s: string) =>
   s
@@ -42,14 +105,31 @@ const escapeText = (s: string) =>
 
 function cleanAttrs(tag: string, raw: string): string {
   const allowed = ALLOWED_ATTRS[tag];
-  if (!allowed) return "";
+  const colourable = COLOURABLE.has(tag);
+  if (!allowed && !colourable) return "";
   const out: string[] = [];
   const re = /([a-zA-Z-]+)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(raw))) {
     const name = m[1].toLowerCase();
-    if (!allowed.has(name)) continue;
     const value = (m[3] ?? m[4] ?? m[5] ?? "").trim();
+
+    if (colourable && name === "class") {
+      // An allowlist, not a filter: a name that is not one of ours is gone,
+      // rather than being passed through to collide with a site class.
+      const keep = value
+        .split(/\s+/)
+        .filter((c) => CLASS_ALLOWED.has(c.toLowerCase()));
+      if (keep.length) out.push(`class="${keep.join(" ")}"`);
+      continue;
+    }
+    if (colourable && name === "style") {
+      const style = cleanStyle(value);
+      if (style) out.push(`style="${style}"`);
+      continue;
+    }
+
+    if (!allowed?.has(name)) continue;
     if (name === "href" && !SAFE_HREF.test(value)) continue;
     out.push(`${name}="${escapeText(value).replace(/"/g, "&quot;")}"`);
   }

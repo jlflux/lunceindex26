@@ -12,9 +12,12 @@
  */
 import {
   computeOdds,
+  podBracket,
+  podSize,
   podsFor,
+  qualifiersFor,
   roundNames,
-  QUALIFIERS_PER_REGION,
+  seedSlots,
 } from "../src/lib/playoffs";
 import type { Classification, Game, RatingRow } from "../src/lib/types";
 
@@ -115,6 +118,64 @@ console.log("\n1. The bracket, as the 2025 season played it");
     JSON.stringify(podsFor(2)) === JSON.stringify([[1,2]]));
 }
 
+console.log("\n1b. The standard bracket reproduces the AHSAA pairing");
+{
+  check("four slots order 1,4,2,3", seedSlots(4).join() === "1,4,2,3", seedSlots(4).join());
+  check("eight slots order 1,8,4,5,2,7,3,6",
+    seedSlots(8).join() === "1,8,4,5,2,7,3,6", seedSlots(8).join());
+
+  // Pod seeds alternate the two regions, so with four from each the ordinary
+  // bracket lays out A1-B4, B2-A3, B1-A4, A2-B3 — which is what every
+  // eight-region class actually played in 2025. It was not built to match.
+  const seeded = [
+    ["A1", "A2", "A3", "A4"],
+    ["B1", "B2", "B3", "B4"],
+  ];
+  const flat = podBracket(seeded, [1, 2], 4);
+  const games = [];
+  for (let i = 0; i < flat.length; i += 2) games.push(`${flat[i]}v${flat[i + 1]}`);
+  check(
+    "four qualifiers give the 2025 pairing",
+    games.join(" ") === "A1vB4 B2vA3 B1vA4 A2vB3",
+    games.join(" "),
+  );
+
+  // 6A sends six, so a pod of twelve sits in a bracket of sixteen and the
+  // four empty slots land against the four best seeds — the two region
+  // champions and the two runners-up.
+  check("six qualifiers need a bracket of sixteen", podSize(6) === 16, `${podSize(6)}`);
+  const six = [
+    ["A1", "A2", "A3", "A4", "A5", "A6"],
+    ["B1", "B2", "B3", "B4", "B5", "B6"],
+  ];
+  const f6 = podBracket(six, [1, 2], 6);
+  const byes = [];
+  for (let i = 0; i < f6.length; i += 2) {
+    if (f6[i] && !f6[i + 1]) byes.push(f6[i]);
+    if (!f6[i] && f6[i + 1]) byes.push(f6[i + 1]);
+  }
+  check(
+    "the champions and runners-up sit out the first round",
+    byes.sort().join() === "A1,A2,B1,B2",
+    byes.join(),
+  );
+  check("and everybody else plays", f6.filter(Boolean).length === 12);
+  check("eight qualifiers need no byes", podSize(8) === 16 &&
+    podBracket([["A1","A2","A3","A4","A5","A6","A7","A8"],
+                ["B1","B2","B3","B4","B5","B6","B7","B8"]], [1, 2], 8)
+      .every((x) => x !== ""));
+}
+
+console.log("\n1c. Each classification sends what it is told to send");
+{
+  check("6A sends six", qualifiersFor("6A") === 6);
+  check("1A through 5A send four",
+    ["1A","2A","3A","4A","5A"].every((c) => qualifiersFor(c) === 4));
+  check("A sends four", qualifiersFor("A") === 4);
+  check("AA sends all eight", qualifiersFor("AA") === 8);
+  check("but never more than a region holds", qualifiersFor("AA", 5) === 5);
+}
+
 console.log("\n2. Rounds are named from the final backwards");
 {
   check("five rounds", roundNames(5).join(", ") ===
@@ -145,7 +206,7 @@ console.log("\n3. Probabilities behave like probabilities");
   check(
     "the four seeds of a region sum to one per team-slot",
     Math.abs(c.teams.reduce((a, t) => a + t.seeds.reduce((x, y) => x + y, 0), 0) -
-      8 * QUALIFIERS_PER_REGION) < 1e-9,
+      8 * qualifiersFor("1A")) < 1e-9,
   );
   check(
     "making the playoffs is exactly holding one of the four seeds",
@@ -175,6 +236,36 @@ console.log("\n3. Probabilities behave like probabilities");
     "and never wins a round more often than it makes the playoffs",
     c.teams.every((t) => t.rounds[0] <= t.playoff + 1e-12),
   );
+}
+
+console.log("\n3b. A class that seeds more than four");
+{
+  // 6A sends six from each region, so there are six seeds to account for and
+  // six columns to fill. A tally sized to four leaves the last two empty,
+  // which looks like "nobody ever finishes fifth" rather than like a bug.
+  const teams = field("6A", 4, 8);
+  const r = computeOdds(teams, roundRobin(teams), { trials: 400, seed: 21 });
+  const c = r.classes.find((x) => x.classification === "6A")!;
+  check("six qualifiers", c.qualifiers === 6, `${c.qualifiers}`);
+  check("six seed columns", c.teams[0].seeds.length === 6, `${c.teams[0].seeds.length}`);
+  check(
+    "every seed is actually finished on by somebody",
+    c.teams[0].seeds.every((_, i) => c.teams.some((t) => t.seeds[i] > 0)),
+    c.teams[0].seeds.map((_, i) => c.teams.reduce((a, t) => a + t.seeds[i], 0).toFixed(2)).join(" "),
+  );
+  check(
+    "each seed is held by exactly one team per region per season",
+    c.teams[0].seeds.every((_, i) =>
+      Math.abs(c.teams.reduce((a, t) => a + t.seeds[i], 0) - 4) < 1e-9,
+    ),
+  );
+  check(
+    "making the playoffs is still exactly holding one of the seeds",
+    c.teams.every(
+      (t) => Math.abs(t.playoff - t.seeds.reduce((a, b) => a + b, 0)) < 1e-9,
+    ),
+  );
+  check("and 24 qualifiers still make a five-round bracket", c.roundNames.length === 5);
 }
 
 console.log("\n4. Better teams do better");

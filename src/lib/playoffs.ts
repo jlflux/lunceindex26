@@ -24,9 +24,8 @@
  *     that deserves one, so both flags come from a separate argument that
  *     cannot be wrong in the direction that matters — see `standingsBounds`.
  *
- * What is a genuine assumption is how many teams each region sends. Four is
- * the long-standing AHSAA rule; QUALIFIERS_PER_REGION is the one place to
- * change it.
+ * How many teams each region sends is not derived from anything — it is told
+ * to us, and it differs by classification. See QUALIFIERS.
  */
 import { officialWinner } from "./result";
 import {
@@ -36,8 +35,36 @@ import {
   type RatingRow,
 } from "./types";
 
-/** How many teams each region sends to the playoffs. */
-export const QUALIFIERS_PER_REGION = 4;
+/**
+ * How many teams each region sends to the playoffs, by classification.
+ *
+ * Not a single number: 6A sends six from each of its four regions, and AA
+ * sends every team in both of its, which makes its bracket a seeding exercise
+ * rather than a qualification one. Everything else sends four.
+ *
+ * This is the one part of the format that is told to us rather than derived
+ * from a previous season, so it is a table on its own and the only thing to
+ * edit if the association changes it.
+ */
+export const QUALIFIERS: Record<string, number> = {
+  "6A": 6,
+  "5A": 4,
+  "4A": 4,
+  "3A": 4,
+  "2A": 4,
+  "1A": 4,
+  AA: 8,
+  A: 4,
+};
+
+/** Fallback for a classification the table does not name. */
+export const QUALIFIERS_DEFAULT = 4;
+
+export function qualifiersFor(cls: string, size?: number): number {
+  const q = QUALIFIERS[cls] ?? QUALIFIERS_DEFAULT;
+  // Never ask for more teams than a region holds.
+  return size ? Math.min(q, size) : q;
+}
 
 /**
  * Rating points over which a gap becomes a near-certainty.
@@ -105,7 +132,7 @@ export interface TeamOdds {
   proj_l: number;
   /** Share of simulated seasons in which the team reaches the playoffs. */
   playoff: number;
-  /** Share finishing 1st, 2nd, 3rd and 4th in its region. */
+  /** Share finishing on each qualifying seed, 1st first. Length varies by class. */
   seeds: number[];
   /** Share winning each round, in bracket order. Last entry is the title. */
   rounds: number[];
@@ -182,6 +209,7 @@ export function computeOdds(
     trials?: number;
     scale?: number;
     hfa?: number;
+    /** Overrides the per-classification table. Tests use it. */
     qualifiers?: number;
     seed?: number;
   } = {},
@@ -189,7 +217,6 @@ export function computeOdds(
   const trials = opts.trials ?? 10000;
   const scale = opts.scale ?? WIN_SCALE.classic;
   const hfa = opts.hfa ?? 2;
-  const qualifiers = opts.qualifiers ?? QUALIFIERS_PER_REGION;
   const rnd = mulberry32(opts.seed ?? 20260826);
 
   const meta = new Map<string, { c: Classification; r: number }>();
@@ -209,7 +236,15 @@ export function computeOdds(
     const regions = Math.max(...field.map((t) => t.region));
     const pods = podsFor(regions);
     if (!pods.length) continue;
-    const bracketSize = pods.length * 2 * qualifiers;
+    // Smallest region in the class caps it: a region cannot send more teams
+    // than it holds.
+    const smallest = Math.min(
+      ...Array.from({ length: regions }, (_, i) =>
+        field.filter((t) => t.region === i + 1).length,
+      ).filter((n) => n > 0),
+    );
+    const qualifiers = opts.qualifiers ?? qualifiersFor(cls, smallest);
+    const bracketSize = pods.length * podSize(qualifiers);
     const rounds = Math.round(Math.log2(bracketSize));
 
     // Region games involving this class, split into settled and outstanding.
@@ -256,7 +291,12 @@ export function computeOdds(
     const madePlayoffs = new Int32Array(names.length);
     const sumW = new Float64Array(names.length);
     const sumL = new Float64Array(names.length);
-    const seedHits = Array.from({ length: 4 }, () => new Int32Array(names.length));
+    // One counter per qualifying place, not a fixed four — 6A seeds six and
+    // AA seeds eight.
+    const seedHits = Array.from(
+      { length: qualifiers },
+      () => new Int32Array(names.length),
+    );
     const roundHits = Array.from({ length: rounds }, () => new Int32Array(names.length));
 
     // Head-to-head, so a tie in the region table is broken the way the
@@ -316,21 +356,24 @@ export function computeOdds(
       }
 
       // 3. Build the first round and play the bracket out.
-      let slots: string[] = [];
+      const slots: string[] = [];
       for (let p = 0; p < pods.length; p += 2) {
-        const P = podGames(seeded, pods[p], qualifiers);
-        const Q = pods[p + 1] ? podGames(seeded, pods[p + 1], qualifiers) : null;
+        const P = podBracket(seeded, pods[p], qualifiers);
+        const Q = pods[p + 1]
+          ? podBracket(seeded, pods[p + 1], qualifiers)
+          : null;
         if (!Q) {
-          // A single pod (two regions) is a straight bracket of its own.
-          for (const m of P) slots.push(m[0], m[1]);
+          // A single pod is a straight bracket of its own.
+          slots.push(...P);
           continue;
         }
-        // Interleaved so the ordinary adjacent-pair advancement below sends
-        // each pod's winners across to the other pod, which is what the 2025
-        // second rounds did in every class.
-        for (let i = 0; i < P.length; i++) {
-          const q = Q[Q.length - 1 - i];
-          slots.push(P[i][0], P[i][1], q[0], q[1]);
+        // Interleaved a game at a time, so the ordinary adjacent-pair
+        // advancement below sends each pod's winners across to the other pod
+        // — which is what the 2025 second rounds did in every class. Q is
+        // taken from its far end so the two pods' top seeds stay apart.
+        for (let i = 0; i < P.length; i += 2) {
+          const j = Q.length - 2 - i;
+          slots.push(P[i], P[i + 1], Q[j], Q[j + 1]);
         }
       }
 
@@ -341,12 +384,12 @@ export function computeOdds(
       for (const n of seeded.flat()) madePlayoffs[idx.get(n)!]++;
       for (let r = 1; r <= regions; r++) {
         const list = seeded[r - 1];
-        for (let s = 0; s < list.length && s < 4; s++) {
+        for (let s = 0; s < list.length && s < qualifiers; s++) {
           seedHits[s][idx.get(list[s])!]++;
         }
       }
 
-      let alive = slots;
+          let alive: string[] = slots;
       for (let round = 0; round < rounds; round++) {
         const next: string[] = [];
         for (let i = 0; i + 1 < alive.length; i += 2) {
@@ -444,27 +487,56 @@ export function computeOdds(
 }
 
 /**
- * The four first-round games inside one pod of two regions.
+ * Standard bracket order: which seed sits in which slot, for a field of `m`.
  *
- * The champion of each hosts the other's fourth seed, and the runner-up hosts
- * the other's third — the pairing the AHSAA has used for years, and the one
- * every eight-region class followed in 2025.
+ * m=4 gives [1,4,2,3]; m=8 gives [1,8,4,5,2,7,3,6]. Built by the usual
+ * doubling rule, so the top seed meets the bottom one and the two best are
+ * kept apart until the final.
  */
-function podGames(
+export function seedSlots(m: number): number[] {
+  let arr = [1];
+  while (arr.length < m) {
+    const n = arr.length * 2;
+    const next: number[] = [];
+    for (const seed of arr) next.push(seed, n + 1 - seed);
+    arr = next;
+  }
+  return arr;
+}
+
+/**
+ * One pod's first round: two regions' qualifiers, laid into a bracket.
+ *
+ * The pod is seeded by alternating the regions — each region's champion, then
+ * each runner-up, and so on — and then dropped into the standard bracket order
+ * above. With four from each region that reproduces the AHSAA pairing exactly:
+ * A1-B4, B2-A3, B1-A4, A2-B3, which is what all six eight-region classes did
+ * in 2025. It was not built to match; it falls out of ordinary bracket
+ * seeding, which is a reason to trust it for the sizes there is no precedent
+ * for.
+ *
+ * When the field is not a power of two the empty slots land against the top
+ * seeds, which is what a bye is. 6A sending six from each region gives a pod
+ * of twelve in a bracket of sixteen, so each region's champion and runner-up
+ * sit out the first round.
+ */
+export function podBracket(
   seeded: string[][],
   pod: [number, number],
   qualifiers: number,
-): [string, string][] {
+): string[] {
   const A = seeded[pod[0] - 1] ?? [];
   const B = seeded[pod[1] - 1] ?? [];
-  const at = (list: string[], seed: number) => list[seed - 1] ?? "";
-  const worst = qualifiers; // 4th seed in the usual format
-  const second = Math.min(2, qualifiers);
-  const third = Math.min(3, qualifiers);
-  return [
-    [at(A, 1), at(B, worst)],
-    [at(B, second), at(A, third)],
-    [at(B, 1), at(A, worst)],
-    [at(A, second), at(B, third)],
-  ];
+  // Pod seed order: A1, B1, A2, B2, …
+  const order: string[] = [];
+  for (let i = 0; i < qualifiers; i++) {
+    order.push(A[i] ?? "", B[i] ?? "");
+  }
+  const m = podSize(qualifiers);
+  return seedSlots(m).map((seed) => order[seed - 1] ?? "");
+}
+
+/** Bracket size for one pod: the field rounded up to a power of two. */
+export function podSize(qualifiers: number): number {
+  return Math.pow(2, Math.ceil(Math.log2(Math.max(2, qualifiers * 2))));
 }

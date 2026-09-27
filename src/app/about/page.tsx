@@ -114,6 +114,12 @@ export default function AboutPage() {
               chance happened about 70% of the time.
             </p>
             <p>
+              How many teams each region sends differs by classification: 6A
+              sends six, Class AA sends every team it has &mdash; so its
+              bracket is about seeding rather than qualifying &mdash; and the
+              rest send four.
+            </p>
+            <p>
               &ldquo;Clinched&rdquo; and &ldquo;eliminated&rdquo; are not read
               off the simulation. Ten thousand seasons without an outcome is not
               a proof, and those two words deserve one, so both come from what

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Icon from "./Icon";
 import type { ClassOdds, OddsReport, TeamOdds } from "@/lib/playoffs";
 import { CLS_FILTER_ORDER, type Classification } from "@/lib/types";
@@ -88,15 +88,24 @@ export default function OddsBoard({ report }: { report: OddsReport }) {
       </div>
 
       <ClassTable block={block} query={query.trim().toLowerCase()} />
-      <Legend qualifiers={block.qualifiers} />
+      <Legend block={block} />
     </div>
   );
+}
+
+/** True when the classification takes everybody — AA, as it stands. */
+function everyoneQualifies(block: ClassOdds): boolean {
+  return block.teams.every((t) => t.playoff === 1);
 }
 
 /** Every numeric column, so each can be scaled against its own range. */
 function columnsOf(block: ClassOdds) {
   return [
-    { key: "playoff", label: "Playoffs", wide: true },
+    // A column of nothing but 100% says nothing. Where every team in the
+    // classification is in the bracket, the question is seeding, not entry.
+    ...(everyoneQualifies(block)
+      ? []
+      : [{ key: "playoff", label: "Playoffs", wide: true }]),
     ...Array.from({ length: block.qualifiers }, (_, i) => ({
       key: `seed${i}`,
       label: i === 0 ? "1 seed" : `${i + 1}`,
@@ -171,8 +180,22 @@ function ClassTable({ block, query }: { block: ClassOdds; query: string }) {
             ))}
           </tr>
         </thead>
-        {visible.map((g) => (
-          <tbody key={g.region}>
+        {visible.map((g, gi) => (
+          <Fragment key={g.region}>
+            {/* Regions are separate competitions — four teams out of each go,
+                and nothing about one bears on another. A rule alone was not
+                enough to stop them reading as one long table. */}
+            {gi > 0 && (
+              <tbody aria-hidden>
+                <tr>
+                  <td
+                    colSpan={4 + cols.length}
+                    style={{ height: 14, background: "rgb(var(--canvas))" }}
+                  />
+                </tr>
+              </tbody>
+            )}
+          <tbody>
             {g.shown.map((t, j) => {
               const i = g.teams.indexOf(t);
               // The line qualification is drawn at: under fourth place. Only
@@ -189,9 +212,8 @@ function ClassTable({ block, query }: { block: ClassOdds; query: string }) {
                   {j === 0 && (
                     <td
                       rowSpan={g.shown.length}
-                      className="border-t px-1 text-center align-middle"
+                      className="px-1 text-center align-middle"
                       style={{
-                        borderColor: "rgb(var(--border-strong))",
                         borderRight: "1px solid rgb(var(--border))",
                         background: "rgb(var(--surface-2))",
                       }}
@@ -245,6 +267,7 @@ function ClassTable({ block, query }: { block: ClassOdds; query: string }) {
               );
             })}
           </tbody>
+          </Fragment>
         ))}
       </table>
     </div>
@@ -381,21 +404,33 @@ function Flag({ kind }: { kind: "x" | "e" }) {
   );
 }
 
-function Legend({ qualifiers }: { qualifiers: number }) {
+function Legend({ block }: { block: ClassOdds }) {
+  const all = everyoneQualifies(block);
   return (
     <p
       className="text-xs leading-relaxed"
       style={{ color: "rgb(var(--text-faint))" }}
     >
-      The rule under each region&rsquo;s {ordinalWord(qualifiers)} team is the
-      playoff line — everyone above it qualifies as the region stands.{" "}
-      <strong style={{ color: "rgb(var(--good))" }}>x</strong> clinched,{" "}
-      <strong>e</strong> eliminated; both are proved from the games left to play
-      rather than read off the simulation, so neither can be wrong. Each column
-      is shaded against its own best, so the strongest title chance reads as
-      strongly as the strongest playoff chance. Everything else is a share of
-      ten thousand simulated seasons and carries about half a point of sampling
-      noise.
+      {all ? (
+        <>
+          Every team in Class {block.classification} reaches the bracket, so
+          there is no line to draw and no playoff column to show — what the
+          region table decides here is the seed, and the seed decides the draw.
+        </>
+      ) : (
+        <>
+          The rule under each region&rsquo;s {ordinalWord(block.qualifiers)}{" "}
+          team is the playoff line — everyone above it qualifies as the region
+          stands.{" "}
+          <strong style={{ color: "rgb(var(--good))" }}>x</strong> clinched,{" "}
+          <strong>e</strong> eliminated; both are proved from the games left to
+          play rather than read off the simulation, so neither can be wrong.
+        </>
+      )}{" "}
+      Each column is shaded against its own best, so the strongest title chance
+      reads as strongly as the strongest playoff chance. Every figure is a
+      share of ten thousand simulated seasons and carries about half a point of
+      sampling noise.
     </p>
   );
 }

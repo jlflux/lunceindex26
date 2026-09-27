@@ -212,8 +212,15 @@ than an error. `PROJECT.md` covers the reasoning.
 - **The playoff bracket is derived from data, not memory.** `podsFor` in
   `src/lib/playoffs.ts` encodes what the 2025 playoffs actually did: eight-region
   classes pair 1-2, 3-4, 5-6, 7-8 in the first round, four-region classes cross
-  1-4 and 2-3. `QUALIFIERS_PER_REGION` is the one genuine assumption — four per
-  region — and the one place to change it.
+  1-4 and 2-3. Ordinary bracket seeding then reproduces the AHSAA pairing
+  (A1-B4, B2-A3, B1-A4, A2-B3) on its own, which is why it is trusted for the
+  field sizes 2025 has no precedent for.
+- **Qualifiers per region differ by classification** and are told to us rather
+  than derived: 6A sends six, AA sends all eight (its bracket is a seeding
+  exercise, not a qualification one), everything else sends four. `QUALIFIERS`
+  in `src/lib/playoffs.ts` is the only place to change it. 6A's 24-team field
+  is not a power of two, so region champions and runners-up take first-round
+  byes.
 - **A forfeit changes the record, never the rating.** `forfeit_by` names which
   side gave a game up; the scores stay as played. Everything record-shaped
   (standings, region order, RPI, Résumé) reads the ruling, and the Index reads

@@ -295,8 +295,11 @@ export function decidingFactor(
  * beneath teams that have started and lost.
  */
 function standingKey(r: Record2): [number, number] {
-  const n = r.wins + r.losses;
-  return [n ? r.wins / n : 0.5, r.wins];
+  const n = r.wins + r.losses + r.ties;
+  // A tie is half a game won, not a game that never happened. Dividing by
+  // wins-plus-losses alone would let a team with three of them reach .500 on
+  // two wins while everyone else needed three and a half.
+  return [n ? (r.wins + r.ties / 2) / n : 0.5, r.wins];
 }
 
 /**

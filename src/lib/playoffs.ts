@@ -125,6 +125,8 @@ export interface TeamOdds {
   /** Region record as it stands, before any simulation. */
   region_w: number;
   region_l: number;
+  /** Games that finished level. Zero in any real Alabama season. */
+  region_t: number;
   /**
    * Mean region record across the simulated seasons — where this team is
    * heading rather than where it is. The analogue of a projected points total,
@@ -256,11 +258,11 @@ export function computeOdds(
     const rounds = Math.round(Math.log2(bracketSize));
 
     // Region games involving this class, split into settled and outstanding.
-    const settled = new Map<string, { w: number; l: number }>();
+    const settled = new Map<string, { w: number; l: number; t: number }>();
     const left: { t1: string; t2: string; neutral: boolean }[] = [];
     const leftCount = new Map<string, number>();
     for (const t of field) {
-      settled.set(t.name, { w: 0, l: 0 });
+      settled.set(t.name, { w: 0, l: 0, t: 0 });
       leftCount.set(t.name, 0);
     }
 
@@ -270,7 +272,15 @@ export function computeOdds(
       const winner = officialWinner(g);
       const decided = g.s1 !== null && g.s2 !== null;
       if (decided || g.forfeit_by) {
-        if (!winner) continue; // a tie changes neither record
+        if (!winner) {
+          // Played and level. Half a game won on each side, and never
+          // simulated — a coin has no middle.
+          const a = settled.get(g.t1);
+          const b = settled.get(g.t2);
+          if (a) a.t++;
+          if (b) b.t++;
+          continue;
+        }
         const w = settled.get(winner === "t1" ? g.t1 : g.t2);
         const l = settled.get(winner === "t1" ? g.t2 : g.t1);
         if (w) w.w++;
@@ -422,7 +432,11 @@ export function computeOdds(
           byRegion.get(r) ?? [],
           (name) => {
             const i = idx.get(name) as number;
-            return { wins: simW[i], losses: simL[i] };
+            return {
+              wins: simW[i],
+              losses: simL[i],
+              ties: settled.get(name)?.t ?? 0,
+            };
           },
           makeCtx,
         );
@@ -520,6 +534,7 @@ export function computeOdds(
         region: t.region,
         region_w: s.w,
         region_l: s.l,
+        region_t: s.t,
         proj_w: sumW[i] / trials,
         proj_l: sumL[i] / trials,
         playoff: share,

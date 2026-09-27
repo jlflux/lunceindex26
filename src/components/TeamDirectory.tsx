@@ -32,21 +32,22 @@ import {
 function RegionPill({ r }: { r: Record2 | undefined }) {
   const w = r?.wins ?? 0;
   const l = r?.losses ?? 0;
-  const played = w + l;
-  const pct = played ? w / played : 0.5;
+  const t = r?.ties ?? 0;
+  const played = w + l + t;
+  // Half credit for a level game, and counted in the denominator. Alabama
+  // decides football in overtime so this only matters if one is entered by
+  // mistake — but a tie hidden from the record makes the percentage lie.
+  const pct = played ? (w + t / 2) / played : 0.5;
+  const text = t ? `${w}-${l}-${t}` : `${w}-${l}`;
   return (
     <StatPill
       className="!text-[12px]"
       empty={played === 0}
       hot={pct >= 0.5}
       strength={Math.abs(pct - 0.5) * 2}
-      title={
-        played
-          ? `${w}-${l} in region play`
-          : "No region games played yet"
-      }
+      title={played ? `${text} in region play` : "No region games played yet"}
     >
-      {w}-{l}
+      {text}
     </StatPill>
   );
 }

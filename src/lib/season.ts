@@ -114,6 +114,13 @@ export function currentWeekKey(
 export interface Record2 {
   wins: number;
   losses: number;
+  /**
+   * Games that finished level. Alabama football decides games in overtime, so
+   * in practice this is always zero — but a 0-0 typed into the admin by
+   * mistake is a played, undecided game, and a tie left out of the standing
+   * entirely inflates the percentage of whoever has one.
+   */
+  ties: number;
 }
 
 /**
@@ -135,7 +142,7 @@ export function regionRecords(
   for (const t of ratings) meta.set(t.name, { c: t.classification, r: t.region });
 
   const out = new Map<string, Record2>();
-  for (const t of ratings) out.set(t.name, { wins: 0, losses: 0 });
+  for (const t of ratings) out.set(t.name, { wins: 0, losses: 0, ties: 0 });
 
   for (const g of games) {
     if (g.type === "playoff") continue;
@@ -148,7 +155,14 @@ export function regionRecords(
     if (!a || !b) continue; // one side is out of state
     if (a.c !== b.c || a.r !== b.r) continue; // not a region game
     const winner = officialWinner(g);
-    if (!winner) continue; // a tie
+    if (!winner) {
+      // Played and level. It counts as half a game won on each side.
+      const ta = out.get(g.t1);
+      const tb = out.get(g.t2);
+      if (ta) ta.ties++;
+      if (tb) tb.ties++;
+      continue;
+    }
     const w = out.get(winner === "t1" ? g.t1 : g.t2);
     const l = out.get(winner === "t1" ? g.t2 : g.t1);
     if (w) w.wins++;
@@ -248,7 +262,7 @@ export function orderRegionStandings(
   const by = new Map(teams.map((t) => [t.name, t]));
   const order = orderRegion(
     teams.map((t) => t.name),
-    (name) => reg.get(name) ?? { wins: 0, losses: 0 },
+    (name) => reg.get(name) ?? { wins: 0, losses: 0, ties: 0 },
     (teamAtPlace) => tieContext(data, teamAtPlace),
   );
   return order.map((n) => by.get(n) as RatingRow);

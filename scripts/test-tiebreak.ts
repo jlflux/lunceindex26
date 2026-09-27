@@ -153,7 +153,7 @@ console.log("\n5. One place at a time, restarting for the rest");
     region: ["A>B", "A>C", "B>C"],
     rating: { A: 1, B: 2, C: 99 },
   });
-  const rec = (): Record2 => ({ wins: 2, losses: 1 });
+  const rec = (): Record2 => ({ wins: 2, losses: 1, ties: 0 });
   const order = orderRegion(["C", "B", "A"], rec, (at) => ({
     ...ctx,
     teamAtPlace: at,
@@ -241,6 +241,35 @@ console.log("\n8. The equal-games factors stand down when games differ");
     "but the version without that condition still does",
     TIE_RULES.find((r) => r.key === "wins")!.apply(["A", "B"], uneven) !== null,
   );
+}
+
+console.log("\n8b. A tie is half a game won, not a game that never happened");
+{
+  // Alabama decides football games in overtime, so this is really a guard
+  // against a 0-0 typed in by mistake. Left out of the denominator entirely,
+  // three ties would let a 2-2 team outrank a 3-4 one.
+  const ctx = world({ rating: { Tied: 1, Clean: 2 } });
+  const rec = (t: string): Record2 =>
+    t === "Tied"
+      ? { wins: 2, losses: 2, ties: 3 }
+      : { wins: 3, losses: 4, ties: 0 };
+  const order = orderRegion(["Tied", "Clean"], rec, (at) => ({
+    ...ctx,
+    teamAtPlace: at,
+  }));
+  // (2 + 1.5) / 7 against (3 + 0) / 7 — the tied team really is ahead, but by
+  // half a game rather than by the sixth of a season a bare W/(W+L) would say.
+  check("half credit ranks 2-2-3 just above 3-4", order[0] === "Tied", order.join());
+
+  const rec2 = (t: string): Record2 =>
+    t === "Tied"
+      ? { wins: 2, losses: 2, ties: 3 }
+      : { wins: 4, losses: 3, ties: 0 };
+  const order2 = orderRegion(["Tied", "Clean"], rec2, (at) => ({
+    ...ctx,
+    teamAtPlace: at,
+  }));
+  check("and 4-3 is clear of it", order2[0] === "Clean", order2.join());
 }
 
 console.log("\n9. (q) is a coin flip, so it is replaced by something steady");

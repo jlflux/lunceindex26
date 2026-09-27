@@ -265,6 +265,7 @@ function ClassTable({ block, query }: { block: ClassOdds; query: string }) {
                       style={{ color: "rgb(var(--text-muted))" }}
                     >
                       {t.region_w}-{t.region_l}
+                      {t.region_t ? `-${t.region_t}` : ""}
                     </span>
                   </Td>
                   <Td first={j === 0} cut={cut} className="!text-center">
@@ -345,6 +346,26 @@ function Td({
 }
 
 /**
+ * The text in a cell.
+ *
+ * 100 and 0 are claims, not roundings. Every other figure is rounded to fit,
+ * and at the top of the range that rounding used to manufacture them: 99.6%
+ * came out as "100" by way of toFixed, which walked straight past the
+ * certainty check and told a team it was through when the simulation had
+ * found seasons where it was not. The reported symptom was a team at 99.6%
+ * reading 100% while a team at a true 100.0% read ">99%" beside it.
+ *
+ * So the top and bottom bands keep a decimal place. Nothing that is not at
+ * the extreme is allowed to print like it is.
+ */
+function label(v: number, certain?: boolean): string {
+  if (v >= 0.9995) return certain ? "100" : ">99";
+  if (v <= 0.0005) return certain ? "0" : "<1";
+  if (v >= 0.995 || v < 0.095) return (v * 100).toFixed(1);
+  return (v * 100).toFixed(0);
+}
+
+/**
  * A percentage as a filled pill, blue through to red.
  *
  * Diverging rather than a single hue, because the interesting reading is which
@@ -367,16 +388,7 @@ function Pill({
   /** Settled by arithmetic, not merely by every trial agreeing. */
   certain?: boolean;
 }) {
-  const shown =
-    v >= 0.9995
-      ? certain
-        ? "100"
-        : ">99"
-      : v <= 0.0005
-        ? certain
-          ? "0"
-          : "<1"
-        : (v * 100).toFixed(v < 0.095 ? 1 : 0);
+  const shown = label(v, certain);
   const tail = <span className="text-[9px] opacity-60">%</span>;
 
   // Never happened in any season. Still the bad end of the scale, but flat —
@@ -390,6 +402,7 @@ function Pill({
       </StatPill>
     );
   }
+
 
   const t = Math.max(0, Math.min(1, v / peak));
   // Pulled apart at the bottom: most of a classification lives under a tenth

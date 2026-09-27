@@ -232,6 +232,19 @@ than an error. `PROJECT.md` covers the reasoning.
   in `src/lib/playoffs.ts` is the only place to change it. 6A's 24-team field
   is not a power of two, so region champions and runners-up take first-round
   byes.
+- **Rounding can manufacture a certainty.** `(0.996 * 100).toFixed(0)` is
+  `"100"`. A probability display that rounds to whole percent will print a flat
+  100% for a team that is not in, and it never reaches whatever check guards
+  the word. `label()` in `src/components/OddsBoard.tsx` keeps a decimal place in
+  the top and bottom bands for that reason, so 100 and 0 can only be printed by
+  a team `clinched`, `eliminated` or `settled` arithmetically. The same trap
+  applies to any new percentage column.
+- **A tie is half a game won.** Standing order is
+  `(W + T/2) / (W + L + T)`, not `W / (W + L)` — leaving ties out of the
+  denominator lets three ties carry a 2-2 team past a 3-4 one. `standingKey` in
+  `src/lib/tiebreak.ts`. Alabama settles football games in overtime, so in
+  practice this is a guard against a 0-0 entered by mistake, but the standings,
+  the region order and the odds all read it.
 - **A forfeit changes the record, never the rating.** `forfeit_by` names which
   side gave a game up; the scores stay as played. Everything record-shaped
   (standings, region order, RPI, Résumé) reads the ruling, and the Index reads

@@ -19,6 +19,7 @@ import {
   roundNames,
   seedSlots,
 } from "../src/lib/playoffs";
+import { magnitude, polarity, recordShade } from "../src/lib/shade";
 import type { Classification, Game, RatingRow } from "../src/lib/types";
 
 let failures = 0;
@@ -465,6 +466,59 @@ console.log("\n9. Forfeits count in the region table the odds are built on");
     `${pb.region_w}-${pb.region_l}`);
   const qb = b.classes[0].teams.find((t) => t.name === "Q")!;
   check("and as a region win for the opponent", qb.region_w === 1);
+}
+
+console.log("\n10. The shading says what the number says");
+{
+  // The reported symptom: a 0.1% title chance was the boldest cell on the
+  // board and a genuine 9.4% contender was nearly blank. A two-sided scale is
+  // strongest at *both* ends, so on a column with no wrong side it put maximum
+  // ink on "no chance" — which is true of most of a classification and is news
+  // about none of it. These are the two properties that rules that out.
+  const peak = 0.3;
+  const ladder = [0, 0.001, 0.01, 0.05, 0.094, 0.15, 0.22, 0.3];
+
+  let monotone = true;
+  for (let i = 1; i < ladder.length; i++) {
+    const lo = magnitude(ladder[i - 1], peak);
+    const hi = magnitude(ladder[i], peak);
+    if (hi.strength < lo.strength) monotone = false;
+  }
+  check("a bigger number never gets less colour than a smaller one", monotone);
+
+  check(
+    "the no-hoper is quieter than the contender, which was the bug",
+    magnitude(0.001, peak).strength < magnitude(0.094, peak).strength,
+    `${magnitude(0.001, peak).strength.toFixed(3)} vs ${magnitude(0.094, peak).strength.toFixed(3)}`,
+  );
+  check(
+    "and the contender is genuinely visible rather than a rounding of blank",
+    magnitude(0.094, peak).strength > 0.4,
+    magnitude(0.094, peak).strength.toFixed(3),
+  );
+  check("a one-sided column never turns red", ladder.every((v) => magnitude(v, peak).hot));
+
+  // The playoff column keeps two sides, and its midpoint is an even chance —
+  // not a quarter, which is where scaling by the column's best and then taking
+  // a root used to put it. A team 30% likely to qualify read faintly positive.
+  check("an even chance is the neutral point", polarity(0.5).strength === 0);
+  check("30% to qualify is on the bad side of it", !polarity(0.3).hot);
+  check("70% is on the good side", polarity(0.7).hot);
+  check(
+    "and both ends are equally strong, being equally decisive",
+    Math.abs(polarity(0).strength - polarity(1).strength) < 1e-9,
+  );
+
+  // The standings read the same rule the other way: a record does have a wrong
+  // side, so it stays two-sided.
+  check("an even record is neutral", recordShade(2, 2).strength === 0);
+  check("a winning record is hot", recordShade(4, 1).hot);
+  check("a losing one is not", !recordShade(1, 4).hot);
+  check("no games played is reported, not shaded as a loss", recordShade(0, 0).played === 0);
+  check(
+    "a tie is half a game won",
+    Math.abs(recordShade(2, 2, 2).strength - recordShade(3, 3).strength) < 1e-9,
+  );
 }
 
 console.log(

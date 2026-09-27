@@ -232,6 +232,16 @@ than an error. `PROJECT.md` covers the reasoning.
   in `src/lib/playoffs.ts` is the only place to change it. 6A's 24-team field
   is not a power of two, so region champions and runners-up take first-round
   byes.
+- **A two-sided colour scale needs a wrong side.** `src/lib/shade.ts`. Both
+  arms of a diverging scale are strongest at their ends, so putting one on a
+  column with no line under it — seeds, rounds, the championship — spends
+  maximum ink on "no chance", which is true of most of a classification and is
+  news about none of it. It shipped that way: 0.1% to win the title drew 0.885
+  of the available colour and a real 9.4% contender drew 0.120. Only the
+  playoff column and a win-loss record have a genuine midpoint, so only those
+  two are `polarity`; everything else is `magnitude` and shades one way. The
+  invariant — a bigger number never gets less ink — is checked in
+  `npm run test:playoffs`.
 - **Rounding can manufacture a certainty.** `(0.996 * 100).toFixed(0)` is
   `"100"`. A probability display that rounds to whole percent will print a flat
   100% for a team that is not in, and it never reaches whatever check guards

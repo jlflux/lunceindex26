@@ -5,6 +5,7 @@ import { Fragment, useMemo, useState } from "react";
 import Icon from "./Icon";
 import StatPill from "./StatPill";
 import type { ClassOdds, OddsReport, TeamOdds } from "@/lib/playoffs";
+import { magnitude, polarity } from "@/lib/shade";
 import { CLS_FILTER_ORDER, type Classification } from "@/lib/types";
 
 /**
@@ -99,23 +100,38 @@ function everyoneQualifies(block: ClassOdds): boolean {
   return block.teams.every((t) => t.playoff === 1);
 }
 
-/** Every numeric column, so each can be scaled against its own range. */
-function columnsOf(block: ClassOdds) {
+/**
+ * How a column's colour is allowed to behave.
+ *
+ * `polarity` is a two-sided scale around a line the team is on one side of.
+ * `magnitude` is one-sided: more of the number is more colour, and none of it
+ * is no colour. Which one a column takes is not a matter of taste — it is a
+ * question about whether the column has a wrong answer, and only one of them
+ * does. See `Pill`.
+ */
+type Scale = "polarity" | "magnitude";
+
+/** Every numeric column, with the kind of scale its question deserves. */
+function columnsOf(block: ClassOdds): {
+  key: string;
+  label: string;
+  scale: Scale;
+}[] {
   return [
     // A column of nothing but 100% says nothing. Where every team in the
     // classification is in the bracket, the question is seeding, not entry.
     ...(everyoneQualifies(block)
       ? []
-      : [{ key: "playoff", label: "Playoffs", wide: true }]),
+      : [{ key: "playoff", label: "Playoffs", scale: "polarity" as Scale }]),
     ...Array.from({ length: block.qualifiers }, (_, i) => ({
       key: `seed${i}`,
       label: i === 0 ? "1 seed" : `${i + 1}`,
-      wide: false,
+      scale: "magnitude" as Scale,
     })),
     ...block.roundNames.map((n, i) => ({
       key: `round${i}`,
       label: shortRound(n),
-      wide: false,
+      scale: "magnitude" as Scale,
     })),
   ];
 }
@@ -145,12 +161,15 @@ const valueOf = (t: TeamOdds, key: string): number => {
 function ClassTable({ block, query }: { block: ClassOdds; query: string }) {
   const cols = columnsOf(block);
 
-  // Each column is scaled against its own best. A 12% title chance is the
-  // strongest number in that column and should read that way, while 12% of
-  // making the playoffs is close to hopeless — the same figure meaning
-  // opposite things is exactly what a shared scale would hide.
+  // Each magnitude column is scaled against its own best. A 12% title chance
+  // is the strongest number in that column and should read that way, while 12%
+  // of making the playoffs is close to hopeless — the same figure meaning
+  // opposite things is exactly what a shared scale would hide. The playoff
+  // column needs no peak: it is measured against an even chance, which is a
+  // fixed thing.
   const peak = new Map<string, number>();
   for (const c of cols) {
+    if (c.scale !== "magnitude") continue;
     peak.set(
       c.key,
       Math.max(0.02, ...block.teams.map((t) => valueOf(t, c.key))),
@@ -277,7 +296,8 @@ function ClassTable({ block, query }: { block: ClassOdds; query: string }) {
                     <Td key={c.key} first={j === 0} cut={cut} className="!px-1">
                       <Pill
                         v={valueOf(t, c.key)}
-                        peak={peak.get(c.key) as number}
+                        scale={c.scale}
+                        peak={peak.get(c.key)}
                         certain={isCertain(t, c.key)}
                       />
                     </Td>
@@ -366,12 +386,35 @@ function label(v: number, certain?: boolean): string {
 }
 
 /**
- * A percentage as a filled pill, blue through to red.
+ * A percentage as a filled pill.
  *
- * Diverging rather than a single hue, because the interesting reading is which
- * side of the middle a team is on. A one-hue ramp renders the whole bottom of
- * a sixty-team classification as the same near-empty wash, which is where most
- * of the teams are and where most of the questions are.
+ * The colour has one job, and it is not "show the number again" — the number is
+ * already there in the cell. It is to make the cells worth looking at louder
+ * than the cells that are not. Which means the whole question is: in this
+ * column, what counts as worth looking at?
+ *
+ * Two answers, and a column gets one or the other.
+ *
+ * **Qualifying has a wrong side.** There is a line under the fourth team and a
+ * team is above it or below it, so the column reads as polarity: blue above an
+ * even chance, red below it, and the further from even the more of it. Red here
+ * means what red should mean — in trouble. It is measured against a flat 50%
+ * rather than against the best team in the column, because an even chance to
+ * qualify means the same thing in every region in the state.
+ *
+ * **Everything else is one-sided.** A team is not on the wrong side of the
+ * championship. Nobody is *in trouble* in the title column; there is no line to
+ * be under. So those columns read as magnitude — one hue, and more of the
+ * number is more of it. A team with no chance gets no colour, which is correct,
+ * because that is the least interesting cell on the board and there are
+ * hundreds of them.
+ *
+ * Both columns used to be the two-sided one, and it inverted the board. The
+ * arms of a diverging scale are strongest at *both* ends, so 0.1% to win the
+ * title — a fact about forty of the forty-eight teams in a classification, and
+ * news about none of them — came out as the loudest cell on the page, while a
+ * genuine 9.4% contender sat a shade off blank. That was the reported symptom.
+ * The cause was using a two-sided scale on a quantity with only one side.
  *
  * `certain` decides whether the extremes may be printed flat. Ten thousand
  * seasons out of ten thousand is not the same claim as "cannot fail", and a
@@ -380,40 +423,45 @@ function label(v: number, certain?: boolean): string {
  */
 function Pill({
   v,
+  scale,
   peak,
   certain,
 }: {
   v: number;
-  peak: number;
+  scale: Scale;
+  /** The column's best, for a magnitude column. Unused by a polarity one. */
+  peak?: number;
   /** Settled by arithmetic, not merely by every trial agreeing. */
   certain?: boolean;
 }) {
   const shown = label(v, certain);
   const tail = <span className="text-[9px] opacity-60">%</span>;
+  const cls = "w-full !text-[12.5px] !py-1";
 
-  // Never happened in any season. Still the bad end of the scale, but flat —
-  // at ten columns a wall of full-strength red is the first thing the eye
-  // lands on, and "did not happen" is the least interesting cell there is.
-  if (v <= 0.0005) {
+  // Never happened in any season, in a column where that is simply the absence
+  // of a chance rather than a bad outcome. Flat: the distinction between 0.0%
+  // and 0.1% is not one the eye should be asked to make, and neither is worth a
+  // drop of ink. The polarity column keeps its colour at zero, because there
+  // nought per cent is the news.
+  if (scale === "magnitude" && v <= 0.0005) {
     return (
-      <StatPill className="w-full !text-[12.5px] !py-1" strength={0} hot={false} empty>
+      <StatPill className={cls} strength={0} hot empty>
         {shown}
         {tail}
       </StatPill>
     );
   }
 
+  // No `empty` at a polarity midpoint: the pill already fades to a 12% tint of
+  // its hue there, neutral enough that a 49% and a 51% read alike — as they
+  // should, being the same news. Painting it `empty` would also drop the text
+  // to the faint ink reserved for a team with no games played, and an even
+  // chance to qualify is the most interesting cell in the column, not the least.
+  const { hot, strength } =
+    scale === "polarity" ? polarity(v) : magnitude(v, peak ?? 1);
 
-  const t = Math.max(0, Math.min(1, v / peak));
-  // Pulled apart at the bottom: most of a classification lives under a tenth
-  // of the leader, and a linear ramp gives all of it the same colour.
-  const k = Math.sqrt(t);
   return (
-    <StatPill
-      className="w-full !text-[12.5px] !py-1"
-      hot={k >= 0.5}
-      strength={Math.abs(k - 0.5) * 2}
-    >
+    <StatPill className={cls} hot={hot} strength={strength}>
       {shown}
       {tail}
     </StatPill>
@@ -466,10 +514,22 @@ function Legend({ block }: { block: ClassOdds }) {
           play rather than read off the simulation, so neither can be wrong.
         </>
       )}{" "}
-      Each column is shaded against its own best, so the strongest title chance
-      reads as strongly as the strongest playoff chance. Every figure is a
-      share of ten thousand simulated seasons and carries about half a point of
-      sampling noise.
+      {!all && (
+        <>
+          The playoff column is the only one with a wrong side, so it is the
+          only one that turns red:{" "}
+          <strong style={{ color: "rgb(var(--odds-hi))" }}>blue</strong> above
+          an even chance of qualifying,{" "}
+          <strong style={{ color: "rgb(var(--odds-lo))" }}>red</strong> below
+          it.{" "}
+        </>
+      )}
+      Seeds and rounds only shade one way, since no team is on the wrong side of
+      a championship — more blue is a better chance, and a team without one
+      stays blank. Those columns are each shaded against their own best, so the
+      strongest title chance reads as strongly as the strongest shot at a seed.
+      Every figure is a share of ten thousand simulated seasons and carries
+      about half a point of sampling noise.
     </p>
   );
 }

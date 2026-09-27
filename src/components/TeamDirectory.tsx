@@ -6,6 +6,7 @@ import StatPill from "./StatPill";
 import { useMemo, useState } from "react";
 import Icon from "./Icon";
 import { fmt, ordinal, record } from "@/lib/format";
+import { recordShade } from "@/lib/shade";
 import { qualifiersFor } from "@/lib/playoffs";
 import {
   orderRegionStandings,
@@ -29,22 +30,27 @@ import {
  * column has to be read against its own range. 0-0 is drawn flat: a team that
  * has not started region play has not lost anything.
  */
+/**
+ * A region record, shaded either side of .500.
+ *
+ * This one stays two-sided while most of the odds board is not, and the reason
+ * is the same rule read the other way: a record has a genuine midpoint. A
+ * losing record really is the wrong side of something, and .500 means the same
+ * thing in every region in the state — so red here marks a team in trouble
+ * rather than merely a small number. See `src/lib/shade.ts`.
+ */
 function RegionPill({ r }: { r: Record2 | undefined }) {
   const w = r?.wins ?? 0;
   const l = r?.losses ?? 0;
   const t = r?.ties ?? 0;
-  const played = w + l + t;
-  // Half credit for a level game, and counted in the denominator. Alabama
-  // decides football in overtime so this only matters if one is entered by
-  // mistake — but a tie hidden from the record makes the percentage lie.
-  const pct = played ? (w + t / 2) / played : 0.5;
+  const { hot, strength, played } = recordShade(w, l, t);
   const text = t ? `${w}-${l}-${t}` : `${w}-${l}`;
   return (
     <StatPill
       className="!text-[12px]"
       empty={played === 0}
-      hot={pct >= 0.5}
-      strength={Math.abs(pct - 0.5) * 2}
+      hot={hot}
+      strength={strength}
       title={played ? `${text} in region play` : "No region games played yet"}
     >
       {text}

@@ -19,8 +19,10 @@ import {
   defaultSlots,
   placesFor,
   regionKey,
+  removalImpact,
   resolveBracket,
   seedLabel,
+  withoutTeam,
   seededRegions,
   defaultStatus,
   type SeededTeam,
@@ -449,6 +451,107 @@ console.log("\n9b. A locked place is proved, and proved conservatively");
     "and the seed share is the chance of the place it holds",
     r1.every((t) => t.seed_odds === null || (t.seed_odds >= 0 && t.seed_odds <= 1)),
   );
+}
+
+console.log("\n9c. Taking a team off the roster");
+{
+  // The trap: the engine prices a name it cannot find off the field mean,
+  // which is how an out-of-state opponent works. So deleting a team row and
+  // leaving its games does not erase the team — the fixtures survive as
+  // out-of-state ones and quietly stop counting as region games for the
+  // opponents. These check the two halves come apart the way they should.
+  const full = world();
+  const games = roundRobin();
+  const gone = full.filter((t) => t.name !== "R1T4");
+  const kept = games.filter((g) => g.t1 !== "R1T4" && g.t2 !== "R1T4");
+
+  const before = seededRegions(full, games, undefined, emptyBracketState()).get(
+    regionKey("5A", 1),
+  )!;
+  const after = seededRegions(gone, kept, undefined, emptyBracketState()).get(
+    regionKey("5A", 1),
+  )!;
+  check("the region is one team shorter", before.length === 4 && after.length === 3);
+  check("and the removed team is nowhere in it", !after.some((t) => t.name === "R1T4"));
+  check(
+    "the survivors each lose exactly the game they played against it",
+    after.every((t) => {
+      const was = before.find((b) => b.name === t.name)!;
+      const played = (r: { region_w: number; region_l: number; region_t: number }) =>
+        r.region_w + r.region_l + r.region_t;
+      return played(was) - played(t) === 1;
+    }),
+    JSON.stringify(after.map((t) => `${t.name}:${t.region_w}-${t.region_l}`)),
+  );
+
+  // Row deleted, games left behind — the outcome the route refuses.
+  const orphaned = seededRegions(gone, games, undefined, emptyBracketState()).get(
+    regionKey("5A", 1),
+  )!;
+  check(
+    "leaving the games behind does NOT erase the team's effect",
+    orphaned.some((t) => {
+      const clean = after.find((a) => a.name === t.name);
+      return clean !== undefined && t.wins !== clean.wins;
+    }) ||
+      orphaned.every((t) => t.region_w + t.region_l === 2),
+    JSON.stringify(orphaned.map((t) => `${t.name}:${t.wins}-${t.losses} reg ${t.region_w}-${t.region_l}`)),
+  );
+
+  // A slot points at a place, so the danger is a region getting shorter than
+  // a place some slot reaches — not the team being named anywhere.
+  const st = emptyBracketState();
+  st.classes["5A"] = {
+    ...base_(),
+    slots: [
+      { region: 1, place: 1 },
+      { region: 2, place: 4 },
+      { region: 1, place: 4 },
+      { region: 2, place: 1 },
+    ],
+    regions: {
+      "1": { note: "", order: ["R1T4", "R1T1"], status: { R1T4: "high" } },
+    },
+  };
+  const impact = removalImpact(st, full, "R1T4");
+  check(
+    "removing the 4th of four leaves a slot pointing at nobody",
+    impact.dangling.join() === "R1-4",
+    JSON.stringify(impact.dangling),
+  );
+  check("and the editorial references are reported", 
+    impact.overrides.join() === "5A R1" && impact.pins.join() === "5A R1");
+
+  // A bracket that only takes the top two of each region has slack: the 4th
+  // team can go without any slot noticing. This is the real-world case — 1A
+  // Region 6 losing its 8th team while the bracket reaches only place 4.
+  const shallow = emptyBracketState();
+  shallow.classes["5A"] = {
+    ...base_(),
+    slots: [
+      { region: 1, place: 1 },
+      { region: 2, place: 2 },
+      { region: 1, place: 2 },
+      { region: 2, place: 1 },
+    ],
+    regions: {},
+  };
+  const safe = removalImpact(shallow, full, "R1T4");
+  check(
+    "but a region with slack loses its last team without a slot noticing",
+    safe.dangling.length === 0,
+    JSON.stringify(safe.dangling),
+  );
+
+
+  const tidied = withoutTeam(st, "R1T4");
+  check("stripping takes the override out",
+    tidied.classes["5A"]?.regions["1"].status === undefined);
+  check("and the team out of the pinned order",
+    tidied.classes["5A"]?.regions["1"].order?.join() === "R1T1",
+    JSON.stringify(tidied.classes["5A"]?.regions["1"].order));
+  check("while the slots are left exactly alone",
+    JSON.stringify(tidied.classes["5A"]?.slots) === JSON.stringify(st.classes["5A"]?.slots));
 }
 
 console.log("\n10. The default shapes");

@@ -147,6 +147,13 @@ full season schedule can be loaded in advance without affecting anything.
 
 Renaming a team also rewrites its games, since games reference teams by name.
 
+Removing a team is the other side of that, and it cannot be done by halves: the
+engine prices any name absent from `teams` off the field mean, which is how an
+out-of-state opponent works. A team whose row is deleted while its games remain
+does not disappear — its fixtures become out-of-state ones, and its opponents
+keep the win-loss while silently losing the region result. Admin → Teams →
+Remove counts the games first and refuses until you confirm them too.
+
 ---
 
 ## Scripts

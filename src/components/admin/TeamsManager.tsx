@@ -109,6 +109,11 @@ export default function TeamsManager({ initial }: { initial: Team[] }) {
             setEditing(null);
             setMessage({ tone: "good", text: note });
           }}
+          onRemoved={(note) => {
+            setTeams((prev) => prev.filter((t) => t.id !== editing.id));
+            setEditing(null);
+            setMessage({ tone: "good", text: note });
+          }}
         />
       )}
 
@@ -221,10 +226,12 @@ function TeamForm({
   team,
   onCancel,
   onSaved,
+  onRemoved,
 }: {
   team: Team;
   onCancel: () => void;
   onSaved: (t: Team, note: string) => void;
+  onRemoved: (note: string) => void;
 }) {
   const [form, setForm] = useState({
     name: team.name,
@@ -237,6 +244,50 @@ function TeamForm({
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  /**
+   * Two presses, because this one cannot be undone from here.
+   *
+   * The first asks the server what would go and shows it. Removing a team
+   * without its games is not a gentler version of this — the engine reads an
+   * unknown name as an out-of-state school, so the fixtures would survive and
+   * quietly stop counting as region games. The server refuses that outright;
+   * this is the confirmation it asks for.
+   */
+  async function remove(withGames: boolean) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/teams", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: team.id, withGames }),
+      });
+      const body = await res.json();
+      if (body.needsConfirm) {
+        setConfirm(body.error);
+        setBusy(false);
+        return;
+      }
+      if (!res.ok) throw new Error(body.error ?? "Remove failed.");
+
+      const c = body.counts ?? {};
+      const bits = [
+        c.games ? `${c.games} game${c.games === 1 ? "" : "s"}` : null,
+        c.aliases ? `${c.aliases} alias${c.aliases === 1 ? "" : "es"}` : null,
+        c.composite ? "its Composite row" : null,
+        c.aswa ? "its ASWA row" : null,
+      ].filter(Boolean);
+      onRemoved(
+        `Removed ${body.team}${bits.length ? ` and ${bits.join(", ")}` : ""}. ` +
+          `Publish to take it off the public site.`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Remove failed.");
+      setBusy(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -400,6 +451,20 @@ function TeamForm({
       )}
       {error && <Banner tone="bad">{error}</Banner>}
 
+      {confirm && (
+        <Banner tone="bad">
+          {confirm}{" "}
+          <button
+            type="button"
+            className="font-semibold underline"
+            onClick={() => remove(true)}
+            disabled={busy}
+          >
+            Remove it and everything listed
+          </button>
+        </Banner>
+      )}
+
       <div className="flex gap-2">
         <button className="btn btn-primary" disabled={busy}>
           {busy ? "Saving…" : "Save"}
@@ -407,6 +472,17 @@ function TeamForm({
         <button type="button" className="btn" onClick={onCancel}>
           Cancel
         </button>
+        {team.id && (
+          <button
+            type="button"
+            className="btn ml-auto !text-[rgb(var(--bad))]"
+            onClick={() => remove(false)}
+            disabled={busy}
+            title="Remove this team from the roster"
+          >
+            Remove team
+          </button>
+        )}
       </div>
     </form>
   );

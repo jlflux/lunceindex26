@@ -667,6 +667,86 @@ export function defaultSlots(cls: Classification, regions: number): Slot[] {
 }
 
 /** Slots in a bracket for this class, for the "did the shape change" check. */
+/**
+ * What removing a team would cost the bracket.
+ *
+ * Slots hold a place, not a name, so a team leaving a region does not break a
+ * slot by being named in one — it breaks a slot by making the region shorter
+ * than a place some slot still points at. Region 6 of 1A dropping from eight
+ * teams to seven is harmless because 1A only ever reaches place 4; the same
+ * removal from a class where every team qualifies would leave the last slot
+ * pointing at nobody.
+ *
+ * Returns the dangling seeds, empty when there are none. Editorial references
+ * — a status override, a place in a pinned order — are listed separately
+ * because they are tidied rather than blocking.
+ */
+export function removalImpact(
+  state: BracketState,
+  ratings: Pick<RatingRow, "name" | "classification" | "region">[],
+  name: string,
+): { dangling: string[]; overrides: string[]; pins: string[] } {
+  const team = ratings.find((t) => t.name === name);
+  const dangling: string[] = [];
+  const overrides: string[] = [];
+  const pins: string[] = [];
+
+  if (team) {
+    const remaining = ratings.filter(
+      (t) =>
+        t.name !== name &&
+        t.classification === team.classification &&
+        t.region === team.region,
+    ).length;
+    for (const slot of state.classes[team.classification]?.slots ?? []) {
+      if (!slot || slot.region !== team.region) continue;
+      if (slot.place > remaining) {
+        const label = `R${slot.region}-${slot.place}`;
+        if (!dangling.includes(label)) dangling.push(label);
+      }
+    }
+  }
+
+  for (const cls of CLS_FILTER_ORDER) {
+    for (const [rid, r] of Object.entries(state.classes[cls]?.regions ?? {})) {
+      if (r.status?.[name]) overrides.push(`${cls} R${rid}`);
+      if (r.order?.includes(name)) pins.push(`${cls} R${rid}`);
+    }
+  }
+
+  return { dangling, overrides, pins };
+}
+
+/**
+ * The bracket document with every trace of a team taken out of it.
+ *
+ * Only the editorial layer names teams — a status override and a pinned order.
+ * The slots themselves hold places and are left exactly alone, which is the
+ * whole reason a roster change does not disturb a hand-made bracket.
+ */
+export function withoutTeam(state: BracketState, name: string): BracketState {
+  const classes: BracketState["classes"] = {};
+  for (const cls of CLS_FILTER_ORDER) {
+    const cs = state.classes[cls];
+    if (!cs) continue;
+    const regions: ClassState["regions"] = {};
+    for (const [rid, r] of Object.entries(cs.regions)) {
+      const next = { ...r };
+      if (next.status?.[name]) {
+        const { [name]: _gone, ...rest } = next.status;
+        next.status = Object.keys(rest).length ? rest : undefined;
+      }
+      if (next.order?.includes(name)) {
+        const kept = next.order.filter((n) => n !== name);
+        next.order = kept.length ? kept : undefined;
+      }
+      regions[rid] = next;
+    }
+    classes[cls] = { ...cs, regions };
+  }
+  return { ...state, classes };
+}
+
 export function sizeOf(state: BracketState, cls: Classification): number {
   return state.classes[cls]?.slots?.length ?? 0;
 }

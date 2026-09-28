@@ -179,8 +179,6 @@ export const ALIASES: Record<string, string> = {
   "Trinity Presbyterian Schools": "Trinity",
   "Vincent Middle High School": "Vincent",
   "Ramsay IB High School": "Ramsay",
-  "Alabama Aerospace & Aviation": "Alabama Aerospace and Aviation",
-  "Alabama Aerospace and Aviation Academy": "Alabama Aerospace and Aviation",
   "Sumter Central High School": "Sumter Central",
   "University Charter School": "University Charter",
   "Breakthrough Charter School": "Breakthrough Charter",

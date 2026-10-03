@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { withAdmin } from "@/lib/admin-auth";
 import { findCoverage } from "@/lib/coverage";
-import { loadTeams } from "@/lib/data";
+import { loadAliases, loadNonMembers, loadTeams } from "@/lib/data";
 import { serviceClient } from "@/lib/db";
 import { findDuplicates } from "@/lib/duplicates";
+import { nonMemberSet } from "@/lib/names";
+import { findNearMisses } from "@/lib/unmatched";
 import type { Game } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -31,6 +33,13 @@ export const runtime = "nodejs";
  * The same pass also answers the opposite question — which schools are missing
  * a week they should have played — because a name matched to the wrong school
  * shows up as both at once: a spare game on one team and a hole in another.
+ *
+ * And a third: a game naming a school the roster nearly holds. "Ramsey" for
+ * "Ramsay" is stored, shown, and counted toward nobody — it is absent from
+ * both schools' overall records and from both region records, which is enough
+ * to invert a region's standings with nothing on the board to explain it.
+ * Neither scan above sees it: the meeting is not duplicated, and the roster
+ * name's missing week reads as a bye, which coverage tolerates on purpose.
  */
 export const GET = withAdmin(async () => {
   const db = serviceClient();
@@ -49,12 +58,24 @@ export const GET = withAdmin(async () => {
     if (!data || data.length < page) break;
   }
 
-  const teams = await loadTeams(true);
+  const [teams, aliases, nonMembers] = await Promise.all([
+    loadTeams(true),
+    loadAliases(),
+    loadNonMembers(),
+  ]);
+  const roster = teams.map((t) => t.name);
 
   return NextResponse.json({
     ok: true,
     ...findDuplicates(rows),
-    coverage: findCoverage(rows, teams.map((t) => t.name)),
+    coverage: findCoverage(rows, roster),
+    // A name reachable by alias is already resolved and must not be reported.
+    nearMisses: findNearMisses(
+      rows,
+      roster,
+      Object.keys(aliases),
+      nonMemberSet(nonMembers),
+    ),
   });
 });
 

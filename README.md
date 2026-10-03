@@ -117,9 +117,11 @@ Setup reads no data and grants no access; it is a calculator.
 2. **Enter results** — either Admin → Games one at a time, or Admin → Import →
    Weekly scores for a CSV of the whole week.
 3. **Check the schedule** — open Admin → Games. The scan at the bottom runs by
-   itself and reports schools missing a week everyone else played, and schools
-   holding two games in one week. Both are what a name matched to the wrong
-   school looks like, and neither is visible by reading the board.
+   itself and reports schools missing a week everyone else played, schools
+   holding two games in one week, and games naming a school the roster nearly
+   holds ("Ramsey" where the roster says "Ramsay"). All three are what a name
+   matched to the wrong school looks like, and none is visible by reading the
+   board.
 4. **Update the bracket** — Admin → Bracketology. Seeds, records and status
    follow from the season, so most weeks this is only the region write-ups and
    the projections. Saves take effect immediately; they do not wait for a
@@ -175,6 +177,21 @@ npm run bracket:sql       # the same, emitted as SQL to paste — no terminal ne
 npm run calibrate:odds    # refits the win-probability curve against the 2025 season
 npm run typecheck
 ```
+
+### When a region comes out in an order that looks wrong
+
+`supabase/diagnose_region.sql` is a pasteable query — no terminal needed. Open
+the Supabase SQL editor, paste it, run it. For one classification and region it
+prints the roster as stored, the region record computed the way the site
+computes it, every completed game marked counted or not *with the reason*,
+fixtures stored twice, and whether the published board predates the scores.
+
+Change the class and region at the top to look elsewhere.
+
+The ordering itself is covered by `test:tiebreak` and `test:bracket` — region
+percentage, then region wins, then the association's factors (a)–(q), with the
+Index rating standing in only for the coin flip at the very end. When a region
+looks misordered, the records being fed in are what to look at.
 
 ### Previewing without a database
 
@@ -348,6 +365,14 @@ than an error. `PROJECT.md` covers the reasoning.
   category factors (k) and (l) actively read. A banned team is also removed
   before `orderRegion` runs — left in, its 0-0 record scores .500 and sorts it
   above everyone with a losing record.
+- **A game naming a school the roster does not hold counts toward nobody.**
+  Games store team *names*, so a misspelling is stored and displayed while
+  being absent from both schools' overall records and — when the two share a
+  class and region — from both region records. That is enough to invert a
+  region's standings with nothing on the page to explain it, since the
+  standings order on the region record and the rating never enters. The
+  near-miss half of the Admin → Games scan exists for this; out-of-state
+  opponents and non-members are legitimately off the roster and are excluded.
 - **A forfeit changes the record, never the rating.** `forfeit_by` names which
   side gave a game up; the scores stay as played. Everything record-shaped
   (standings, region order, RPI, Résumé) reads the ruling, and the Index reads

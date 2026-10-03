@@ -9,9 +9,14 @@
  * Section 7 replays the actual Prattville fault, which is the case the scan
  * was written for.
  *
+ * The last section covers the near-miss scan, which is the same family of
+ * fault read from the other end: not a school missing a week, but a game
+ * naming a school the roster nearly holds.
+ *
  * Usage: npx tsx scripts/test-coverage.ts
  */
 import { findCoverage } from "../src/lib/coverage";
+import { findNearMisses } from "../src/lib/unmatched";
 import type { Game } from "../src/lib/types";
 
 let failures = 0;
@@ -224,6 +229,53 @@ console.log("\n8. A school with nothing at all is separated out");
     "rather than as a school missing three weeks",
     !r.suspect.some((s) => s.team === "Never Imported"),
   );
+}
+
+console.log("\n9. A game naming a school the roster nearly holds");
+{
+  const roster = ["Ramsay", "Mountain Brook", "Helena", "Hoover"];
+
+  {
+    const found = findNearMisses(
+      [g("Ramsey", "Mountain Brook", 4)],
+      roster,
+    );
+    check("the misspelling is reported", found.length === 1);
+    check("and pointed at the school it means",
+      found[0]?.stored === "Ramsey" && found[0]?.suggested === "Ramsay",
+      JSON.stringify(found[0]));
+    check("with the game that carries it",
+      found[0]?.games.length === 1 && found[0]?.games[0].week === 4);
+  }
+
+  // The whole value of this, like the scan above, is what it declines to
+  // report. A roster the site does not carry is not a fault.
+  check("a correct roster produces nothing",
+    findNearMisses([g("Ramsay", "Helena", 2)], roster).length === 0);
+  check("an out-of-state opponent is not a misspelling",
+    findNearMisses([g("Ramsay", "Pace FL", 1)], roster).length === 0);
+  check("nor is a school we simply do not carry",
+    findNearMisses([g("Ramsay", "Sacred Heart Academy", 1)], roster).length === 0);
+  check("nor is a spelling already reachable by alias",
+    findNearMisses([g("Ramsey", "Helena", 1)], roster, ["Ramsey"]).length === 0);
+
+  // Both sides of one game can be wrong, and each is its own finding.
+  check("each bad spelling is reported once, however many games carry it",
+    findNearMisses(
+      [g("Ramsey", "Helena", 1), g("Ramsey", "Hoover", 2)],
+      roster,
+    )[0]?.games.length === 2);
+
+  // Closest first, so the likeliest fault is the one read.
+  {
+    const found = findNearMisses(
+      [g("Mountain Brooke", "Helena", 1), g("Ramsey", "Hoover", 2)],
+      roster,
+    );
+    check("the closest match is listed first",
+      found.length === 2 && found[0].score >= found[1].score,
+      found.map((f) => `${f.stored} ${f.score.toFixed(2)}`).join(", "));
+  }
 }
 
 console.log(

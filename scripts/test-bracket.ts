@@ -772,6 +772,69 @@ console.log("\n13. Colour is allowed in, and nothing else is");
     !renderRichText("<script>x</script>\ny").includes("script"));
 }
 
+console.log("\n14. The standings never follow the Index rating");
+{
+  // Reported from the live board: Mountain Brook second and Ramsay third,
+  // which looked like the table was ordered by the Index — Mountain Brook is
+  // #30 overall and Ramsay #40. It is not, and this is the proof. The region
+  // is the real 5A Region 4, and the ratings are deliberately inverted so
+  // that any rating-shaped ordering would show up as a failure here.
+  const MEMBERS = [
+    "Calera", "Chelsea", "Chilton County", "Helena",
+    "Homewood", "Mountain Brook", "Pelham", "Ramsay",
+  ];
+  // Mountain Brook rated well above Ramsay, as it is in real life.
+  const ratings = MEMBERS.map((n, i) =>
+    row(n, 4, n === "Mountain Brook" ? 90 : n === "Ramsay" ? 40 : 50 + i),
+  );
+
+  const place = (teams: SeededTeam[], name: string) =>
+    teams.find((t) => t.name === name)?.place ?? 0;
+
+  {
+    // Ramsay 4-0 in region including the head-to-head; Mountain Brook 2-2.
+    const games = [
+      beat("Ramsay", "Mountain Brook"),
+      beat("Ramsay", "Helena"),
+      beat("Ramsay", "Pelham"),
+      beat("Ramsay", "Calera"),
+      beat("Mountain Brook", "Chelsea"),
+      beat("Mountain Brook", "Chilton County"),
+      beat("Homewood", "Mountain Brook"),
+    ];
+    const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
+    const teams = seeded.get(regionKey("5A", 4)) ?? [];
+    check("the 4-0 team leads the region, not the better-rated 2-2 team",
+      place(teams, "Ramsay") === 1,
+      `Ramsay at ${place(teams, "Ramsay")}, Mountain Brook at ${place(teams, "Mountain Brook")}`);
+    check("and the better-rated team sits where its record puts it",
+      place(teams, "Ramsay") < place(teams, "Mountain Brook"));
+  }
+
+  {
+    // The fault that does reproduce the report: the head-to-head imported
+    // under a misspelling, so it reaches neither region record. Ramsay then
+    // holds fewer *counted* region wins than Mountain Brook and drops below
+    // it — on the record, not on the rating. The tell is Ramsay's overall
+    // record, which loses the game too.
+    const games = [
+      g("Ramsey", "Mountain Brook", 24, 17), // not on the roster
+      beat("Ramsay", "Helena"),
+      beat("Mountain Brook", "Chelsea"),
+      beat("Mountain Brook", "Chilton County"),
+    ];
+    const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
+    const teams = seeded.get(regionKey("5A", 4)) ?? [];
+    check("a misspelt import inverts the pair, which is the reported symptom",
+      place(teams, "Mountain Brook") < place(teams, "Ramsay"),
+      `Mountain Brook at ${place(teams, "Mountain Brook")}, Ramsay at ${place(teams, "Ramsay")}`);
+    const ramsay = teams.find((t) => t.name === "Ramsay");
+    check("and the region record is what moved, 2-0 against 1-0",
+      ramsay?.region_w === 1 && ramsay?.region_l === 0,
+      `Ramsay region ${ramsay?.region_w}-${ramsay?.region_l}`);
+  }
+}
+
 console.log(
   failures === 0 ? "\nThe bracket behaves.\n" : `\n${failures} check(s) failed.\n`,
 );

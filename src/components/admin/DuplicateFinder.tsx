@@ -5,6 +5,7 @@ import { Banner } from "./PublishButton";
 import { weekLabel } from "@/lib/format";
 import type { CoverageReport, TeamGap } from "@/lib/coverage";
 import { redundantIds, type DuplicateGroup } from "@/lib/duplicates";
+import type { NearMiss } from "@/lib/unmatched";
 import type { Game } from "@/lib/types";
 
 type Group = DuplicateGroup;
@@ -27,12 +28,18 @@ async function readJson<T = Record<string, unknown>>(res: Response): Promise<T> 
  * name leaves a spare game on whoever it played and a hole in the schedule of
  * whoever it should have been — so the scan reports extra games and missing
  * ones side by side.
+ *
+ * A third question, added after a region came out in an order nobody could
+ * explain: a game naming a school the roster nearly holds. That game counts
+ * toward neither side, so it is missing from both records while sitting in
+ * plain sight on the schedule.
  */
 export default function DuplicateFinder() {
   const [reversed, setReversed] = useState<Group[]>([]);
   const [repeated, setRepeated] = useState<Group[]>([]);
   const [collisions, setCollisions] = useState<Group[]>([]);
   const [coverage, setCoverage] = useState<CoverageReport | null>(null);
+  const [nearMisses, setNearMisses] = useState<NearMiss[]>([]);
   const [showByes, setShowByes] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [total, setTotal] = useState(0);
@@ -56,25 +63,29 @@ export default function DuplicateFinder() {
         repeated: Group[];
         collisions: Group[];
         coverage: CoverageReport;
+        nearMisses: NearMiss[];
       }>(res);
       if (!res.ok) throw new Error(body.error ?? "Scan failed.");
       setReversed(body.reversed);
       setRepeated(body.repeated);
       setCollisions(body.collisions ?? []);
       setCoverage(body.coverage ?? null);
+      setNearMisses(body.nearMisses ?? []);
       setTotal(body.totalGames);
       setScanned(true);
       const missing =
         (body.coverage?.suspect.length ?? 0) + (body.coverage?.absent.length ?? 0);
+      const misspelt = body.nearMisses?.length ?? 0;
       setMessage({
         tone:
-          body.reversed.length || body.collisions?.length || missing
+          body.reversed.length || body.collisions?.length || missing || misspelt
             ? "warn"
             : "good",
         text:
           `${body.totalGames} games · ${body.reversed.length} with the sides swapped · ` +
           `${body.collisions?.length ?? 0} school(s) with two games in a week · ` +
-          `${missing} school(s) missing a week they should have played.`,
+          `${missing} school(s) missing a week they should have played · ` +
+          `${misspelt} game(s) naming a school the roster nearly holds.`,
       });
     } catch (e) {
       setMessage({
@@ -158,6 +169,58 @@ export default function DuplicateFinder() {
 
       {message && <Banner tone={message.tone}>{message.text}</Banner>}
 
+      {nearMisses.length > 0 && (
+        <div className="card p-4">
+          <h3 className="text-sm font-bold">
+            A school the roster nearly holds ({nearMisses.length})
+          </h3>
+          <p
+            className="mt-1 text-xs"
+            style={{ color: "rgb(var(--text-muted))" }}
+          >
+            These games count toward nobody. The stored spelling is not on the
+            roster, so the result is missing from both schools&rsquo; overall
+            records and — if the two share a classification and a region — from
+            both region records, which is enough to invert a region&rsquo;s
+            standings. Fix the spelling in Games, or add it as an alias in
+            Teams if the sheet keeps using it.
+          </p>
+          <div className="mt-2 space-y-2">
+            {nearMisses.map((m) => (
+              <div
+                key={m.stored}
+                className="rounded border px-3 py-2 text-xs"
+                style={{ borderColor: "rgb(var(--border))" }}
+              >
+                <div className="font-semibold">
+                  <span style={{ color: "rgb(var(--bad))" }}>{m.stored}</span>
+                  {" → probably "}
+                  <span style={{ color: "rgb(var(--good))" }}>
+                    {m.suggested}
+                  </span>
+                  <span
+                    className="ml-2 font-normal tnum"
+                    style={{ color: "rgb(var(--text-faint))" }}
+                  >
+                    {(m.score * 100).toFixed(0)}% match
+                  </span>
+                </div>
+                <ul
+                  className="mt-1 space-y-0.5"
+                  style={{ color: "rgb(var(--text-muted))" }}
+                >
+                  {m.games.map((g, i) => (
+                    <li key={g.id ?? i}>
+                      {weekLabel(g)}: {g.t1} vs {g.t2}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {reversed.length > 0 && (
         <div className="card p-4">
           <h3 className="text-sm font-bold">
@@ -219,7 +282,8 @@ export default function DuplicateFinder() {
         !repeated.length &&
         !collisions.length &&
         !coverage?.suspect.length &&
-        !coverage?.absent.length && (
+        !coverage?.absent.length &&
+        !nearMisses.length && (
           <Banner tone="good">
             Nothing out of place across {total} games. Every school has a game
             in every week that finished importing.

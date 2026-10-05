@@ -241,20 +241,42 @@ function Slot({
       <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 py-1">
         {slot.team ? (
           <>
-            <Link
-              href={`/team/${slot.slug}`}
-              onClick={(e) => e.stopPropagation()}
-              // The column is a fixed width and some school names are long,
-              // so the full one has to be reachable without opening the game.
-              title={`${slot.team}${slot.record ? ` (${slot.record})` : ""}`}
-              className="truncate text-[13px] font-semibold hover:underline"
-              style={{
-                color: slot.winner ? "rgb(var(--brand))" : "rgb(var(--text))",
-                fontStyle: slot.projected ? "italic" : undefined,
-              }}
-            >
-              {slot.team}
-            </Link>
+            {/*
+              In pick mode the name is not a link.
+
+              It used to be one unconditionally, with `stopPropagation` to keep
+              a click off the row's handler — right for a reader, and exactly
+              wrong for the editor, where the instruction is "click a team to
+              advance it" and the team name is the obvious thing to click.
+              Doing that navigated to the team page and advanced nothing.
+            */}
+            {onPick ? (
+              <span
+                title={`${slot.team}${slot.record ? ` (${slot.record})` : ""}`}
+                className="truncate text-[13px] font-semibold"
+                style={{
+                  color: slot.winner ? "rgb(var(--brand))" : "rgb(var(--text))",
+                  fontStyle: slot.projected ? "italic" : undefined,
+                }}
+              >
+                {slot.team}
+              </span>
+            ) : (
+              <Link
+                href={`/team/${slot.slug}`}
+                onClick={(e) => e.stopPropagation()}
+                // The column is a fixed width and some school names are long,
+                // so the full one has to be reachable without opening the game.
+                title={`${slot.team}${slot.record ? ` (${slot.record})` : ""}`}
+                className="truncate text-[13px] font-semibold hover:underline"
+                style={{
+                  color: slot.winner ? "rgb(var(--brand))" : "rgb(var(--text))",
+                  fontStyle: slot.projected ? "italic" : undefined,
+                }}
+              >
+                {slot.team}
+              </Link>
+            )}
             {slot.home && (
               <span
                 className="shrink-0 rounded px-1 text-[9px] font-extrabold leading-[1.5]"

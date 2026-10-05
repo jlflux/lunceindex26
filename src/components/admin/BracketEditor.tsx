@@ -6,6 +6,8 @@ import {
   applyPinnedOrder,
   assignPlaces,
   defaultSlots,
+  regionKey,
+  resolveBracket,
   type ResolvedBracket,
   type SeededTeam,
 } from "@/lib/bracket";
@@ -18,7 +20,7 @@ import {
   type StatusKey,
 } from "@/lib/bracket-types";
 import { PROSE_COLOURS } from "@/lib/sanitize";
-import { CLS_FILTER_ORDER, type Classification } from "@/lib/types";
+import { CLS_FILTER_ORDER, type Classification, type Game } from "@/lib/types";
 
 export type EditorRegion = {
   region: number;
@@ -31,8 +33,6 @@ export type EditorRegion = {
 export type EditorClass = {
   classification: Classification;
   regions: EditorRegion[];
-  bracket: ResolvedBracket | null;
-  bracketProjected: ResolvedBracket | null;
 };
 
 type Tab = "seeding" | "bracket" | "projections" | "settings";
@@ -70,9 +70,12 @@ function readIndex(dt: DataTransfer, fallback: number | null): number | null {
 export default function BracketEditor({
   initial,
   classes,
+  playoffGames = [],
 }: {
   initial: BracketState;
   classes: EditorClass[];
+  /** Playoff results only — all `resolveBracket` reads from the schedule. */
+  playoffGames?: Game[];
 }) {
   const [state, setState] = useState<BracketState>(initial);
   const [tab, setTab] = useState<Tab>("seeding");
@@ -112,6 +115,31 @@ export default function BracketEditor({
       }),
     [block, state, cls],
   );
+
+  /**
+   * The bracket as it stands *now*, resolved in the browser.
+   *
+   * Same fault as `liveRegions` above, one layer out: the bracket used to be
+   * resolved by the server component and passed down frozen, so clicking a
+   * team wrote the pick into state and the drawn bracket never moved. A pick is recorded and
+   * saved either way, which is what made it look as though the click did
+   * nothing — the bracket advancing is the only feedback a click has.
+   *
+   * Projections are always resolved here. Whether *readers* may see them is
+   * `showProjections`, which the public page applies; an author cannot build
+   * a projection they are not allowed to look at.
+   *
+   * Seeded off `liveRegions` rather than `block.regions` so a pin or a drag in
+   * the Seeding tab moves the bracket too.
+   */
+  const liveBracket = useMemo(() => {
+    const seeded = new Map(
+      liveRegions.map((r) => [regionKey(cls, r.region), r.shown]),
+    );
+    return resolveBracket(state, cls, seeded, playoffGames, {
+      projected: true,
+    });
+  }, [liveRegions, state, cls, playoffGames]);
 
   const pinnedCount = useMemo(
     () =>
@@ -315,7 +343,7 @@ export default function BracketEditor({
           regions={liveRegions}
           slots={state.classes[cls]?.slots ?? []}
           onSlots={(slots) => editClass(cls, (cs) => ({ ...cs, slots }))}
-          bracket={block.bracket}
+          bracket={liveBracket}
           results={state.classes[cls]?.results ?? {}}
           onResults={(results) => editClass(cls, (cs) => ({ ...cs, results }))}
         />
@@ -323,7 +351,7 @@ export default function BracketEditor({
 
       {tab === "projections" && block && (
         <Projections
-          bracket={block.bracketProjected ?? block.bracket}
+          bracket={liveBracket}
           picks={state.classes[cls]?.projected ?? {}}
           published={state.showProjections}
           onPick={(id, side) =>

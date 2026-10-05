@@ -169,6 +169,7 @@ npm run test:sheet        # the AHSAA weekly Google Sheet, against a real week
 npm run test:coverage     # the missing-week scan, including the bye/noise rules
 npm run test:forfeits     # that a vacated win changes the record and not the rating
 npm run test:playoffs     # the odds: bracket, probability invariants, clinch/elimination
+npm run test:render       # what a bracket slot renders: a link for readers, not in the editor
 npm run test:tiebreak     # the AHSAA tie-breaking procedure, (a) through (q)
 npm run test:ineligible   # postseason bans: what they void, and what they must not
 npm run test:bracket      # bracket resolution, projections, and the explainer sanitiser
@@ -365,6 +366,13 @@ than an error. `PROJECT.md` covers the reasoning.
   category factors (k) and (l) actively read. A banned team is also removed
   before `orderRegion` runs — left in, its 0-0 record scores .500 and sorts it
   above everyone with a losing record.
+- **Whether a projection may be *shown* is a page decision, not the
+  resolver's.** `resolveBracket` applies `opts.projected` and nothing else;
+  `showProjections` is reader visibility, and `src/app/bracketology/page.tsx`
+  withholds the projected bracket entirely rather than resolving it and hiding
+  it in the UI — a resolved bracket handed to a client component is serialized
+  into the page. The admin editor always resolves projections, because that is
+  where they are made.
 - **A game naming a school the roster does not hold counts toward nobody.**
   Games store team *names*, so a misspelling is stored and displayed while
   being absent from both schools' overall records and — when the two share a

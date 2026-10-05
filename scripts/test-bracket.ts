@@ -257,14 +257,40 @@ console.log("\n5. A real result beats a projection, in both directions");
     !proj.rounds[1][0].top.projected,
   );
 
-  // The gate: projections stay private until published.
+  // `showProjections` used to be read inside the resolver, which meant the
+  // admin editor — the one caller that must always see projections, since it
+  // is where they are made — resolved none of them in the flag's default
+  // state. Clicking a team did nothing. The flag is reader visibility and the
+  // pages apply it; the resolver is mechanical.
   const shut = stateWith({ ...base_(), slots, projected: { r1g1: "top" } });
   shut.showProjections = false;
-  const hidden = resolveBracket(shut, "5A", seeded, games, { projected: true })!;
+  const unpublished = resolveBracket(shut, "5A", seeded, games, {
+    projected: true,
+  })!;
   check(
-    "an unpublished projection is not shown even when asked for",
-    hidden.rounds[1][0].bottom.team === null,
+    "an unpublished projection still resolves, because the author is editing it",
+    unpublished.rounds[1][0].bottom.team === "R1T2",
+    String(unpublished.rounds[1][0].bottom.team),
   );
+  check(
+    "and asking for no projections still gets none",
+    resolveBracket(shut, "5A", seeded, games)!.rounds[1][0].bottom.team === null,
+  );
+
+  // The privacy guarantee moved to the page, so it is tested as the page
+  // states it: `bracketProjected` is withheld rather than resolved and then
+  // hidden, which also keeps it out of the serialized payload.
+  const forReaders = (st: BracketState) =>
+    st.showProjections
+      ? resolveBracket(st, "5A", seeded, games, { projected: true })
+      : null;
+  check("a reader is given no projected bracket at all while it is unpublished",
+    forReaders(shut) === null);
+
+  const open_ = stateWith({ ...base_(), slots, projected: { r1g1: "top" } });
+  open_.showProjections = true;
+  check("and is given one once it is published",
+    forReaders(open_)?.rounds[1][0].bottom.team === "R1T2");
 }
 
 console.log("\n6. A forfeit in the bracket follows the ruling");
@@ -833,6 +859,76 @@ console.log("\n14. The standings never follow the Index rating");
       ramsay?.region_w === 1 && ramsay?.region_l === 0,
       `Ramsay region ${ramsay?.region_w}-${ramsay?.region_l}`);
   }
+}
+
+console.log("\n15. A click advances a team, with nothing saved and nothing published");
+{
+  // The editor used to draw a bracket resolved on the server and frozen for
+  // the page's life, so a pick was written into state and the board never
+  // moved. Since a pick's only feedback *is* the board moving, the click
+  // looked inert. This is the loop the editor now runs on every edit:
+  // state -> seeded -> resolveBracket, with projections always on.
+  const ratings = world();
+  const games = roundRobin();
+  const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
+  const slots = [
+    { region: 1, place: 1 },
+    { region: 2, place: 4 },
+    { region: 1, place: 2 },
+    { region: 2, place: 3 },
+  ];
+
+  let state = stateWith({ ...base_(), slots });
+  // Deliberately left unpublished: this is the default, and the state the
+  // editor was broken in.
+  state.showProjections = false;
+
+  /** `onPick` from BracketEditor: click to advance, click again to undo. */
+  const pick = (id: string, side: "top" | "bottom") => {
+    const cs = state.classes["5A"]!;
+    const next = { ...cs.projected };
+    if (next[id] === side) delete next[id];
+    else next[id] = side;
+    state = { ...state, classes: { ...state.classes, "5A": { ...cs, projected: next } } };
+  };
+
+  /** `liveBracket` from BracketEditor. */
+  const draw = () => resolveBracket(state, "5A", seeded, [], { projected: true })!;
+
+  check("before any click the second round is undecided",
+    draw().rounds[1][0].top.team === null);
+
+  pick("r1g0", "top");
+  check("one click advances the team",
+    draw().rounds[1][0].top.team === "R1T1",
+    String(draw().rounds[1][0].top.team));
+  check("and marks it a projection", draw().rounds[1][0].top.projected);
+
+  // The drag bug's signature was a second edit discarding the first, because
+  // each one recomputed from the same frozen array. Both picks must survive.
+  pick("r1g1", "top");
+  const both = draw();
+  check("a second click does not discard the first",
+    both.rounds[1][0].top.team === "R1T1" &&
+      both.rounds[1][0].bottom.team === "R1T2",
+    `${both.rounds[1][0].top.team} / ${both.rounds[1][0].bottom.team}`);
+
+  pick("r1g0", "top");
+  check("clicking the same team again undoes it",
+    draw().rounds[1][0].top.team === null);
+  check("and leaves the other pick alone",
+    draw().rounds[1][0].bottom.team === "R1T2");
+
+  // The seeding tab and the bracket share one source now, so a pin moves both.
+  const pinned = stateWith({
+    ...base_(),
+    slots,
+    regions: { "1": { note: "", order: ["R1T3"] } },
+  });
+  const pinnedSeeded = seededRegions(ratings, games, undefined, pinned);
+  check("a pinned region reseeds the bracket",
+    resolveBracket(pinned, "5A", pinnedSeeded, [], { projected: true })!
+      .rounds[0][0].top.team === "R1T3");
 }
 
 console.log(

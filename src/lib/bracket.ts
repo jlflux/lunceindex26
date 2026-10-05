@@ -443,7 +443,14 @@ export function resolveBracket(
   const cs = state.classes[cls];
   if (!cs?.slots?.length) return null;
 
-  const projected = opts.projected === true && state.showProjections;
+  // Whether projections may be *shown* is a page decision, not this
+  // function's: the admin editor has to resolve them to draw what the author
+  // is building, while the public page must withhold them until they are
+  // published. This used to read `&& state.showProjections`, which conflated
+  // the two and left the editor resolving nothing in the one configuration
+  // the flag exists to support — build privately, publish deliberately. The
+  // callers own it now, and there are only two.
+  const projected = opts.projected === true;
   const rounds = buildTree(cs.slots);
   if (!rounds.length) return null;
 

@@ -16,8 +16,9 @@ export const metadata = { title: "Bracketology" };
  * snapshot and the hand-authored bracket layer — and the join between them is
  * a seed rather than a team, so the page has no state of its own to keep in
  * sync. Both projected and as-played brackets are resolved here rather than in
- * the browser, because the rules about when a projection may be shown belong
- * with the resolver.
+ * the browser, and whether a projection may be shown is decided here too —
+ * the resolver is mechanical about it, so withholding an unpublished
+ * projection is this page's job.
  */
 export default async function BracketologyPage() {
   const [data, state] = await Promise.all([loadRatings(), loadBracket()]);
@@ -44,9 +45,15 @@ export default async function BracketologyPage() {
     classes.push({
       classification: cls,
       bracket: resolveBracket(state, cls, seeded, data.games),
-      bracketProjected: resolveBracket(state, cls, seeded, data.games, {
-        projected: true,
-      }),
+      // Withheld entirely until published, rather than resolved and then
+      // hidden by the UI. The toggle in `BracketBoard` is already gated on
+      // the same flag, but a resolved bracket passed to a client component is
+      // serialized into the page, so an unpublished projection used to be
+      // readable in the page source of a live page. `BracketBoard` falls back
+      // to the as-played bracket when this is null.
+      bracketProjected: state.showProjections
+        ? resolveBracket(state, cls, seeded, data.games, { projected: true })
+        : null,
       regions,
     });
   }

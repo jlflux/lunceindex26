@@ -8,22 +8,12 @@ import {
   COMPOSITE_SOURCES,
   COMPOSITE_RANKED,
 } from "@/lib/rankings";
-
-interface Row {
-  team: string;
-  maxpreps: string;
-  massey: string;
-  hsratings: string;
-  ahsfhs: string;
-}
-
-const blank = (): Row => ({
-  team: "",
-  maxpreps: "",
-  massey: "",
-  hsratings: "",
-  ahsfhs: "",
-});
+import {
+  blankRow as blank,
+  boardPositions,
+  inBoardOrder,
+  type EditorRow as Row,
+} from "@/lib/composite-order";
 
 /** Our own rank, keyed by team, so the average can be shown while typing. */
 export default function CompositeEditor({
@@ -60,9 +50,14 @@ export default function CompositeEditor({
       );
       // Always leave room to reach thirty without hunting for an "add" button.
       while (loaded.length < COMPOSITE_SHOWN) loaded.push(blank());
-      setRows(loaded);
+      // The table hands them back alphabetically, which is no use for reading
+      // down a poll. Opening in board order means row 1 is the number-one
+      // team. Sorting happens here and on the button, never on every
+      // keystroke — a row that reorders itself while being typed into is
+      // worse than one in the wrong place.
+      setRows(inBoardOrder(loaded, ourRank));
     })();
-  }, []);
+  }, [ourRank]);
 
   function set(i: number, key: keyof Row, value: string) {
     setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [key]: value } : r)));
@@ -91,16 +86,14 @@ export default function CompositeEditor({
     });
   }, [rows, ourRank]);
 
-  // Position on the board, so the editor shows the order it will publish in.
-  const order = useMemo(() => {
-    const idx = preview
-      .map((p, i) => ({ i, avg: p.average }))
-      .filter((x) => x.avg !== null)
-      .sort((a, b) => (a.avg as number) - (b.avg as number));
-    const m = new Map<number, number>();
-    idx.forEach((x, n) => m.set(x.i, n + 1));
-    return m;
-  }, [preview]);
+  /**
+   * Position on the board, straight from the rule the board itself uses.
+   *
+   * This used to sort by average here, which agreed with the published page
+   * most of the time and quietly disagreed on a tie — the board breaks those
+   * on our own rank, and this did not.
+   */
+  const order = useMemo(() => boardPositions(rows, ourRank), [rows, ourRank]);
 
   async function save() {
     setBusy(true);
@@ -125,6 +118,7 @@ export default function CompositeEditor({
   }
 
   const complete = preview.filter((p) => p.average !== null).length;
+  const named = rows.filter((r) => r.team.trim()).length;
 
   return (
     <div className="space-y-5">
@@ -143,8 +137,38 @@ export default function CompositeEditor({
         >
           Add a row
         </button>
+        <button
+          className="btn !py-1.5 !text-xs"
+          onClick={() => setRows((rs) => inBoardOrder(rs, ourRank))}
+          disabled={!named}
+          title="Put the rows back in board order, best first"
+        >
+          Sort 1&ndash;{COMPOSITE_SHOWN}
+        </button>
+        <button
+          className="btn !py-1.5 !text-xs"
+          disabled={!named}
+          style={named ? { color: "rgb(var(--bad))" } : undefined}
+          onClick={() => {
+            if (
+              confirm(
+                `Clear all ${named} team${named === 1 ? "" : "s"} and their numbers?\n\n` +
+                  `Nothing is removed from the site until you press Save board.`,
+              )
+            ) {
+              setRows(Array.from({ length: COMPOSITE_SHOWN }, blank));
+              setMsg({
+                tone: "good",
+                text: "Cleared. Press Save board to empty the published board, or leave without saving to keep it as it was.",
+              });
+            }
+          }}
+          title="Empty every row"
+        >
+          Clear
+        </button>
         <span className="text-xs tnum" style={{ color: "rgb(var(--text-muted))" }}>
-          {complete} of {rows.filter((r) => r.team.trim()).length} complete
+          {complete} of {named} complete
         </span>
       </div>
 
@@ -268,11 +292,17 @@ export default function CompositeEditor({
         </table>
       </div>
 
-      <p className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
+      <p className="text-xs leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
         Our own rank and the record are filled in from the published board, so
         they never need typing and cannot drift out of step with it. A row
         showing <strong>4/5</strong> is missing one poll and will not be ranked
         until it has all five.
+        <br />
+        Rows open in board order, best first, so the number down the left is
+        the position that will publish. They are not reordered as you type —
+        press <strong>Sort 1&ndash;{COMPOSITE_SHOWN}</strong> when you want
+        them rearranged. Neither that nor <strong>Clear</strong> touches the
+        site until you press <strong>Save board</strong>.
       </p>
     </div>
   );

@@ -17,6 +17,10 @@ import {
   type CompositeEntry,
 } from "../src/lib/rankings";
 import { CLS_FILTER_ORDER, type Classification } from "../src/lib/types";
+import {
+  inBoardOrder,
+  type EditorRow as Row,
+} from "../src/lib/composite-order";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail = "") {
@@ -243,6 +247,62 @@ console.log("\n10. Each board carries its own date");
   );
   check("nothing to show when there is no date", formatUpdated(null) === null);
   check("and a bad value shows nothing", formatUpdated("nonsense") === null);
+}
+
+console.log("\n11. The editor opens in board order, not alphabetical");
+{
+  const row = (
+    team: string,
+    maxpreps: string,
+    massey: string,
+    hsratings: string,
+    ahsfhs: string,
+  ): Row => ({ team, maxpreps, massey, hsratings, ahsfhs });
+
+  // Stored alphabetically, which is how the table hands them back.
+  const stored: Row[] = [
+    row("Auburn", "3", "3", "3", "3"),       // avg with ours(3) = 3
+    row("Brookwood", "1", "1", "1", "1"),    // avg with ours(1) = 1
+    row("Clay-Chalkville", "2", "2", "2", "2"), // avg with ours(2) = 2
+  ];
+  const ourRank = { Auburn: 3, Brookwood: 1, "Clay-Chalkville": 2 };
+
+  const sorted = inBoardOrder(stored, ourRank);
+  check("the best team comes first, not the first alphabetically",
+    sorted.map((r) => r.team).join(",") === "Brookwood,Clay-Chalkville,Auburn",
+    sorted.map((r) => r.team).join(","));
+
+  // An incomplete row cannot be ranked, so it belongs under every complete one
+  // however good its numbers look — the same rule the board applies.
+  const withGap: Row[] = [
+    row("Addison", "1", "1", "", "1"),        // 4 of 5
+    row("Zion Chapel", "9", "9", "9", "9"),   // complete
+  ];
+  const gapSorted = inBoardOrder(withGap, { Addison: 1, "Zion Chapel": 9 });
+  check("an unfinished row sorts below a complete one",
+    gapSorted[0].team === "Zion Chapel",
+    gapSorted.map((r) => r.team).join(","));
+
+  // Blank rows are the room left to reach thirty; they stay at the bottom.
+  const padded = inBoardOrder(
+    [row("", "", "", "", ""), ...stored, row("", "", "", "", "")],
+    ourRank,
+  );
+  check("blank rows stay at the end", 
+    padded.slice(0, 3).every((r) => r.team) && padded.slice(3).every((r) => !r.team),
+    padded.map((r) => r.team || "·").join(","));
+  check("and the row count is unchanged", padded.length === 5);
+
+  // The editor's order has to be the board's order, ties included, or the
+  // numbers down its left edge are not the ones that will publish.
+  const tied: Row[] = [
+    row("Hoover", "2", "2", "2", "2"),
+    row("Thompson", "2", "2", "2", "2"),
+  ];
+  const tieSorted = inBoardOrder(tied, { Hoover: 9, Thompson: 1 });
+  check("a tie on the average goes to the team our own board rates higher",
+    tieSorted[0].team === "Thompson",
+    tieSorted.map((r) => r.team).join(","));
 }
 
 console.log(

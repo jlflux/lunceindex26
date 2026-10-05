@@ -60,7 +60,7 @@ export default async function TeamPage({
   return (
     <AppShell generated={data.generated}>
       <Link
-        href="/"
+        href="/ratings"
         className="mb-4 inline-flex items-center gap-1.5 text-[13px] font-medium hover:underline"
         style={{ color: "rgb(var(--text-muted))" }}
       >

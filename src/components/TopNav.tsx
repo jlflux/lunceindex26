@@ -20,7 +20,7 @@ import ThemeToggle from "./ThemeToggle";
  * like the main event.
  */
 const RANKINGS = [
-  { href: "/", label: "Power Index" },
+  { href: "/ratings", label: "Power Index" },
   { href: "/resume", label: "Résumé" },
   { href: "/rpi", label: "RPI" },
   { href: "/composite", label: "Composite" },
@@ -52,10 +52,12 @@ export default function TopNav({
   season?: string;
 }) {
   const pathname = usePathname();
-  // A team page is reached from the Index, so the Index stays lit underneath it.
+  // A team page is reached from the Index, so the Index stays lit underneath
+  // it. `/` is the front page now rather than the board, and nothing in either
+  // row points at it — the wordmark does — so no tab is lit there.
   const isActive = (href: string) =>
-    href === "/"
-      ? pathname === "/" || pathname.startsWith("/team/")
+    href === "/ratings"
+      ? pathname === "/ratings" || pathname.startsWith("/team/")
       : pathname === href;
 
   return (

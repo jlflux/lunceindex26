@@ -14,3 +14,6 @@ next-env.d.ts
 
 # Generated schedule-parse output
 scripts/out/
+
+# Screenshots taken to review a page before it ships.
+.preview-shots/

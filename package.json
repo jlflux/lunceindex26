@@ -33,6 +33,7 @@
     "test:tiebreak": "tsx scripts/test-tiebreak.ts",
     "test:ineligible": "tsx scripts/test-ineligible.ts",
     "test:bracket": "tsx scripts/test-bracket.ts",
+    "test:home": "tsx scripts/test-home.ts",
     "test:render": "tsx --tsconfig scripts/tsconfig.render.json scripts/test-render.tsx",
     "import:bracket": "tsx scripts/import-bracket.ts",
     "bracket:sql": "tsx scripts/make-bracket-sql.ts"

@@ -6,6 +6,7 @@
  * per page view. Any admin write that changes the inputs republishes.
  */
 import { computeOdds, WIN_SCALE } from "./playoffs";
+import { defaultHomeState, type HomeState } from "./home-types";
 import "server-only";
 
 import { computeBoard, modelOf } from "./board";
@@ -153,6 +154,54 @@ export async function loadBracket(admin = false): Promise<BracketState> {
   } catch (e) {
     if (admin) throw e;
     return emptyBracketState();
+  }
+}
+
+/**
+ * The hand-authored front page.
+ *
+ * Falls back to the built-in default rather than throwing when the table is
+ * missing, for the same reason the bracket does: a deployment that has not run
+ * 007 yet still has a whole site to show, and a blank front page would be a
+ * worse answer than the one it shipped with.
+ *
+ * The stored document is merged over the default, so a field added to
+ * `HomeState` later appears with its default on a page saved before it
+ * existed, instead of arriving as undefined in the middle of a render.
+ */
+export async function loadHome(admin = false): Promise<HomeState> {
+  const preview = await previewObject<HomeState>("home");
+  if (preview) return { ...defaultHomeState(), ...preview };
+  try {
+    const c = admin ? serviceClient() : publicClient();
+    const { data, error } = await c
+      .from("home")
+      .select("data")
+      .eq("id", 1)
+      .maybeSingle();
+    if (error) {
+      if (admin && !isMissingTable(error)) throw new Error(error.message);
+      return defaultHomeState();
+    }
+    const stored = (data?.data ?? {}) as Partial<HomeState>;
+    // An empty document is a table that exists but has never been written —
+    // the default is the right answer there, not a page with no sections.
+    if (!stored || !Object.keys(stored).length) return defaultHomeState();
+    return { ...defaultHomeState(), ...stored };
+  } catch (e) {
+    if (admin) throw e;
+    return defaultHomeState();
+  }
+}
+
+export async function saveHome(state: HomeState): Promise<void> {
+  const { error } = await serviceClient()
+    .from("home")
+    .upsert({ id: 1, data: state }, { onConflict: "id" });
+  if (error) {
+    throw new Error(
+      `${error.message} — if the table is missing, run supabase/migrations/007_home.sql.`,
+    );
   }
 }
 

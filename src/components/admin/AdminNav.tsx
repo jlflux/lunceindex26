@@ -7,6 +7,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 
 const LINKS = [
   { href: "/admin", label: "Dashboard" },
+  { href: "/admin/home", label: "Front page" },
   { href: "/admin/games", label: "Games" },
   { href: "/admin/import", label: "Import" },
   { href: "/admin/formula", label: "Formula" },

@@ -215,16 +215,39 @@ const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
  * The floor is the wins it already has; the ceiling is those plus every region
  * game it has left. Both are certainties rather than estimates, which is what
  * makes them usable for a claim as strong as "eliminated".
+ *
+ * Win *percentage* as well as win count, because the standings order on
+ * percentage first — 1-0 leads 3-1 — and a bound in wins alone claims locks
+ * the table does not honour. A team 5-0 with a game left was being called
+ * certain to finish first over a rival sitting 1-0 with a game in hand, when
+ * that rival finishing 2-0 tops a 5-1 record on percentage. The simulation
+ * disagreed with the proof, which is the one thing a proof may never do.
+ *
+ * Ties count as half a win in both, matching `standingPct`.
  */
 function standingsBounds(
   names: string[],
-  played: Map<string, { w: number; l: number }>,
+  played: Map<string, { w: number; l: number; t?: number }>,
   left: Map<string, number>,
-): Map<string, { min: number; max: number }> {
-  const out = new Map<string, { min: number; max: number }>();
+): Map<string, { min: number; max: number; pctMin: number; pctMax: number }> {
+  const out = new Map<
+    string,
+    { min: number; max: number; pctMin: number; pctMax: number }
+  >();
   for (const n of names) {
-    const p = played.get(n) ?? { w: 0, l: 0 };
-    out.set(n, { min: p.w, max: p.w + (left.get(n) ?? 0) });
+    const p = played.get(n) ?? { w: 0, l: 0, t: 0 };
+    const ties = p.t ?? 0;
+    const rem = left.get(n) ?? 0;
+    const total = p.w + p.l + ties + rem;
+    const pts = p.w + ties / 2;
+    out.set(n, {
+      min: p.w,
+      max: p.w + rem,
+      // A region with nothing played and nothing left scores neutral, the
+      // same as `standingPct` does, rather than dividing by zero.
+      pctMin: total ? pts / total : 0.5,
+      pctMax: total ? (pts + rem) / total : 0.5,
+    });
   }
   return out;
 }
@@ -586,10 +609,17 @@ export function computeOdds(
         };
         return empty;
       }
-      // Certain to finish above me: their worst beats my best.
-      const above = rivals.filter((n) => bounds.get(n)!.min > mine.max).length;
+      // Certain to finish above me: their worst beats my best. Compared on
+      // percentage, which is what the table sorts on, and strictly — a pair
+      // that could land level is decided by the tiebreak chain, which these
+      // bounds cannot see, so it is never called certain either way.
+      const above = rivals.filter(
+        (n) => bounds.get(n)!.pctMin > mine.pctMax,
+      ).length;
       // Certain to finish below me: my worst beats their best.
-      const below = rivals.filter((n) => bounds.get(n)!.max < mine.min).length;
+      const below = rivals.filter(
+        (n) => bounds.get(n)!.pctMax < mine.pctMin,
+      ).length;
       const done = regionSettled.get(t.region) === true;
       // Only the rivals certain to be above me can be above me at my best;
       // at my worst, everyone not certain to be below me is.

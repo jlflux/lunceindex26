@@ -148,14 +148,21 @@ function columnsOf(block: ClassOdds): {
  * trials.
  *
  * Qualifying has a proof either way — clinched and eliminated both come from
- * what the games left to play make arithmetically possible. A seed becomes a
- * fact once the region has no games left. Winning a round never does: the
+ * what the games left to play make arithmetically possible. So does a seed:
+ * `place_locked` is the same kind of arithmetic, and it holds as soon as no
+ * result can move the team, which is usually before its region runs out of
+ * games. Reading `settled` here instead meant a team that had mathematically
+ * won its region with a game still to play was shown ">99" for a first place
+ * nothing could take from it. Winning a round never becomes a fact: the
  * bracket is played out by the same weighted coins as everything else, so
  * even the best team in the state only ever reaches ">99".
  */
 const isCertain = (t: TeamOdds, key: string): boolean => {
   if (key === "playoff") return t.clinched || t.eliminated;
-  if (key.startsWith("seed")) return t.settled;
+  // Every seed column at once: a locked place means 100 on that one and a
+  // flat 0 on the rest, and all of them are facts. `place_locked` already
+  // covers a settled region, which sets it unconditionally.
+  if (key.startsWith("seed")) return t.place_locked;
   return false;
 };
 

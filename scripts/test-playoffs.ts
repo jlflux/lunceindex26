@@ -377,7 +377,7 @@ console.log("\n7. A season with nothing left to play is already decided");
   check("the title is still open", (c.teams[0].rounds.at(-1) ?? 0) < 1);
 }
 
-console.log("\n7b. A settled region is the only place a seed is a fact");
+console.log("\n7b. A seed is a fact when nothing can move it, not when the region runs out of games");
 {
   const teams = field("2A", 8, 4);
   const mid = roundRobin(teams).map((g, i) =>
@@ -393,8 +393,9 @@ console.log("\n7b. A settled region is the only place a seed is a fact");
   );
   // A team can be uncatchable and still not settled: its own games are done
   // and nobody can reach it, but the region below it is still being played.
-  // That is the case the ">99%" rule exists for — the seed is certain in
-  // every trial, and the page must still not call it a fact.
+  // `settled` stays false there and `place_locked` goes true, and it is
+  // `place_locked` the page reads — a first place nothing can take should not
+  // be shown as ">99".
   const r1 = teams.filter((t) => t.region === 1).map((t) => t.name);
   const locked = [
     // The leader has played everybody and beaten them.
@@ -414,9 +415,12 @@ console.log("\n7b. A settled region is the only place a seed is a fact");
     lead.seeds[0] === 1, `${lead.seeds[0]}`);
   check("and is proved into the playoffs", lead.clinched);
   check(
-    "but its seed is not settled while the region is still playing",
+    "its region is not settled while games remain",
     !lead.settled,
   );
+  check("but its place is locked, which is what the page reads",
+    lead.place_locked && lead.best_place === 1 && lead.worst_place === 1,
+    `locked ${lead.place_locked} ${lead.best_place}-${lead.worst_place}`);
 
   const done = roundRobin(teams).map((g) => ({ ...g, s1: 28, s2: 7, status: "final" }));
   const r2 = computeOdds(teams, done, { trials: 50, seed: 13 });
@@ -430,6 +434,55 @@ console.log("\n7b. A settled region is the only place a seed is a fact");
       return t.playoff === 1 ? ones === 1 : ones === 0;
     }),
   );
+}
+
+console.log("\n7c. A proof never contradicts the simulation it is printed beside");
+{
+  // The bounds behind `place_locked` used to be counted in wins while the
+  // table they describe sorts on percentage. A leader 5-0 from five games was
+  // called certain of first over a rival 1-0 with a game in hand — but 2-0
+  // tops 5-1 on percentage, so the simulation put that rival first in a
+  // quarter of its seasons while the proof said the place could not move. It
+  // needs a region big enough for the win counts and the percentages to come
+  // apart, which a region of four cannot do.
+  // Both regions: a class with one region makes no first-round pods and is
+  // skipped entirely. Only region 1 is given games.
+  const teams = field("2A", 2, 7);
+  const n = teams.filter((t) => t.region === 1).map((t) => t.name);
+  const [lead, , , , , , late] = n;
+
+  const uneven: Game[] = [
+    // The leader has beaten five of the six, and has the sixth to come.
+    ...n.slice(1, 6).map((o) => game(lead, o, 35, 7)),
+    // That sixth has played once, and won: 1-0 against the leader's 5-0.
+    game(late, n[1], 21, 14),
+    game(lead, late, null, null),
+  ];
+
+  const r = computeOdds(teams, uneven, { trials: 600, seed: 23 });
+  const c = r.classes.find((x) => x.classification === "2A")!;
+  const leader = c.teams.find((t) => t.name === lead)!;
+
+  check("the leader's win count leads the region", leader.region_w === 5);
+  check("but a rival with a game in hand can still top it on percentage",
+    leader.seeds[0] < 1,
+    `seed1 ${leader.seeds[0]}`);
+  check("so the leader is not called locked",
+    !leader.place_locked,
+    `locked ${leader.place_locked} at ${leader.best_place}-${leader.worst_place}`);
+
+  // The invariant itself, over every team in the class: a locked place has to
+  // be the place every simulated season gives it. This is the check that
+  // would have caught the bug wherever it turned up.
+  for (const t of c.teams) {
+    if (!t.place_locked) continue;
+    const share = t.seeds[t.best_place - 1];
+    check(
+      `${t.name}: locked at ${t.best_place}, and every season agrees`,
+      share === undefined || share === 1,
+      `seed${t.best_place - 1} = ${share}`,
+    );
+  }
 }
 
 console.log("\n8. The same data gives the same page twice");

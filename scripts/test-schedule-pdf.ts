@@ -16,6 +16,7 @@ import {
   normalize,
   normalizeClassToken,
 } from "../src/lib/names";
+import { DATE_RE, displayDate } from "../src/lib/schedule-rows";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail = "") {
@@ -28,6 +29,42 @@ function check(label: string, cond: boolean, detail = "") {
 
 const teams = loadRosterCsv("data/AHSAA_Class_List_2026.csv");
 const index = buildIndex(teams);
+
+console.log("\n0. The date cell, however Excel broke that print run");
+{
+  // Whether the kickoff is its own cell or merged into the date one is a
+  // property of the print, not the document, and it changes between weeks.
+  // Week 7 2026 merged them — "10-08-2026 7:00 PM" — and because the US date
+  // branch was anchored, every row failed the date test and was dropped
+  // before it was read. The import reported no rows and said nothing about
+  // why, which is the part that cost the time.
+  const accepts = [
+    "Aug. 21, 2026",
+    "Sep. 4, 2026 7:30 PM",
+    "2026-08-22",
+    "2026-08-22 0:00:00",
+    "10-08-2026",
+    "10-08-2026 7:00 PM",
+    "10-09-2026 7:00PM",
+    "10-09-2026 19:00",
+  ];
+  for (const d of accepts) check(`accepts ${JSON.stringify(d)}`, DATE_RE.test(d));
+
+  const refuses = ["", "Benjamin Russell HS", "10-08-2026 extra", "31", "R-2"];
+  for (const d of refuses) check(`refuses ${JSON.stringify(d)}`, !DATE_RE.test(d));
+
+  // A merged time must not survive into the stored date.
+  check("a merged time is dropped from the date",
+    displayDate("10-08-2026 7:00 PM") === "Oct. 8, 2026",
+    displayDate("10-08-2026 7:00 PM"));
+  check("and the same date without one reads identically",
+    displayDate("10-08-2026") === displayDate("10-08-2026 7:00 PM"));
+  check("the ISO form still normalises",
+    displayDate("2026-08-22 0:00:00") === "Aug. 22, 2026",
+    displayDate("2026-08-22 0:00:00"));
+  check("and the written form is left alone",
+    displayDate("Aug. 21, 2026") === "Aug. 21, 2026");
+}
 
 console.log("\n1. Names the results sheets spell differently");
 {

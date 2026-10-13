@@ -196,11 +196,28 @@ export async function parseSchedulePdf(
 
   const rows: { fields: RowFields; line: string }[] = [];
   const skipped: { line: string; reason: string }[] = [];
+  // Rows that carry a classification — so they are plainly fixtures — but
+  // whose first cell is not a date this parser knows. See below.
+  const dateless: string[] = [];
 
   for (const page of pages) {
     for (const row of page) {
       const cells = toCells(row);
-      if (!cells.length || !DATE_RE.test(cells[0])) continue;
+      if (!cells.length) continue;
+
+      if (!DATE_RE.test(cells[0])) {
+        // Everything that is not a fixture lands here too — titles, headers,
+        // the blank rows Excel prints between blocks — so silence is right
+        // for almost all of it. What is not right is silence when the row is
+        // obviously a game and only its date cell was unrecognised: that is
+        // the format moving under us, and it is exactly how Week 7 2026 came
+        // out as nought rows, nought skipped, nought warnings, with nothing
+        // to work back from. A fixture is recognisable without its date.
+        if (cells.length >= 5 && cells.some((c) => CLASS_RE.test(c))) {
+          dateless.push(cells.join("  "));
+        }
+        continue;
+      }
 
       // A row carrying only a date is the tail of a wrapped stadium name.
       if (cells.length === 1) continue;
@@ -212,5 +229,14 @@ export async function parseSchedulePdf(
     }
   }
 
-  return assemble(rows, teams, extraAliases, { skipped });
+  const extraWarnings: string[] = [];
+  if (dateless.length) {
+    extraWarnings.push(
+      `${dateless.length} row(s) look like fixtures but their first cell is not a date ` +
+        `this reader knows — the sheet's date format may have changed. First one: ` +
+        `"${dateless[0].slice(0, 120)}"`,
+    );
+  }
+
+  return assemble(rows, teams, extraAliases, { skipped, extraWarnings });
 }

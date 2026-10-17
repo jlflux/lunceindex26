@@ -931,6 +931,61 @@ console.log("\n15. A click advances a team, with nothing saved and nothing publi
       .rounds[0][0].top.team === "R1T3");
 }
 
+console.log("\n16. A locked place is not the same as a good one");
+{
+  // The Seeding tab shows a chip once a place is arithmetically settled, and
+  // clicking it writes the status. It used to write "clinched" whatever the
+  // place was — so a side nailed to the bottom of its region, which is every
+  // bit as locked as the champion, was offered "Clinched" when the true
+  // reading is "Out". The rule the chip follows is this one.
+  const lockedAs = (t: Pick<SeededTeam, "qualifies">) =>
+    t.qualifies ? "clinched" : "out";
+
+  const ratings = world();
+  const games = roundRobin();
+  const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
+  const region = seeded.get(regionKey("5A", 1)) ?? [];
+
+  // 5A takes four, and `world()` builds regions of four, so everybody in this
+  // one qualifies — the case where a locked last place still means Clinched.
+  check("a region no bigger than the field has every place qualifying",
+    region.length === 4 && region.every((t) => t.qualifies),
+    region.map((t) => `${t.name}:${t.qualifies}`).join(" "));
+  check("so even the team certain to finish last reads Clinched",
+    lockedAs(region[region.length - 1]) === "clinched");
+
+  // A region deeper than the field is where the two part company. Places one
+  // to four go through; five and below do not.
+  const deep = assignPlaces(
+    "5A",
+    Array.from({ length: 7 }, (_, i) => ({
+      ...region[0],
+      name: `T${i + 1}`,
+      slug: `t${i + 1}`,
+      place: 0,
+      qualifies: false,
+    })) as SeededTeam[],
+  );
+  check("the first four of seven qualify",
+    deep.slice(0, 4).every((t) => t.qualifies));
+  check("and the last three do not",
+    deep.slice(4).every((t) => !t.qualifies),
+    deep.map((t) => `${t.place}:${t.qualifies}`).join(" "));
+
+  check("a locked place inside the field offers Clinched",
+    lockedAs(deep[0]) === "clinched");
+  check("a locked place below the line offers Out, which was the bug",
+    lockedAs(deep[6]) === "out",
+    `got ${lockedAs(deep[6])}`);
+  check("including the first place below the line",
+    lockedAs(deep[4]) === "out");
+
+  // A barred team never gets the chip at all: it holds no place to lock.
+  const barred = { ...deep[0], ineligible: true, qualifies: false } as SeededTeam;
+  check("a barred team does not qualify, so it is never offered Clinched",
+    lockedAs(barred) === "out");
+}
+
 console.log(
   failures === 0 ? "\nThe bracket behaves.\n" : `\n${failures} check(s) failed.\n`,
 );

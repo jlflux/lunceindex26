@@ -316,10 +316,14 @@ export default function BracketEditor({
           finish first, and three teams who could land in any order are Medium
           even if all three are going through.{" "}
           <strong style={{ color: "rgb(var(--text-muted))" }}>Clinched</strong>{" "}
-          means that exact place is locked, not that they are in the bracket; a{" "}
-          <strong style={{ color: "rgb(var(--odds-hi))" }}>locked</strong> chip
-          appears once the arithmetic proves it. Everything is Medium until you
-          say otherwise, except a team that is mathematically out. The
+          means that exact place is locked, not that they are in the bracket. A
+          chip appears once the arithmetic proves a place cannot move:{" "}
+          <strong style={{ color: "rgb(var(--odds-hi))" }}>locked</strong> where
+          that place is inside the field, and{" "}
+          <strong style={{ color: "rgb(var(--text-faint))" }}>locked out</strong>{" "}
+          where it is below the line — clicking either applies the one it means,
+          Clinched or Out. Everything is Medium until you say otherwise, except
+          a team that is mathematically out. The
           percentages on the Playoff Odds board are a separate thing and make no
           claim about any of this.
         </p>
@@ -451,7 +455,27 @@ function RegionEditor({
       </div>
 
       <ul>
-        {list.map((t, i) => (
+        {list.map((t, i) => {
+          /**
+           * What the arithmetic proves, and therefore what the chip sets.
+           *
+           * `place_locked` says the finishing place cannot move. It says
+           * nothing about whether that place is a good one: a side nailed to
+           * the bottom of its region is exactly as locked as the champion.
+           * The chip used to set Clinched either way, which put "Clinched" on
+           * teams that are mathematically out — the opposite of the truth, and
+           * on the one status where being wrong is loudest.
+           *
+           * `qualifies` is the place against the number this class takes, so
+           * it is the same line the board draws under the region.
+           */
+          const lockedAs: StatusKey = t.qualifies ? "clinched" : "out";
+          const showLock =
+            !t.ineligible &&
+            t.place_locked &&
+            stored?.status?.[t.name] !== lockedAs;
+
+          return (
           <li
             key={t.slug}
             draggable
@@ -500,22 +524,36 @@ function RegionEditor({
             <span className="shrink-0 text-[11px] tnum" style={{ color: "rgb(var(--text-faint))" }}>
               {t.ineligible ? "—" : `${t.region_w}-${t.region_l}`}
             </span>
-            {!t.ineligible && t.place_locked && stored?.status?.[t.name] !== "clinched" && (
+            {showLock && (
               <button
                 className="shrink-0 rounded px-1 py-0.5 text-[9.5px] font-bold uppercase"
-                style={{
-                  background: "rgb(var(--odds-hi) / 0.18)",
-                  color: "rgb(var(--odds-hi))",
-                }}
-                title="This finishing place is arithmetically settled — nobody left can pass them and they can pass nobody. Click to mark it Clinched."
+                style={
+                  lockedAs === "clinched"
+                    ? {
+                        background: "rgb(var(--odds-hi) / 0.18)",
+                        color: "rgb(var(--odds-hi))",
+                      }
+                    : {
+                        // Being locked out is not good news, and a chip in the
+                        // same hopeful blue as a clinched seed reads as if it
+                        // were.
+                        background: "rgb(var(--surface-3))",
+                        color: "rgb(var(--text-faint))",
+                      }
+                }
+                title={
+                  lockedAs === "clinched"
+                    ? `This finishing place is arithmetically settled — nobody left can pass them and they can pass nobody, and the place is inside the ${cls} field. Click to mark it Clinched.`
+                    : `This finishing place is arithmetically settled — nobody left can pass them and they can pass nobody — and it is below the ${cls} playoff line. Click to mark it Out.`
+                }
                 onClick={() =>
                   onChange((r) => ({
                     ...r,
-                    status: { ...(r.status ?? {}), [t.name]: "clinched" },
+                    status: { ...(r.status ?? {}), [t.name]: lockedAs },
                   }))
                 }
               >
-                locked
+                {lockedAs === "clinched" ? "locked" : "locked out"}
               </button>
             )}
             {!t.ineligible &&
@@ -552,7 +590,8 @@ function RegionEditor({
               ))}
             </select>
           </li>
-        ))}
+          );
+        })}
       </ul>
 
       {pinned && differs && (

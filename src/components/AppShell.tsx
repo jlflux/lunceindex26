@@ -1,30 +1,38 @@
 import Link from "next/link";
 import Icon from "./Icon";
 import TopNav from "./TopNav";
+import { hiddenSections } from "@/lib/guard";
+import { isPathHidden } from "@/lib/site-sections";
 
 /**
  * Public site chrome: a colored masthead carrying the wordmark and nav, then
  * one wide content column. No sidebar — the ratings table wants the width.
  */
-export default function AppShell({
+export default async function AppShell({
   generated,
   children,
 }: {
   generated?: string;
   children: React.ReactNode;
 }) {
+  // Read here rather than threaded through every page: the chrome is the one
+  // thing every page has in common, so this is the single place that has to
+  // know which sections are switched off. `loadHome` is per-request cached,
+  // so a page that reads it too does not pay twice.
+  const hidden = await hiddenSections();
+
   return (
     <div className="flex min-h-screen flex-col">
-      <TopNav generated={generated} />
+      <TopNav generated={generated} hidden={hidden} />
       <main className="mx-auto w-full max-w-[1280px] flex-1 px-5 py-6 sm:px-8">
         {children}
       </main>
-      <Footer />
+      <Footer hidden={hidden} />
     </div>
   );
 }
 
-function Footer() {
+function Footer({ hidden }: { hidden: readonly string[] }) {
   return (
     <footer
       className="mt-10 border-t"
@@ -34,13 +42,18 @@ function Footer() {
         <p className="text-[12px]" style={{ color: "rgb(var(--text-faint))" }}>
           ALPreps Index · AHSAA Football · 2026
         </p>
-        <Link
-          href="/about"
-          className="text-[12px] hover:underline"
-          style={{ color: "rgb(var(--text-muted))" }}
-        >
-          How the ALPreps Index works
-        </Link>
+        {/* The explainer can be switched off like anything else, and a footer
+            link to a 404 on every page of the site would be the loudest
+            possible way to leave one behind. */}
+        {!isPathHidden("/about", hidden) && (
+          <Link
+            href="/about"
+            className="text-[12px] hover:underline"
+            style={{ color: "rgb(var(--text-muted))" }}
+          >
+            How the ALPreps Index works
+          </Link>
+        )}
       </div>
     </footer>
   );

@@ -2,11 +2,14 @@ import AppShell, { PageHeader } from "@/components/AppShell";
 import RatingsTable from "@/components/RatingsTable";
 import EmptyState from "@/components/EmptyState";
 import { loadRatings } from "@/lib/data";
+import { guardSection } from "@/lib/guard";
 
 export const revalidate = 300;
 export const metadata = { title: "Résumé Rankings" };
 
 export default async function ResumePage() {
+  await guardSection("/resume");
+
   const data = await loadRatings();
   const hasResume = data.ratings.some(
     (r) => typeof r.sor === "number" && r.wins + r.losses > 0,

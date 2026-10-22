@@ -1,4 +1,5 @@
 import AppShell, { PageHeader } from "@/components/AppShell";
+import { guardSection } from "@/lib/guard";
 
 export const metadata = { title: "How the ALPreps Index works" };
 
@@ -7,7 +8,9 @@ export const metadata = { title: "How the ALPreps Index works" };
  * meant the page had to fetch ratings and re-render on a schedule; it now says
  * nothing that changes when a slider moves, so it is fully static.
  */
-export default function AboutPage() {
+export default async function AboutPage() {
+  await guardSection("/about");
+
   return (
     <AppShell>
       <PageHeader title="How the ALPreps Index Works" />

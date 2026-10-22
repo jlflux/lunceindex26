@@ -11,6 +11,7 @@
  * without pulling the page's data loading into the browser bundle.
  */
 import type { IconName } from "@/components/Icon";
+import { knownHidden } from "./site-sections";
 
 /** The three ways the front page can draw a group of links. */
 export const HOME_STYLES = ["card", "board", "chip"] as const;
@@ -68,6 +69,14 @@ export interface HomeState {
   showTopFive: boolean;
   topFiveLabel: string;
   sections: HomeSection[];
+  /**
+   * Keys from `SITE_SECTIONS` that are switched off across the whole site —
+   * out of the nav, and their pages refuse to serve. Not a front-page
+   * concern, but it lives in this document because it is the same thing: what
+   * a person decided the site should show this week, as against what the
+   * season computed.
+   */
+  hiddenSections: string[];
 }
 
 /**
@@ -145,6 +154,7 @@ export function defaultHomeState(): HomeState {
     showSearch: true,
     showTopFive: true,
     topFiveLabel: "Top of the Index",
+    hiddenSections: [],
     sections: [
       {
         id: "start",
@@ -230,6 +240,14 @@ export function sanitizeHomeState(raw: unknown): HomeState {
     showSearch: r.showSearch !== false,
     showTopFive: r.showTopFive !== false,
     topFiveLabel: str(r.topFiveLabel, 60) || fallback.topFiveLabel,
+    // Filtered to keys that still name a section, so a key left behind by a
+    // rename cannot hide nothing for ever while looking like it hides
+    // something.
+    hiddenSections: knownHidden(
+      Array.isArray(r.hiddenSections)
+        ? r.hiddenSections.filter((k): k is string => typeof k === "string")
+        : [],
+    ),
     sections: [],
   };
 

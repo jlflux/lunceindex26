@@ -30,11 +30,11 @@ export const PUT = withAdmin(async (req: Request) => {
 
   await saveHome(state);
 
-  // The front page reads this document on render, so the edit is live as soon
-  // as the cache lets go. Saying so here rather than waiting out `revalidate`
-  // is the difference between "it saved" and "it saved and you can see it" —
-  // a gap that has already cost an afternoon on the bracket's own toggle.
-  revalidatePath("/");
+  // Every page, not just the front one. This document now decides which
+  // sections appear in the nav, and the nav is on all of them — refreshing
+  // `/` alone would leave a hidden board still listed everywhere else until
+  // its own five minutes ran out. The "layout" scope is what reaches them.
+  revalidatePath("/", "layout");
 
   const links = state.sections.reduce((n, s) => n + s.items.length, 0);
   return NextResponse.json({ ok: true, sections: state.sections.length, links });

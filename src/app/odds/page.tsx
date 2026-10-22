@@ -3,11 +3,14 @@ import EmptyState from "@/components/EmptyState";
 import OddsBoard from "@/components/OddsBoard";
 import { loadRatings } from "@/lib/data";
 import { formatUpdated } from "@/lib/rankings";
+import { guardSection } from "@/lib/guard";
 
 export const revalidate = 300;
 export const metadata = { title: "Playoff Odds" };
 
 export default async function OddsPage() {
+  await guardSection("/odds");
+
   const data = await loadRatings();
   const odds = data.odds;
 

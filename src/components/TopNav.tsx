@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Icon from "./Icon";
 import ThemeToggle from "./ThemeToggle";
+import { SITE_SECTIONS } from "@/lib/site-sections";
 
 /**
  * The nav splits by what a link answers, not by importance.
@@ -19,21 +20,16 @@ import ThemeToggle from "./ThemeToggle";
  * boards made eight links that all looked equivalent and none of which looked
  * like the main event.
  */
-const RANKINGS = [
-  { href: "/ratings", label: "Power Index" },
-  { href: "/resume", label: "Résumé" },
-  { href: "/rpi", label: "RPI" },
-  { href: "/composite", label: "Composite" },
-  { href: "/aswa", label: "ASWA" },
-] as const;
-
-const PAGES = [
-  { href: "/teams", label: "Standings" },
-  { href: "/bracketology", label: "Bracketology" },
-  { href: "/odds", label: "Playoff Odds" },
-  { href: "/schedule", label: "Schedule" },
-  { href: "/about", label: "How It Works" },
-] as const;
+/**
+ * Both rows come from `SITE_SECTIONS` rather than from lists kept here.
+ *
+ * They used to be kept here, which meant the menu and the pages held separate
+ * ideas of what the site contains — and a section hidden from one was still
+ * served by the other. One catalogue, read by the nav, the guards and the
+ * admin alike.
+ */
+const rowOf = (row: "rankings" | "pages", hidden: readonly string[]) =>
+  SITE_SECTIONS.filter((x) => x.row === row && !hidden.includes(x.key));
 
 /**
  * The ratings live on their own subdomain, so the way back to the main site
@@ -47,11 +43,16 @@ const HOME_URL = "https://alpreps.com";
 export default function TopNav({
   generated,
   season = "2026",
+  hidden = [],
 }: {
   generated?: string;
   season?: string;
+  /** Section keys switched off in the admin. */
+  hidden?: readonly string[];
 }) {
   const pathname = usePathname();
+  const rankings = rowOf("rankings", hidden);
+  const pages = rowOf("pages", hidden);
   // A team page is reached from the Index, so the Index stays lit underneath
   // it. `/` is the front page now rather than the board, and nothing in either
   // row points at it — the wordmark does — so no tab is lit there.
@@ -95,7 +96,7 @@ export default function TopNav({
               no longer fit on one phone-width line, so the gap tightens and the
               row is allowed to wrap onto as many lines as it needs. */}
           <nav className="order-3 flex w-full flex-wrap items-center gap-x-4 sm:order-none sm:w-auto sm:flex-nowrap sm:gap-x-6">
-            {RANKINGS.map((l) => (
+            {rankings.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
@@ -154,7 +155,7 @@ export default function TopNav({
         }}
       >
         <nav className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-x-5 px-5 sm:gap-x-7 sm:px-8">
-          {PAGES.map((l) => (
+          {pages.map((l) => (
             <Link
               key={l.href}
               href={l.href}

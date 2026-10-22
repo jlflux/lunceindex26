@@ -3,6 +3,7 @@ import AppShell, { PageHeader } from "@/components/AppShell";
 import EmptyState from "@/components/EmptyState";
 import { loadBracket, loadRatings } from "@/lib/data";
 import { renderRichText } from "@/lib/sanitize";
+import { guardSection } from "@/lib/guard";
 
 export const revalidate = 300;
 export const metadata = { title: "About bracketology" };
@@ -16,6 +17,8 @@ export const metadata = { title: "About bracketology" };
  * classes, since the markup is authored elsewhere and cannot carry any.
  */
 export default async function BracketAboutPage() {
+  await guardSection("/bracketology/about");
+
   const [data, state] = await Promise.all([loadRatings(), loadBracket()]);
   const html = renderRichText(state.aboutHtml);
 

@@ -5,6 +5,7 @@ import BracketBoard, { type BoardClass } from "@/components/bracket/BracketBoard
 import { regionKey, resolveBracket, seededRegions } from "@/lib/bracket";
 import { loadBracket, loadRatings } from "@/lib/data";
 import { CLS_FILTER_ORDER } from "@/lib/types";
+import { guardSection } from "@/lib/guard";
 
 export const revalidate = 300;
 export const metadata = { title: "Bracketology" };
@@ -21,6 +22,8 @@ export const metadata = { title: "Bracketology" };
  * projection is this page's job.
  */
 export default async function BracketologyPage() {
+  await guardSection("/bracketology");
+
   const [data, state] = await Promise.all([loadRatings(), loadBracket()]);
 
   const seeded = seededRegions(data.ratings, data.games, data.odds, state);

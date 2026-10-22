@@ -2,11 +2,14 @@ import AppShell, { PageHeader } from "@/components/AppShell";
 import RatingsTable from "@/components/RatingsTable";
 import EmptyState from "@/components/EmptyState";
 import { loadRatings } from "@/lib/data";
+import { guardSection } from "@/lib/guard";
 
 export const revalidate = 300;
 export const metadata = { title: "RPI" };
 
 export default async function RpiPage() {
+  await guardSection("/rpi");
+
   const data = await loadRatings();
 
   return (

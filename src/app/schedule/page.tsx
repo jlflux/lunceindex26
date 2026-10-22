@@ -3,11 +3,14 @@ import EmptyState from "@/components/EmptyState";
 import ScheduleBrowser from "@/components/ScheduleBrowser";
 import { loadRatings } from "@/lib/data";
 import { currentWeekKey } from "@/lib/season";
+import { guardSection } from "@/lib/guard";
 
 export const revalidate = 300;
 export const metadata = { title: "Schedule" };
 
 export default async function SchedulePage() {
+  await guardSection("/schedule");
+
   const data = await loadRatings();
   const rated = new Map(data.ratings.map((r) => [r.name, r]));
 

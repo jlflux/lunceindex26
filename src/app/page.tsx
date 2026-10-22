@@ -6,6 +6,7 @@ import TeamJump from "@/components/TeamJump";
 import { fmt, record } from "@/lib/format";
 import { loadHome, loadRatings } from "@/lib/data";
 import { isExternal, type HomeItem, type HomeSection } from "@/lib/home-types";
+import { isPathHidden } from "@/lib/site-sections";
 import { CLS_ORDER } from "@/lib/types";
 
 export const revalidate = 300;
@@ -38,9 +39,14 @@ export default async function HomePage({
   const [data, home] = await Promise.all([loadRatings(), loadHome()]);
   const published = data.ratings.length > 0;
   const top = [...data.ratings].sort((a, b) => a.rank - b.rank).slice(0, 5);
-  const sections = home.sections.filter(
-    (s) => s.shown && s.items.some((i) => i.shown),
-  );
+  // A card pointing at a switched-off section is a link to a 404, and the
+  // front page is the likeliest place somebody meets one. Drop those first,
+  // then drop any group left with nothing in it.
+  const visible = (i: HomeItem) => i.shown && !isPathHidden(i.href, home.hiddenSections);
+  const sections = home.sections
+    .filter((s) => s.shown)
+    .map((s) => ({ ...s, items: s.items.filter(visible) }))
+    .filter((s) => s.items.length > 0);
 
   return (
     <AppShell generated={published ? data.generated : undefined}>
@@ -121,6 +127,7 @@ export default async function HomePage({
                 label={home.topFiveLabel}
                 teams={top}
                 total={data.ratings.length}
+                ratingsOn={!isPathHidden("/ratings", home.hiddenSections)}
               />
               <div>
                 <SectionLabel>{section.label}</SectionLabel>
@@ -147,6 +154,7 @@ export default async function HomePage({
               label={home.topFiveLabel}
               teams={top}
               total={data.ratings.length}
+              ratingsOn={!isPathHidden("/ratings", home.hiddenSections)}
             />
           </section>
         )}
@@ -155,7 +163,9 @@ export default async function HomePage({
 }
 
 function Items({ section }: { section: HomeSection }) {
-  const items = section.items.filter((i) => i.shown);
+  // Already filtered by the page — hidden sections and unshown items are
+  // gone before this renders.
+  const items = section.items;
   if (section.style === "card") {
     return (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -303,10 +313,13 @@ function TopFive({
   label,
   teams,
   total,
+  ratingsOn,
 }: {
   label: string;
   teams: Awaited<ReturnType<typeof loadRatings>>["ratings"];
   total: number;
+  /** The board this links to can itself be switched off. */
+  ratingsOn: boolean;
 }) {
   return (
     <div className="card overflow-hidden">
@@ -323,13 +336,19 @@ function TopFive({
         >
           {label}
         </span>
-        <Link
-          href="/ratings"
-          className="text-[12px] font-semibold hover:underline"
-          style={{ color: "rgb(var(--brand))" }}
-        >
-          All {total} teams →
-        </Link>
+        {ratingsOn ? (
+          <Link
+            href="/ratings"
+            className="text-[12px] font-semibold hover:underline"
+            style={{ color: "rgb(var(--brand))" }}
+          >
+            All {total} teams →
+          </Link>
+        ) : (
+          <span className="text-[12px]" style={{ color: "rgb(var(--text-faint))" }}>
+            {total} teams
+          </span>
+        )}
       </div>
       <ol>
         {teams.map((t, i) => (

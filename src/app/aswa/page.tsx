@@ -10,11 +10,14 @@ import {
   type AswaClassBlock,
 } from "@/lib/rankings";
 import { CLS_FILTER_ORDER } from "@/lib/types";
+import { guardSection } from "@/lib/guard";
 
 export const revalidate = 300;
 export const metadata = { title: "ASWA Poll" };
 
 export default async function AswaPage() {
+  await guardSection("/aswa");
+
   const [data, entries] = await Promise.all([loadRatings(), loadAswa()]);
   const slug = new Map(data.ratings.map((r) => [r.name, r.slug]));
   const blocks = buildAswa(entries, CLS_FILTER_ORDER);

@@ -4,6 +4,7 @@ import EmptyState from "@/components/EmptyState";
 import { loadRatings } from "@/lib/data";
 import type { Classification } from "@/lib/types";
 import { CLS_ORDER } from "@/lib/types";
+import { guardSection } from "@/lib/guard";
 
 export const revalidate = 300;
 export const metadata = { title: "Power Index" };
@@ -21,6 +22,8 @@ export default async function RatingsPage({
 }: {
   searchParams: Promise<{ class?: string }>;
 }) {
+  await guardSection("/ratings");
+
   const { class: classParam } = await searchParams;
   const initialClass =
     classParam && classParam in CLS_ORDER

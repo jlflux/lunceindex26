@@ -11,6 +11,12 @@
  * Usage: npx tsx scripts/test-home.ts
  */
 import {
+  isPathHidden,
+  knownHidden,
+  sectionOf,
+  SITE_SECTIONS,
+} from "../src/lib/site-sections";
+import {
   defaultHomeState,
   HOME_ICONS,
   isExternal,
@@ -181,6 +187,62 @@ console.log("\n3. What the API accepts");
   const long = sanitizeHomeState({ ...defaultHomeState(), intro: "x".repeat(5000) });
   check("an over-long intro is trimmed rather than refused",
     long.intro.length === 600);
+}
+
+console.log("\n4. Switching a section off");
+{
+  // The menu is a courtesy, not a gate. What makes a section hidden is that
+  // its page refuses to serve — so the thing worth testing is that the same
+  // catalogue decides both, and that path matching is tight enough not to
+  // close a page nobody asked to close.
+  check("every section has a distinct key", 
+    new Set(SITE_SECTIONS.map((s) => s.key)).size === SITE_SECTIONS.length);
+  check("and a distinct path",
+    new Set(SITE_SECTIONS.map((s) => s.href)).size === SITE_SECTIONS.length);
+  check("every path is one the editor would accept as a link",
+    SITE_SECTIONS.every((s) => isSafeHref(s.href)));
+
+  // The front page and team pages are deliberately not hideable.
+  check("the front page belongs to no section", sectionOf("/") === null);
+  check("nor does a team page", sectionOf("/team/thompson") === null);
+  check("so neither can be hidden, whatever is stored",
+    !isPathHidden("/", SITE_SECTIONS.map((s) => s.key)) &&
+      !isPathHidden("/team/thompson", SITE_SECTIONS.map((s) => s.key)));
+
+  const off = ["composite"];
+  check("the hidden section's own page is closed",
+    isPathHidden("/composite", off));
+  check("and its query string does not reopen it",
+    isPathHidden("/composite?class=6A", off));
+  check("and nor does a trailing slash",
+    isPathHidden("/composite/", off));
+  check("every other board stays open",
+    ["/ratings", "/rpi", "/aswa", "/resume", "/odds"].every((p) => !isPathHidden(p, off)));
+
+  // A nested page goes with its parent, and only on a path boundary — the
+  // reason this is matched by segment rather than by `startsWith` alone.
+  check("a section's nested page closes with it",
+    isPathHidden("/bracketology/about", ["bracketology"]));
+  check("but a path that merely starts the same does not",
+    sectionOf("/ratingsomething") === null);
+
+  // Keys left behind by a rename must not linger as a hide nobody can find.
+  check("an unknown key is dropped on the way in",
+    knownHidden(["composite", "no-such-section"]).join() === "composite");
+  check("and duplicates are collapsed",
+    knownHidden(["rpi", "rpi"]).length === 1);
+
+  // The document carries it, and the API has to keep it.
+  const saved = sanitizeHomeState({ ...defaultHomeState(), hiddenSections: ["composite", "aswa"] });
+  check("a saved hide survives the API", 
+    saved.hiddenSections.includes("composite") && saved.hiddenSections.includes("aswa"),
+    saved.hiddenSections.join());
+  const junk = sanitizeHomeState({ ...defaultHomeState(), hiddenSections: ["composite", 7, null, "bogus"] });
+  check("and anything that is not a real section is discarded",
+    junk.hiddenSections.join() === "composite",
+    junk.hiddenSections.join());
+  check("the page ships with nothing hidden",
+    defaultHomeState().hiddenSections.length === 0);
 }
 
 console.log(

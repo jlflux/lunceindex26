@@ -11,11 +11,14 @@ import {
   latestUpdate,
 } from "@/lib/rankings";
 import type { Classification } from "@/lib/types";
+import { guardSection } from "@/lib/guard";
 
 export const revalidate = 300;
 export const metadata = { title: "Composite Rankings" };
 
 export default async function CompositePage() {
+  await guardSection("/composite");
+
   const [data, entries] = await Promise.all([loadRatings(), loadComposite()]);
 
   const ourRank = new Map(data.ratings.map((r) => [r.name, r.rank]));

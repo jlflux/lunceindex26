@@ -146,7 +146,7 @@ full season schedule can be loaded in advance without affecting anything.
 | Bracketology | The bracket, region write-ups, projections and the explainer. Seeds and records are computed; pin a region to override it |
 | Formula | Sliders for every tunable, with a live top-25 preview showing rank movement before you save |
 | Teams | Edit names, classification, region and preseason rating; bulk-import priors |
-| Front page | The headline, the announcement banner, and every group of links on `/` — their wording, order, icons and destinations. Links may point at a page here or at any http(s) address |
+| Site | Which sections the site shows — switching one off takes it out of the nav *and* makes its page 404, so a saved link cannot reach it. Plus the whole front page: headline, announcement banner, and the groups of links, with their wording, order, icons and destinations |
 
 Renaming a team also rewrites its games, since games reference teams by name.
 
@@ -171,7 +171,7 @@ npm run test:coverage     # the missing-week scan, including the bye/noise rules
 npm run test:forfeits     # that a vacated win changes the record and not the rating
 npm run test:playoffs     # the odds: bracket, probability invariants, clinch/elimination
 npm run test:render       # what a bracket slot renders: a link for readers, not in the editor
-npm run test:home         # the front page document, above all where a link may point
+npm run test:home         # the site document: where a link may point, and what a hidden section closes
 npm run test:tiebreak     # the AHSAA tie-breaking procedure, (a) through (q)
 npm run test:ineligible   # postseason bans: what they void, and what they must not
 npm run test:bracket      # bracket resolution, projections, and the explainer sanitiser

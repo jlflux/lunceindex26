@@ -8,6 +8,7 @@
 import { computeOdds, WIN_SCALE } from "./playoffs";
 import { defaultHomeState, type HomeState } from "./home-types";
 import "server-only";
+import { cache } from "react";
 
 import { computeBoard, modelOf } from "./board";
 import { emptyBracketState, type BracketState } from "./bracket-types";
@@ -169,7 +170,9 @@ export async function loadBracket(admin = false): Promise<BracketState> {
  * `HomeState` later appears with its default on a page saved before it
  * existed, instead of arriving as undefined in the middle of a render.
  */
-export async function loadHome(admin = false): Promise<HomeState> {
+export const loadHome = cache(async function loadHome(
+  admin = false,
+): Promise<HomeState> {
   const preview = await previewObject<HomeState>("home");
   if (preview) return { ...defaultHomeState(), ...preview };
   try {
@@ -192,7 +195,7 @@ export async function loadHome(admin = false): Promise<HomeState> {
     if (admin) throw e;
     return defaultHomeState();
   }
-}
+});
 
 export async function saveHome(state: HomeState): Promise<void> {
   const { error } = await serviceClient()

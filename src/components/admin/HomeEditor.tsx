@@ -19,6 +19,7 @@ import {
   type HomeStyle,
 } from "@/lib/home-types";
 import type { IconName } from "@/components/Icon";
+import { SITE_SECTIONS } from "@/lib/site-sections";
 
 /**
  * The front page, as a form.
@@ -84,9 +85,14 @@ export default function HomeEditor() {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Save failed.");
+      const off = state.hiddenSections.length;
       setMsg({
         tone: "good",
-        text: `Saved ${body.links} link(s) across ${body.sections} group(s). The front page is updated.`,
+        text:
+          `Saved ${body.links} link(s) across ${body.sections} group(s). ` +
+          (off
+            ? `${off} section${off === 1 ? " is" : "s are"} hidden from the site.`
+            : "The front page is updated."),
       });
     } catch (e) {
       setMsg({
@@ -109,8 +115,8 @@ export default function HomeEditor() {
   return (
     <div className="space-y-5">
       <AdminHeader
-        title="Front page"
-        subtitle="The headline, the announcement banner, and every group of links on the site's front page. Nothing changes until you press Save."
+        title="Site"
+        subtitle="Which sections the site shows, and everything on its front page — the headline, the announcement banner, and the groups of links. Nothing changes until you press Save."
       />
 
       <div className="flex flex-wrap items-center gap-3">
@@ -249,6 +255,72 @@ export default function HomeEditor() {
           Off by default. The text is kept when you switch it off, so a banner
           you use every week does not need retyping.
         </p>
+      </div>
+
+      {/* --------------------------------------------- what the site shows */}
+      <div className="card space-y-3 p-4">
+        <h2 className="text-sm font-bold uppercase tracking-wider">
+          Sections of the site
+        </h2>
+        <p className="text-xs leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
+          Switching one off takes it out of the menu <em>and</em> stops its
+          page loading, so a saved link or a typed address will not reach it
+          either. Any card on the front page pointing at it disappears too.
+          Nothing is deleted — switch it back on and it returns with its data
+          as it was.
+        </p>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          {SITE_SECTIONS.map((sec) => {
+            const off = state.hiddenSections.includes(sec.key);
+            return (
+              <label
+                key={sec.key}
+                className="flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5"
+                style={{
+                  borderColor: off ? "rgb(var(--bad) / 0.45)" : "rgb(var(--border))",
+                  background: off ? "rgb(var(--bad-soft))" : "transparent",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[rgb(var(--brand))]"
+                  checked={!off}
+                  onChange={(e) =>
+                    setState((st) => ({
+                      ...st,
+                      hiddenSections: e.target.checked
+                        ? st.hiddenSections.filter((k) => k !== sec.key)
+                        : [...st.hiddenSections, sec.key],
+                    }))
+                  }
+                />
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1.5 text-[13px] font-semibold">
+                    {sec.label}
+                    {off && (
+                      <span
+                        className="rounded px-1 py-px text-[9.5px] font-bold uppercase"
+                        style={{
+                          background: "rgb(var(--bad) / 0.18)",
+                          color: "rgb(var(--bad))",
+                        }}
+                      >
+                        hidden
+                      </span>
+                    )}
+                  </span>
+                  <span
+                    className="block text-[11.5px] leading-snug"
+                    style={{ color: "rgb(var(--text-muted))" }}
+                  >
+                    {sec.note}
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+        </div>
       </div>
 
       {/* ------------------------------------------------------- sections */}

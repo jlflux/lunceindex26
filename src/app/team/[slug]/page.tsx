@@ -21,6 +21,8 @@ import {
   type ScheduleEntry,
 } from "@/lib/team-view";
 import type { Performance } from "@/lib/engine";
+import { hiddenSections } from "@/lib/guard";
+import { isPathHidden } from "@/lib/site-sections";
 
 export const revalidate = 300;
 
@@ -56,16 +58,21 @@ export default async function TeamPage({
   const hasEff = t.wins + t.losses >= MIN_GAMES_FOR_EFFICIENCY;
   // The adjusted split leans on the carry-over until a team has a few games.
   const hasSplit = t.wins + t.losses >= MIN_GAMES_FOR_SPLIT;
+  const backHref = isPathHidden("/ratings", await hiddenSections())
+    ? "/"
+    : "/ratings";
 
   return (
     <AppShell generated={data.generated}>
+      {/* The board this goes back to can be switched off; the front page
+          cannot, so that is where the way out leads when it is. */}
       <Link
-        href="/ratings"
+        href={backHref}
         className="mb-4 inline-flex items-center gap-1.5 text-[13px] font-medium hover:underline"
         style={{ color: "rgb(var(--text-muted))" }}
       >
         <Icon name="arrow-left" size={14} />
-        All teams
+        {backHref === "/ratings" ? "All teams" : "Home"}
       </Link>
 
       {/* Identity banner */}

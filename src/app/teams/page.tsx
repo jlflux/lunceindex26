@@ -2,11 +2,14 @@ import AppShell, { PageHeader } from "@/components/AppShell";
 import EmptyState from "@/components/EmptyState";
 import TeamDirectory from "@/components/TeamDirectory";
 import { loadRatings } from "@/lib/data";
+import { guardSection } from "@/lib/guard";
 
 export const revalidate = 300;
 export const metadata = { title: "Standings" };
 
 export default async function TeamsPage() {
+  await guardSection("/teams");
+
   const data = await loadRatings();
 
   return (

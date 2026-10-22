@@ -1,7 +1,7 @@
 import HomeEditor from "@/components/admin/HomeEditor";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Front page" };
+export const metadata = { title: "Site" };
 
 /**
  * The editor loads its own document over the API rather than being handed one

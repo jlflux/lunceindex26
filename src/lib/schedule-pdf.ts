@@ -29,6 +29,7 @@ import {
   displayDate,
   REGION_RE,
   SCORE_RE,
+  splitLeadingDate,
   type ParseReport,
   type RowFields,
 } from "./schedule-rows";
@@ -91,13 +92,34 @@ function groupRows(items: TextItem[]): Row[] {
   return rows;
 }
 
-/** Merges runs separated by less than 4pt — occasional mid-name splits. */
+/**
+ * Merges runs that belong to one cell, and only those.
+ *
+ * A run that starts before the previous one ends is a name broken mid-word
+ * and has to be rejoined; a run that starts after a gap is the next column.
+ * The threshold used to be 4pt, which was wrong in the dangerous direction:
+ * in Week 9 of 2026 the date column sat 3.8pt from the home column and the
+ * two merged, so every row failed its date test and the week imported
+ * nothing. Week 7's print put the same pair 5.0pt apart and parsed cleanly.
+ *
+ * Measured across every sheet to hand — Weeks 0, 2, 7 and 9 of 2026, 6,296
+ * gaps between consecutive runs: the only sub-zero gaps are two genuine
+ * mid-name splits in Week 0, and the tightest real column gap is 2.63pt.
+ * Nothing at all falls between. 2pt sits inside that window with room on
+ * both sides, where 4pt sat on the wrong side of it.
+ *
+ * A threshold is still a measurement, and the next print will move it again,
+ * so the date is additionally put back in its own cell by structure rather
+ * than by spacing — see `splitLeadingDate`.
+ */
+const CELL_GAP = 2;
+
 function toCells(row: Row): string[] {
   const cells: string[] = [];
   let cur = "";
   let prevEnd = -Infinity;
   for (const it of row.items) {
-    if (cur && it.x - prevEnd > 4) {
+    if (cur && it.x - prevEnd > CELL_GAP) {
       cells.push(cur.replace(/\s+/g, " ").trim());
       cur = "";
     }
@@ -202,8 +224,16 @@ export async function parseSchedulePdf(
 
   for (const page of pages) {
     for (const row of page) {
-      const cells = toCells(row);
+      let cells = toCells(row);
       if (!cells.length) continue;
+
+      // Two columns printed close enough together arrive as one cell. When
+      // that happens to the date and whatever sits beside it, put the date
+      // back in a cell of its own rather than losing the row — the grouping
+      // is a measurement, and this is not a thing to lose a week's results
+      // over. See `splitLeadingDate`.
+      const split = splitLeadingDate(cells[0]);
+      if (split) cells = [split[0], split[1], ...cells.slice(1)];
 
       if (!DATE_RE.test(cells[0])) {
         // Everything that is not a fixture lands here too — titles, headers,

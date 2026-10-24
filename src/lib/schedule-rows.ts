@@ -76,15 +76,49 @@ const TIME = String.raw`(?:\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]\.?M\.?)?)?`;
  * sheets' "09-11-2026". Matching only the first silently drops every row in
  * the other sections — the Week 0 Saturday block went missing this way.
  */
-export const DATE_RE = new RegExp(
-  "^(?:" +
-    String.raw`[A-Z][a-z]{2}\.?\s+\d{1,2},\s*\d{4}` + TIME +
-    "|" +
-    String.raw`\d{4}-\d{2}-\d{2}` + TIME +
-    "|" +
-    String.raw`\d{2}-\d{2}-\d{4}` + TIME +
-    ")$",
-);
+const DATE_BODY =
+  "(?:" +
+  String.raw`[A-Z][a-z]{2}\.?\s+\d{1,2},\s*\d{4}` + TIME +
+  "|" +
+  String.raw`\d{4}-\d{2}-\d{2}` + TIME +
+  "|" +
+  String.raw`\d{2}-\d{2}-\d{4}` + TIME +
+  ")";
+
+export const DATE_RE = new RegExp(`^${DATE_BODY}$`);
+
+/** A date followed by something else in the same cell. See `splitLeadingDate`. */
+const DATE_PREFIX_RE = new RegExp(`^(${DATE_BODY})\\s+(\\S.*)$`);
+
+/**
+ * Pulls a date off the front of a cell that carries more than a date.
+ *
+ * The PDF reader groups text runs into cells by how far apart they sit, and
+ * two columns that print close enough together arrive as one. In Week 9 of
+ * 2026 the gap between the date column and the home column was 3.8pt against
+ * a 4pt threshold — so "10-22-2026 7:00 PM" and "Mountain Brook HS" merged
+ * into a single cell and every row failed the date test. The same two columns
+ * in Week 7 sat 5.0pt apart and parsed cleanly. A 1.2pt difference in font
+ * metrics between two prints of the same document decided whether the week
+ * imported, which is not a thing a reader should rest on.
+ *
+ * Splitting here rather than tuning the threshold: the threshold exists to
+ * rejoin names broken mid-word, and lowering it to clear this week would put
+ * that at risk for a measurement that will move again. A date is a column of
+ * its own in every one of these sheets, and no school is named after one.
+ *
+ * Returns null when the cell is only a date, or is not one at all.
+ */
+export function splitLeadingDate(cell: string): [string, string] | null {
+  const t = cell.trim();
+  // A cell that is wholly a date has nothing to split off. Without this the
+  // optional kickoff backtracks and "10-22-2026 7:00 PM" comes apart into a
+  // date and a time, which is not wrong further down but makes the helper
+  // lie about what it is for.
+  if (DATE_RE.test(t)) return null;
+  const m = DATE_PREFIX_RE.exec(t);
+  return m ? [m[1], m[2]] : null;
+}
 
 /** Normalizes any of them to the display format used everywhere else. */
 export function displayDate(raw: string): string {

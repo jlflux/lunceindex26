@@ -16,7 +16,7 @@ import {
   normalize,
   normalizeClassToken,
 } from "../src/lib/names";
-import { DATE_RE, displayDate } from "../src/lib/schedule-rows";
+import { DATE_RE, displayDate, splitLeadingDate } from "../src/lib/schedule-rows";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail = "") {
@@ -64,6 +64,25 @@ console.log("\n0. The date cell, however Excel broke that print run");
     displayDate("2026-08-22 0:00:00"));
   check("and the written form is left alone",
     displayDate("Aug. 21, 2026") === "Aug. 21, 2026");
+
+  // Two columns printed close enough together arrive as one cell. The date
+  // is put back in its own cell by structure, so no spacing threshold has to
+  // be right for the row to be read.
+  const split = (c: string) => splitLeadingDate(c)?.join(" | ") ?? null;
+  check("a date merged with the home team is pulled apart",
+    split("10-22-2026 7:00 PM Mountain Brook HS") ===
+      "10-22-2026 7:00 PM | Mountain Brook HS",
+    String(split("10-22-2026 7:00 PM Mountain Brook HS")));
+  check("with no kickoff between them either",
+    split("10-22-2026 Mountain Brook HS") === "10-22-2026 | Mountain Brook HS");
+  check("the written form splits too",
+    split("Sep. 4, 2026 7:30 PM Hoover HS") === "Sep. 4, 2026 7:30 PM | Hoover HS");
+  check("the Excel serial form splits too",
+    split("2026-08-22 0:00:00 Thompson HS") === "2026-08-22 0:00:00 | Thompson HS");
+  check("a cell holding only a date is left whole",
+    split("10-22-2026 7:00 PM") === null && split("10-22-2026") === null);
+  check("and a cell holding no date is left alone",
+    split("Mountain Brook HS") === null);
 }
 
 console.log("\n1. Names the results sheets spell differently");
@@ -136,6 +155,10 @@ console.log("\n3. The private classes, however they are written");
 
 const RESULTS = "data/2026_Week_2_Scores.pdf";
 const SCHEDULE = "data/2026_Week_0_Football.pdf";
+// Week 9 is kept because of how its columns are spaced, not its results:
+// the date column prints 3.8pt from the home column there, which is the
+// tightest in any sheet to hand and the one that broke the reader.
+const TIGHT = "data/2026_Week_9_Scores.pdf";
 
 async function main() {
   if (existsSync(RESULTS)) {
@@ -204,6 +227,52 @@ async function main() {
       games.length >= 138,
       `${games.length} games`,
     );
+  }
+
+  if (existsSync(TIGHT)) {
+    console.log("\n6. A sheet whose columns very nearly touch");
+    const report = await parseSchedulePdf(
+      new Uint8Array(readFileSync(TIGHT)),
+      teams,
+    );
+    // This sheet read as nought games until the date stopped depending on a
+    // 4pt measurement: its date column sits 3.8pt from the home column, so
+    // the two merged and every row failed its date test.
+    check(
+      "every row is read",
+      report.totalRows > 150 && report.skipped.length === 0,
+      `${report.totalRows} rows, ${report.skipped.length} skipped`,
+    );
+    check(
+      "and nothing is left looking like an unreadable date",
+      !report.warnings.some((w) => w.includes("not a date this reader knows")),
+      report.warnings.join(" / "),
+    );
+    const games = toGames(report, 9);
+    check("nearly every game carries a score",
+      games.filter((g) => g.s1 !== null).length >= games.length - 3,
+      `${games.filter((g) => g.s1 !== null).length} of ${games.length}`);
+
+    // The two names this sheet got wrong, both now reachable: one truncated
+    // by the association's own column width, one spelt differently from the
+    // roster.
+    check("a name the sheet cut in half still matches",
+      games.some((g) => g.t1 === "Carver-Birmingham" || g.t2 === "Carver-Birmingham"),
+      "Carver-Birmingham missing");
+    check("and one the association spells its own way",
+      games.some((g) => g.t1 === "Snook Christian" || g.t2 === "Snook Christian"),
+      "Snook Christian missing");
+
+    // Spot-checks read straight off the PDF.
+    for (const [home, hs, away, as_] of [
+      ["Mountain Brook", 21, "Pelham", 25],
+      ["Woodlawn", 32, "Carver-Birmingham", 26],
+    ] as [string, number, string, number][]) {
+      const g = games.find((x) => x.t1 === home && x.t2 === away);
+      check(`${home} ${hs}–${as_} ${away}`,
+        !!g && g.s1 === hs && g.s2 === as_,
+        g ? `got ${g.s1}–${g.s2}` : "game not found");
+    }
   }
 
   console.log(

@@ -134,6 +134,8 @@ export const ALIASES: Record<string, string> = {
   "Paul W. Bryant High School": "Paul Bryant",
   "Mary G. Montgomery High School": "Mary Montgomery",
   "G.W. Carver-Birmingham HS": "Carver-Birmingham",
+  // The association writes "Academy", the roster "Christian".
+  "Snook Academy": "Snook Christian",
   "Carver HS - Montgomery": "Carver-Montgomery",
   "G.W. Long High School": "GW Long",
   "B.B. Comer High School": "BB Comer",
@@ -294,6 +296,13 @@ export function normalize(raw: string): string {
       // "Central HS, Phenix City", where suffix stripping cannot reach it.
       // No roster name contains "hs" as a word.
       .replace(/\bhs\b/g, " ")
+      // A trailing lone "h" is an "HS" the sheet's column cut in half:
+      // Week 9 of 2026 printed "G.W. Carver-Birmingham H" and the row went
+      // unmatched past an alias that was already there for the full
+      // spelling. No roster name and no alias ends in a standalone "h", so
+      // dropping it costs nothing and rescues every future truncation of
+      // that shape.
+      .replace(/\bh$/, " ")
       .replace(/\s+/g, " ")
       .trim()
   );

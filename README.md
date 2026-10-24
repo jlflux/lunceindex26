@@ -375,6 +375,15 @@ than an error. `PROJECT.md` covers the reasoning.
   it in the UI — a resolved bracket handed to a client component is serialized
   into the page. The admin editor always resolves projections, because that is
   where they are made.
+- **The PDF reader groups text runs into cells by how far apart they sit.**
+  Two columns printed close enough together arrive as one. The threshold is
+  2pt, chosen from 6,296 measured gaps across Weeks 0, 2, 7 and 9 of 2026:
+  real mid-name splits are at or below 0pt, the tightest genuine column gap
+  is 2.63pt, and nothing falls between. It was 4pt, which swallowed Week 9's
+  3.8pt date column and imported nothing. The date is additionally put back
+  in its own cell by structure rather than by spacing — see
+  `splitLeadingDate` — so no measurement has to be right for a row to be
+  read.
 - **A game naming a school the roster does not hold counts toward nobody.**
   Games store team *names*, so a misspelling is stored and displayed while
   being absent from both schools' overall records and — when the two share a

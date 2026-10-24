@@ -9,6 +9,7 @@ import {
   regionKey,
   resolveBracket,
   type ResolvedBracket,
+  type ResolvedGame,
   type SeededTeam,
 } from "@/lib/bracket";
 import {
@@ -71,11 +72,14 @@ export default function BracketEditor({
   initial,
   classes,
   playoffGames = [],
+  playoffWeek = 12,
 }: {
   initial: BracketState;
   classes: EditorClass[];
   /** Playoff results only — all `resolveBracket` reads from the schedule. */
   playoffGames?: Game[];
+  /** Week number the first playoff round sits in; later rounds count on. */
+  playoffWeek?: number;
 }) {
   const [state, setState] = useState<BracketState>(initial);
   const [tab, setTab] = useState<Tab>("seeding");
@@ -86,6 +90,9 @@ export default function BracketEditor({
   const [msg, setMsg] = useState<{ tone: "ok" | "bad"; text: string } | null>(
     null,
   );
+  // Held in state rather than read from the prop, so a result entered on the
+  // bracket re-resolves it immediately instead of waiting for a reload.
+  const [games, setGames] = useState<Game[]>(playoffGames);
 
   const block = classes.find((c) => c.classification === cls) ?? classes[0];
 
@@ -136,10 +143,10 @@ export default function BracketEditor({
     const seeded = new Map(
       liveRegions.map((r) => [regionKey(cls, r.region), r.shown]),
     );
-    return resolveBracket(state, cls, seeded, playoffGames, {
+    return resolveBracket(state, cls, seeded, games, {
       projected: true,
     });
-  }, [liveRegions, state, cls, playoffGames]);
+  }, [liveRegions, state, cls, games]);
 
   const pinnedCount = useMemo(
     () =>
@@ -166,6 +173,65 @@ export default function BracketEditor({
       ),
     [state],
   );
+
+  /**
+   * Writes a playoff result to the games table.
+   *
+   * Not into the bracket document: a playoff game is a game, it belongs in
+   * the same table as every other one, and the rating has to count it. The
+   * bracket reads results back out of that table by team names, so the winner
+   * advances as soon as this returns.
+   *
+   * Updates the row when the pair already has one, rather than relying on the
+   * upsert key — the key includes the week, and a result corrected after the
+   * fact must not be able to land as a second game.
+   */
+  async function saveScore(g: ResolvedGame, s1: string, s2: string) {
+    const t1 = g.top.team;
+    const t2 = g.bottom.team;
+    if (!t1 || !t2) throw new Error("Both teams have to be known.");
+
+    const key = [t1, t2].sort().join("|");
+    const existing = games.find((x) => [x.t1, x.t2].sort().join("|") === key);
+
+    const body = {
+      id: existing?.id,
+      t1,
+      t2,
+      s1: s1.trim(),
+      s2: s2.trim(),
+      type: "playoff" as const,
+      // The round a game sits in is the bracket's, counted from the first.
+      round: `r${Math.min(g.round, 5)}`,
+      // Playoff weeks run on from the regular season so the schedule page
+      // keeps them in order. The round decides it, not the calendar.
+      week: Math.min(playoffWeek + g.round - 1, 20),
+      neutral_site: Boolean(state.classes[cls]?.results?.[g.id]?.location),
+    };
+
+    const res = await fetch("/api/admin/games", {
+      method: existing ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const out = await res.json();
+    if (!res.ok) throw new Error(out.error ?? "Could not save the result.");
+
+    const saved = out.game as Game;
+    setGames((list) => {
+      const rest = list.filter((x) => x.id !== saved.id);
+      // A cleared score comes back with nulls; the row stays, and the bracket
+      // reads it as unplayed because a game needs both scores to count.
+      return [...rest, saved];
+    });
+    setMsg({
+      tone: "ok",
+      text:
+        saved.s1 === null
+          ? `${t1} v ${t2}: result cleared.`
+          : `${t1} ${saved.s1}–${saved.s2} ${t2} saved. Publish to move the ratings.`,
+    });
+  }
 
   /** Edits one classification's slice, creating it if this is the first edit. */
   function editClass(c: Classification, fn: (cs: ClassState) => ClassState) {
@@ -353,6 +419,8 @@ export default function BracketEditor({
           bracket={liveBracket}
           results={state.classes[cls]?.results ?? {}}
           onResults={(results) => editClass(cls, (cs) => ({ ...cs, results }))}
+          playoffGames={games}
+          saveScore={saveScore}
         />
       )}
 
@@ -639,6 +707,8 @@ function SlotEditor({
   bracket,
   results,
   onResults,
+  playoffGames,
+  saveScore,
 }: {
   cls: Classification;
   regions: EditorRegion[];
@@ -647,9 +717,21 @@ function SlotEditor({
   bracket: ResolvedBracket | null;
   results: ClassState["results"];
   onResults: (r: ClassState["results"]) => void;
+  playoffGames: Game[];
+  saveScore: (g: ResolvedGame, s1: string, s2: string) => Promise<void>;
 }) {
   const [drag, setDrag] = useState<number | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [arrange, setArrange] = useState(false);
+
+  /** The stored playoff game for a drawn match-up, if it has been played. */
+  const playedFor = (g: ResolvedGame | null | undefined): Game | null => {
+    if (!g?.top.team || !g?.bottom.team) return null;
+    const key = [g.top.team, g.bottom.team].sort().join("|");
+    return (
+      playoffGames.find((x) => [x.t1, x.t2].sort().join("|") === key) ?? null
+    );
+  };
 
   const nameAt = (s: Slot): string => {
     if (!s) return "Bye";
@@ -695,16 +777,27 @@ function SlotEditor({
           </button>
         </div>
       ) : (
-        <p className="text-xs leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
-          Drag a slot onto another to swap them — including onto a bye, which
-          moves the bye. The bracket holds places, not teams, so a seed keeps
-          pointing at whoever holds that place as the season moves. Click a
-          match-up below to set its date, time, location and home side.
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="min-w-0 flex-1 text-xs leading-relaxed"
+            style={{ color: "rgb(var(--text-faint))" }}>
+            Click any match-up on the bracket to enter its result, date, time,
+            location and home side. A result saves on its own and the winner
+            advances straight away.
+          </p>
+          <button className="btn !py-1.5 !text-xs shrink-0"
+            onClick={() => setArrange((v) => !v)}>
+            {arrange ? "Hide the seeding grid" : "Rearrange the first round"}
+          </button>
+        </div>
       )}
 
-      {slots.length > 0 && (
+      {slots.length > 0 && arrange && (
       <div className="card table-scroll p-3">
+        <p className="mb-2 text-xs leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
+          Drag a slot onto another to swap them — including onto a bye, which
+          moves the bye. The bracket holds places, not teams, so a seed keeps
+          pointing at whoever holds that place as the season moves.
+        </p>
         <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))" }}>
           {slots.map((s, i) => (
             <div
@@ -751,43 +844,15 @@ function SlotEditor({
       </div>
       )}
 
+      {/*
+        The bracket itself, clickable. It used to be a flat list of every
+        match-up in the class beside a grid of slots, which is a fine way to
+        see that sixteen games exist and a poor way to find the one being
+        played on Friday. The shape is the index: you look where the game is.
+      */}
       {bracket && (
         <div className="card p-3">
-          <div
-            className="mb-2 text-[11px] font-bold uppercase tracking-wider"
-            style={{ color: "rgb(var(--text-faint))" }}
-          >
-            Match-ups — {cls}
-          </div>
-          <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))" }}>
-            {bracket.rounds.flat().map((g) => {
-              const e = results[g.id] ?? {};
-              const filled = Boolean(e.date || e.time || e.location || e.note);
-              return (
-                <button
-                  key={g.id}
-                  onClick={() => setOpen(g.id)}
-                  className="rounded-md border px-2 py-1.5 text-left"
-                  style={{
-                    borderColor: filled ? "rgb(var(--brand) / 0.5)" : "rgb(var(--border))",
-                  }}
-                >
-                  <div className="text-[9.5px] font-bold uppercase" style={{ color: "rgb(var(--text-faint))" }}>
-                    {bracket.roundNames[g.round - 1]} · {g.id}
-                  </div>
-                  <div className="truncate text-[12px] font-semibold">
-                    {g.top.team ?? (g.top.bye ? "Bye" : "TBD")} v{" "}
-                    {g.bottom.team ?? (g.bottom.bye ? "Bye" : "TBD")}
-                  </div>
-                  {filled && (
-                    <div className="truncate text-[11px]" style={{ color: "rgb(var(--text-muted))" }}>
-                      {[e.date, e.time, e.location].filter(Boolean).join(" · ")}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <BracketView bracket={bracket} onOpenGame={(g) => setOpen(g.id)} />
         </div>
       )}
 
@@ -795,11 +860,24 @@ function SlotEditor({
         <GameEditor
           id={open}
           editorial={results[open] ?? {}}
+          played={playedFor(bracket?.rounds.flat().find((x) => x.id === open))}
+          onScore={(() => {
+            const g = bracket?.rounds.flat().find((x) => x.id === open);
+            // Nothing to record until both sides are known — a bye or a round
+            // still being played leaves one of them empty.
+            if (!g?.top.team || !g?.bottom.team) return null;
+            return (a: string, b: string) => saveScore(g, a, b);
+          })()}
           labels={(() => {
             const g = bracket?.rounds.flat().find((x) => x.id === open);
+            // "Top"/"Bottom" said nothing to anybody. A side with no team is
+            // either a bye or a round that has not been played yet, and which
+            // of those it is answers the question the heading raises.
+            const side = (x: typeof g extends infer _ ? NonNullable<typeof g>["top"] : never) =>
+              x.team ?? (x.bye ? "Bye" : "TBD");
             return [
-              g?.top.team ?? "Top",
-              g?.bottom.team ?? "Bottom",
+              g ? side(g.top) : "TBD",
+              g ? side(g.bottom) : "TBD",
             ] as [string, string];
           })()}
           onClose={() => setOpen(null)}
@@ -820,14 +898,25 @@ function GameEditor({
   id,
   editorial,
   labels,
+  played,
   onClose,
   onSave,
+  onScore,
 }: {
   id: string;
   editorial: ClassState["results"][string];
   labels: [string, string];
+  /** The stored playoff game for this pair, if one exists yet. */
+  played: Game | null;
   onClose: () => void;
   onSave: (e: ClassState["results"][string]) => void;
+  /**
+   * Writes the score to the games table. Separate from `onSave` because it
+   * is a different kind of thing in a different place: the editorial fields
+   * live in the bracket document and wait for Save, while a result is a game
+   * like any other and counts toward the ratings the moment it lands.
+   */
+  onScore: ((s1: string, s2: string) => Promise<void>) | null;
 }) {
   const [form, setForm] = useState({
     date: editorial.date ?? "",
@@ -836,6 +925,26 @@ function GameEditor({
     note: editorial.note ?? "",
     home: editorial.home ?? "",
   });
+  const [s1, setS1] = useState(played?.s1 == null ? "" : String(played.s1));
+  const [s2, setS2] = useState(played?.s2 == null ? "" : String(played.s2));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  async function saveScore() {
+    if (!onScore) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await onScore(s1, s2);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1800);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not save the score.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div
@@ -847,11 +956,79 @@ function GameEditor({
         <h3 className="text-base font-bold tracking-tight">
           {labels[0]} v {labels[1]}
         </h3>
-        <p className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
-          Scores are not entered here — a playoff result is a game like any
-          other and belongs in Admin → Games, where it also counts toward the
-          ratings.
-        </p>
+        {onScore ? (
+          <div
+            className="rounded-lg border p-3"
+            style={{ borderColor: "rgb(var(--border-strong))" }}
+          >
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className="text-[11px] font-bold uppercase tracking-wider"
+                style={{ color: "rgb(var(--text-faint))" }}>
+                Result
+              </span>
+              <span className="text-[11px]" style={{ color: "rgb(var(--text-faint))" }}>
+                saves on its own
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">
+                {labels[0]}
+              </span>
+              <input
+                className="input !w-16 !py-1 text-center !text-[13px] tnum"
+                inputMode="numeric"
+                value={s1}
+                onChange={(e) => setS1(e.target.value)}
+                aria-label={`${labels[0]} score`}
+              />
+              <span className="text-[11px]" style={{ color: "rgb(var(--text-faint))" }}>v</span>
+              <input
+                className="input !w-16 !py-1 text-center !text-[13px] tnum"
+                inputMode="numeric"
+                value={s2}
+                onChange={(e) => setS2(e.target.value)}
+                aria-label={`${labels[1]} score`}
+              />
+              <span className="min-w-0 flex-1 truncate text-right text-[13px] font-semibold">
+                {labels[1]}
+              </span>
+            </div>
+
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <button className="btn btn-primary !py-1.5 !text-xs"
+                onClick={saveScore} disabled={busy}>
+                {busy ? "Saving…" : saved ? "Saved" : played ? "Update result" : "Save result"}
+              </button>
+              {(s1 !== "" || s2 !== "") && (
+                <button className="btn !py-1.5 !text-xs"
+                  disabled={busy}
+                  onClick={() => { setS1(""); setS2(""); }}>
+                  Clear
+                </button>
+              )}
+              <span className="text-[11px] leading-snug" style={{ color: "rgb(var(--text-faint))" }}>
+                Both or neither — a half-entered game counts for nobody.
+              </span>
+            </div>
+
+            {err && (
+              <p className="mt-2 text-[12px] font-semibold" style={{ color: "rgb(var(--bad))" }}>
+                {err}
+              </p>
+            )}
+            <p className="mt-2 text-[11px] leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
+              A result goes straight to the games table, so the winner advances
+              here at once and the rating counts it at the next publish. The
+              fields below are the bracket&rsquo;s own and wait for Save.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs" style={{ color: "rgb(var(--text-faint))" }}>
+            Both teams have to be known before a result can be entered — play
+            the round above first.
+          </p>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2">
           {(

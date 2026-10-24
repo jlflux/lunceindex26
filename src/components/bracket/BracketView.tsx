@@ -28,11 +28,24 @@ import type { ResolvedBracket, ResolvedGame, ResolvedSlot } from "@/lib/bracket"
 export default function BracketView({
   bracket,
   onPick,
+  onOpenGame,
 }: {
   bracket: ResolvedBracket;
   /** Set in the admin, to project a winner. Absent on the public page. */
   onPick?: (gameId: string, side: "top" | "bottom") => void;
+  /**
+   * Set in the admin's Bracket tab: a click opens the editor for that game
+   * rather than the reader's details card. The two are mutually exclusive in
+   * practice — one tab projects winners, the other enters results.
+   */
+  onOpenGame?: (game: ResolvedGame) => void;
 }) {
+  // Either admin mode makes the board interactive, and in both of them the
+  // team name must not be a link: a click on the name is the obvious click,
+  // and a link would swallow it and navigate instead. This caught the
+  // Projections tab once already; `onOpenGame` is the second mode and would
+  // have caught it again.
+  const interactive = Boolean(onPick || onOpenGame);
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const board = useRef<HTMLDivElement>(null);
@@ -137,8 +150,9 @@ export default function BracketView({
                     key={g.id}
                     game={g}
                     first={ri === 0}
-                    onOpen={() => setOpen(g)}
+                    onOpen={() => (onOpenGame ? onOpenGame(g) : setOpen(g))}
                     onPick={onPick}
+                    interactive={interactive}
                   />
                 ))}
               </div>
@@ -157,11 +171,13 @@ function Game({
   first,
   onOpen,
   onPick,
+  interactive,
 }: {
   game: ResolvedGame;
   first: boolean;
   onOpen: () => void;
   onPick?: (gameId: string, side: "top" | "bottom") => void;
+  interactive?: boolean;
 }) {
   // The first round's fixed margins set the vertical rhythm; every later
   // column uses space-around, which lands its centres on the same grid.
@@ -182,12 +198,18 @@ function Game({
           boxShadow: "var(--shadow-sm)",
         }}
       >
-        <Slot slot={game.top} onOpen={onOpen} onPick={onPick && (() => onPick(game.id, "top"))} />
+        <Slot
+          slot={game.top}
+          onOpen={onOpen}
+          onPick={onPick && (() => onPick(game.id, "top"))}
+          interactive={interactive}
+        />
         <Slot
           slot={game.bottom}
           divider
           onOpen={onOpen}
           onPick={onPick && (() => onPick(game.id, "bottom"))}
+          interactive={interactive}
         />
       </div>
     </div>
@@ -209,11 +231,14 @@ function Slot({
   divider,
   onOpen,
   onPick,
+  interactive,
 }: {
   slot: ResolvedSlot;
   divider?: boolean;
   onOpen: () => void;
   onPick?: () => void;
+  /** True in either admin mode: the name is text, not a link out. */
+  interactive?: boolean;
 }) {
   return (
     <div
@@ -242,15 +267,15 @@ function Slot({
         {slot.team ? (
           <>
             {/*
-              In pick mode the name is not a link.
+              On an interactive board the name is not a link.
 
               It used to be one unconditionally, with `stopPropagation` to keep
               a click off the row's handler — right for a reader, and exactly
-              wrong for the editor, where the instruction is "click a team to
-              advance it" and the team name is the obvious thing to click.
-              Doing that navigated to the team page and advanced nothing.
+              wrong for the editor, where the name is the obvious thing to
+              click. Doing that navigated to the team page and did neither of
+              the things the admin was trying to do.
             */}
-            {onPick ? (
+            {interactive ? (
               <span
                 title={`${slot.team}${slot.record ? ` (${slot.record})` : ""}`}
                 className="truncate text-[13px] font-semibold"

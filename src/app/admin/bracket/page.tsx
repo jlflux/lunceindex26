@@ -63,6 +63,16 @@ export default async function AdminBracketPage() {
         // bracket itself, from its own state, so an edit is drawn without a
         // round trip — there is no second server-resolved copy to drift.
         playoffGames={data.games.filter((g) => g.type === "playoff")}
+        // Where the first playoff round sits on the calendar: one past the
+        // last regular-season week anyone has a fixture in. Derived rather
+        // than configured so it cannot go stale when the season moves, and
+        // only used for rows this editor creates.
+        playoffWeek={
+          data.games.reduce(
+            (n, g) => (g.type === "regular" ? Math.max(n, g.week) : n),
+            0,
+          ) + 1
+        }
       />
     );
   } catch (e) {

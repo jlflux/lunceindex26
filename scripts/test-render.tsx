@@ -80,6 +80,23 @@ console.log("\nThe slot in reader mode and in pick mode");
     (editor.match(/href="[^"]*"/g) ?? []).slice(0, 3).join(" "));
   check("and the name is still shown", editor.includes("R1T1"));
   check("and still carries its tooltip", editor.includes("title=\"R1T1"));
+
+  // The second admin mode. Entering a result works the same way — the name
+  // is the obvious thing to click — and the link caught it again the first
+  // time this was wired, so it is checked per mode rather than per prop.
+  const scoring = renderToStaticMarkup(
+    <BracketView bracket={bracket} onOpenGame={() => {}} />,
+  );
+  check("in score-entry mode the name is not a link either",
+    !/href="\/team\//.test(scoring),
+    (scoring.match(/href="[^"]*"/g) ?? []).slice(0, 3).join(" "));
+  check("and the name is still shown there", scoring.includes("R1T1"));
+
+  // Both at once would be a mistake, but it must not resurrect the link.
+  const both = renderToStaticMarkup(
+    <BracketView bracket={bracket} onPick={() => {}} onOpenGame={() => {}} />,
+  );
+  check("and with both handlers set", !/href="\/team\//.test(both));
 }
 
 console.log(

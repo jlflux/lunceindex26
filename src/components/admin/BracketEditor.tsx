@@ -391,7 +391,9 @@ export default function BracketEditor({
 
       {tab === "settings" && <Settings state={state} setState={setState} />}
 
-      {tab === "embed" && <Embed cls={cls} />}
+      {tab === "embed" && (
+        <Embed cls={cls} published={state.showProjections} />
+      )}
 
       {tab === "seeding" && block && (
         <>
@@ -1213,18 +1215,29 @@ function Projections({
  * four lines listen for it, so a bracket that grows a round does not get
  * clipped on somebody else's page.
  */
-function Embed({ cls }: { cls: Classification }) {
+function Embed({ cls, published }: { cls: Classification; published: boolean }) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [withScript, setWithScript] = useState(true);
+  const [openProjected, setOpenProjected] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
 
   useEffect(() => setOrigin(window.location.origin), []);
 
+  /**
+   * Everything after the `?`, built from the options rather than written out,
+   * so a second option cannot produce a second `?`.
+   */
+  const query = () => {
+    const q = new URLSearchParams();
+    if (theme === "dark") q.set("theme", "dark");
+    if (openProjected && published) q.set("projected", "1");
+    const s = q.toString();
+    return s ? `?${s}` : "";
+  };
+
   const snippet = (c: Classification) => {
-    const src = `${origin}/embed/bracket/${encodeURIComponent(c)}${
-      theme === "dark" ? "?theme=dark" : ""
-    }`;
+    const src = `${origin}/embed/bracket/${encodeURIComponent(c)}${query()}`;
     const iframe =
       `<iframe src="${src}"\n` +
       `        id="alpreps-${c.toLowerCase()}"\n` +
@@ -1259,7 +1272,7 @@ function Embed({ cls }: { cls: Classification }) {
           Put a bracket on another site
         </h2>
         <p className="text-xs leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
-          Paste one of these into a WordPress <strong>Custom HTML</strong>
+          Paste one of these into a WordPress <strong>Custom HTML</strong>{" "}
           block. Each shows one classification and updates itself whenever you
           publish here — there is nothing to paste again next week. Switching
           Bracketology off under Site takes the embeds down with it.
@@ -1286,7 +1299,32 @@ function Embed({ cls }: { cls: Classification }) {
             />
             Include the four lines that size the frame to the bracket
           </label>
+          <label className="flex cursor-pointer items-center gap-2 text-[12.5px]">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[rgb(var(--brand))]"
+              checked={openProjected}
+              disabled={!published}
+              onChange={(e) => setOpenProjected(e.target.checked)}
+            />
+            Open on the projected bracket rather than on what has been played
+          </label>
         </div>
+        <p className="text-xs leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
+          {published ? (
+            <>
+              The embed carries its own{" "}
+              <strong>Show projected results</strong> switch, so a reader can
+              see it either way whichever one it opens on.
+            </>
+          ) : (
+            <span style={{ color: "rgb(var(--warn))" }}>
+              Projections are private, so the embed shows only what has been
+              played and offers no switch. Publish them under Settings to put
+              them on the embed too.
+            </span>
+          )}
+        </p>
         {!withScript && (
           <p className="text-xs" style={{ color: "rgb(var(--warn))" }}>
             Without it the frame stays 900px tall and a taller bracket scrolls
@@ -1304,10 +1342,10 @@ function Embed({ cls }: { cls: Classification }) {
               style={{ color: "rgb(var(--text-muted))" }}
             >
               /embed/bracket/{c}
-              {theme === "dark" ? "?theme=dark" : ""}
+              {query()}
             </code>
             <a
-              href={`/embed/bracket/${encodeURIComponent(c)}${theme === "dark" ? "?theme=dark" : ""}`}
+              href={`/embed/bracket/${encodeURIComponent(c)}${query()}`}
               target="_blank"
               rel="noreferrer"
               className="btn shrink-0 !px-2 !py-1 !text-[11px]"

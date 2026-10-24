@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import BracketView from "@/components/bracket/BracketView";
+import EmbedBracket from "@/components/bracket/EmbedBracket";
 import EmbedFrame from "@/components/EmbedFrame";
-import { regionKey, resolveBracket, seededRegions } from "@/lib/bracket";
+import { resolveBracket, seededRegions } from "@/lib/bracket";
 import { loadBracket, loadRatings } from "@/lib/data";
 import { guardSection } from "@/lib/guard";
 import { CLS_FILTER_ORDER, type Classification } from "@/lib/types";
@@ -44,20 +44,29 @@ export default async function EmbedBracketPage({
   searchParams,
 }: {
   params: Promise<{ cls: string }>;
-  searchParams: Promise<{ theme?: string }>;
+  searchParams: Promise<{ theme?: string; projected?: string }>;
 }) {
   // An embed is still the bracketology section. Switching that off in the
   // admin has to take the embeds with it, or hiding a board from the site
   // would leave it on display somewhere else.
   await guardSection("/bracketology");
 
-  const [{ cls: raw }, { theme }] = await Promise.all([params, searchParams]);
+  const [{ cls: raw }, { theme, projected }] = await Promise.all([
+    params,
+    searchParams,
+  ]);
   const cls = decodeURIComponent(raw) as Classification;
   if (!CLS_FILTER_ORDER.includes(cls)) notFound();
 
   const [data, state] = await Promise.all([loadRatings(), loadBracket()]);
   const seeded = seededRegions(data.ratings, data.games, data.odds, state);
   const bracket = resolveBracket(state, cls, seeded, data.games);
+  // The same rule the public page follows: the projected bracket is resolved
+  // only once it has been published, so an unfinished bracketology is not
+  // sitting in the source of somebody else's page waiting to be read.
+  const projectedBracket = state.showProjections
+    ? resolveBracket(state, cls, seeded, data.games, { projected: true })
+    : null;
 
   return (
     // Light unless asked otherwise: an embed lands in somebody else's page,
@@ -65,7 +74,13 @@ export default async function EmbedBracketPage({
     // than not. `?theme=dark` takes it back.
     <EmbedFrame theme={theme === "dark" ? "dark" : "light"}>
       {bracket ? (
-        <BracketView bracket={bracket} linkTeams={false} />
+        <EmbedBracket
+          bracket={bracket}
+          projectedBracket={projectedBracket}
+          // `?projected=1` opens on the projected view, for an embedder who
+          // wants that one rather than the choice.
+          initialProjected={projected === "1" || projected === "true"}
+        />
       ) : (
         <p
           className="px-4 py-10 text-center text-sm"

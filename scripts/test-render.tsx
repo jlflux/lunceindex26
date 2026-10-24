@@ -15,6 +15,7 @@
  */
 import { renderToStaticMarkup } from "react-dom/server";
 import BracketView from "../src/components/bracket/BracketView";
+import EmbedBracket from "../src/components/bracket/EmbedBracket";
 import { resolveBracket, seededRegions } from "../src/lib/bracket";
 import { emptyBracketState, type BracketState } from "../src/lib/bracket-types";
 import type { Classification, Game, RatingRow } from "../src/lib/types";
@@ -60,7 +61,12 @@ state.classes["5A"] = {
     { region: 1, place: 1 }, { region: 2, place: 4 },
     { region: 1, place: 2 }, { region: 2, place: 3 },
   ],
-  results: {}, projected: {}, regions: {},
+  results: {},
+  // A pick in each first-round game, so the projected bracket actually
+  // differs from the played one — without these the two are identical and
+  // every check below passes without proving anything.
+  projected: { r1g1: "top", r1g2: "top" },
+  regions: {},
 };
 
 const seeded = seededRegions(ratings, games, undefined, state);
@@ -110,6 +116,46 @@ console.log("\nThe slot in reader mode and in pick mode");
     (embed.match(/href="[^"]*"/g) ?? []).slice(0, 3).join(" "));
   check("and the name is still shown there", embed.includes("R1T1"));
   check("and a game can still be opened", embed.includes("R2T4"));
+}
+
+console.log("\nThe embed's projection switch");
+{
+  // The badge on a projected slot, not the word "projected" — which is in
+  // the switch's own label, and matched everything the first time around.
+  const badges = (html: string) => (html.match(/title="Projected, not played"/g) ?? []).length;
+
+  // The projected bracket is only sent once projections are published, so an
+  // embed with none must offer nothing — not a dead switch, and nothing in
+  // its markup that says a projection exists.
+  const played = resolveBracket(state, "5A", seeded, games)!;
+  const bare = renderToStaticMarkup(
+    <EmbedBracket bracket={played} projectedBracket={null} />,
+  );
+  check("with projections unpublished there is no switch",
+    !bare.includes("Show projected results") && !/<input/.test(bare));
+  check("and no projected pick is drawn", badges(bare) === 0);
+
+  const offered = renderToStaticMarkup(
+    <EmbedBracket bracket={played} projectedBracket={bracket} />,
+  );
+  check("with one published the switch is offered",
+    offered.includes("Show projected results"));
+  check("and it opens on what has been played",
+    badges(offered) === 0);
+  check("with no link out of the frame", !/href="\/team\//.test(offered));
+
+  const opened = renderToStaticMarkup(
+    <EmbedBracket bracket={played} projectedBracket={bracket} initialProjected />,
+  );
+  check("?projected=1 opens on the projected bracket", badges(opened) > 0);
+  check("and still offers the switch back",
+    opened.includes("Show projected results"));
+
+  // The flag cannot conjure a bracket that was never sent.
+  const forced = renderToStaticMarkup(
+    <EmbedBracket bracket={played} projectedBracket={null} initialProjected />,
+  );
+  check("and cannot open one that was never sent", badges(forced) === 0);
 }
 
 console.log(

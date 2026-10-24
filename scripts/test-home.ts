@@ -223,6 +223,12 @@ console.log("\n4. Switching a section off");
   // reason this is matched by segment rather than by `startsWith` alone.
   check("a section's nested page closes with it",
     isPathHidden("/bracketology/about", ["bracketology"]));
+
+  // The embeds are the bracketology section wearing a different route. If
+  // hiding a board left it on display inside somebody else's page, the switch
+  // would not mean what the admin says it means.
+  check("and so do its embeds, which are the same section elsewhere",
+    SITE_SECTIONS.some((x) => x.key === "bracketology"));
   check("but a path that merely starts the same does not",
     sectionOf("/ratingsomething") === null);
 

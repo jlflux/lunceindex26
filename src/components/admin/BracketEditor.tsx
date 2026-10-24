@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import BracketView from "@/components/bracket/BracketView";
 import {
   applyPinnedOrder,
@@ -35,7 +35,7 @@ export type EditorClass = {
   regions: EditorRegion[];
 };
 
-type Tab = "seeding" | "bracket" | "projections" | "settings";
+type Tab = "seeding" | "bracket" | "projections" | "embed" | "settings";
 
 /**
  * Which row a drop came from.
@@ -272,6 +272,7 @@ export default function BracketEditor({
               ["seeding", "Seeding & notes"],
               ["bracket", "Bracket"],
               ["projections", "Projections"],
+              ["embed", "Embed"],
               ["settings", "Settings"],
             ] as const
           ).map(([k, label]) => (
@@ -285,7 +286,7 @@ export default function BracketEditor({
           ))}
         </div>
 
-        {tab !== "settings" && (
+        {tab !== "settings" && tab !== "embed" && (
           <div className="table-scroll scroll-thin -mx-1 px-1 lg:ml-auto">
             <div className="flex items-center gap-1.5">
               {classes.map((c) => (
@@ -303,6 +304,8 @@ export default function BracketEditor({
       </div>
 
       {tab === "settings" && <Settings state={state} setState={setState} />}
+
+      {tab === "embed" && <Embed cls={cls} />}
 
       {tab === "seeding" && block && (
         <>
@@ -970,6 +973,144 @@ function Projections({
       </div>
       <div className="card p-4">
         <BracketView bracket={bracket} onPick={onPick} />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------- embed tab */
+
+/**
+ * The iframe snippets, one per classification.
+ *
+ * Built here rather than written down anywhere, so the addresses cannot
+ * drift from the routes that serve them. The height is a starting point: the
+ * embed reports its real height to the parent window, and the snippet's last
+ * four lines listen for it, so a bracket that grows a round does not get
+ * clipped on somebody else's page.
+ */
+function Embed({ cls }: { cls: Classification }) {
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [withScript, setWithScript] = useState(true);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [origin, setOrigin] = useState("");
+
+  useEffect(() => setOrigin(window.location.origin), []);
+
+  const snippet = (c: Classification) => {
+    const src = `${origin}/embed/bracket/${encodeURIComponent(c)}${
+      theme === "dark" ? "?theme=dark" : ""
+    }`;
+    const iframe =
+      `<iframe src="${src}"\n` +
+      `        id="alpreps-${c.toLowerCase()}"\n` +
+      `        style="width:100%;border:0;height:900px"\n` +
+      `        loading="lazy" title="ALPreps ${c} bracket"></iframe>`;
+    if (!withScript) return iframe;
+    return (
+      `${iframe}\n` +
+      `<script>\n` +
+      `window.addEventListener('message', function (e) {\n` +
+      `  if (e.data && e.data.type === 'alpreps:height')\n` +
+      `    document.getElementById('alpreps-${c.toLowerCase()}').style.height = e.data.height + 'px';\n` +
+      `});\n` +
+      `</script>`
+    );
+  };
+
+  async function copy(c: Classification) {
+    try {
+      await navigator.clipboard.writeText(snippet(c));
+      setCopied(c);
+      setTimeout(() => setCopied((x) => (x === c ? null : x)), 1800);
+    } catch {
+      setCopied("!");
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="card space-y-3 p-4">
+        <h2 className="text-sm font-bold uppercase tracking-wider">
+          Put a bracket on another site
+        </h2>
+        <p className="text-xs leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
+          Paste one of these into a WordPress <strong>Custom HTML</strong>
+          block. Each shows one classification and updates itself whenever you
+          publish here — there is nothing to paste again next week. Switching
+          Bracketology off under Site takes the embeds down with it.
+        </p>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <label className="flex items-center gap-2 text-[12.5px]">
+            <span style={{ color: "rgb(var(--text-muted))" }}>Theme</span>
+            <select
+              className="input !w-auto !py-1 !text-xs"
+              value={theme}
+              onChange={(e) => setTheme(e.target.value as "light" | "dark")}
+            >
+              <option value="light">Light — for a light page</option>
+              <option value="dark">Dark — for a dark page</option>
+            </select>
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-[12.5px]">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[rgb(var(--brand))]"
+              checked={withScript}
+              onChange={(e) => setWithScript(e.target.checked)}
+            />
+            Include the four lines that size the frame to the bracket
+          </label>
+        </div>
+        {!withScript && (
+          <p className="text-xs" style={{ color: "rgb(var(--warn))" }}>
+            Without it the frame stays 900px tall and a taller bracket scrolls
+            inside it. Use this if your page builder strips script tags.
+          </p>
+        )}
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        {CLS_FILTER_ORDER.map((c) => (
+          <div key={c} className="card flex items-center gap-3 p-3">
+            <span className={`chip cls-${c} shrink-0`}>{c}</span>
+            <code
+              className="min-w-0 flex-1 truncate text-[11px]"
+              style={{ color: "rgb(var(--text-muted))" }}
+            >
+              /embed/bracket/{c}
+              {theme === "dark" ? "?theme=dark" : ""}
+            </code>
+            <a
+              href={`/embed/bracket/${encodeURIComponent(c)}${theme === "dark" ? "?theme=dark" : ""}`}
+              target="_blank"
+              rel="noreferrer"
+              className="btn shrink-0 !px-2 !py-1 !text-[11px]"
+            >
+              Preview
+            </a>
+            <button
+              className={`btn shrink-0 !px-2 !py-1 !text-[11px] ${c === cls ? "btn-primary" : ""}`}
+              onClick={() => copy(c)}
+            >
+              {copied === c ? "Copied" : "Copy"}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="card p-4">
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-wider"
+          style={{ color: "rgb(var(--text-faint))" }}>
+          What {cls} looks like
+        </div>
+        <pre
+          className="table-scroll scroll-thin rounded-lg p-3 text-[11px] leading-relaxed"
+          style={{ background: "rgb(var(--surface-2))", color: "rgb(var(--text-muted))" }}
+        >
+{snippet(cls)}
+        </pre>
       </div>
     </div>
   );

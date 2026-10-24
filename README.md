@@ -146,6 +146,7 @@ full season schedule can be loaded in advance without affecting anything.
 | Bracketology | The bracket, region write-ups, projections and the explainer. Seeds and records are computed; pin a region to override it |
 | Formula | Sliders for every tunable, with a live top-25 preview showing rank movement before you save |
 | Teams | Edit names, classification, region and preseason rating; bulk-import priors |
+| Bracketology → Embed | Copy-paste iframe snippets, one per classification, for putting a bracket on another site |
 | Site | Which sections the site shows — switching one off takes it out of the nav *and* makes its page 404, so a saved link cannot reach it. Plus the whole front page: headline, announcement banner, and the groups of links, with their wording, order, icons and destinations |
 
 Renaming a team also rewrites its games, since games reference teams by name.

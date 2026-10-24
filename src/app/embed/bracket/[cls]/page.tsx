@@ -65,7 +65,7 @@ export default async function EmbedBracketPage({
     // than not. `?theme=dark` takes it back.
     <EmbedFrame theme={theme === "dark" ? "dark" : "light"}>
       {bracket ? (
-        <BracketView bracket={bracket} />
+        <BracketView bracket={bracket} linkTeams={false} />
       ) : (
         <p
           className="px-4 py-10 text-center text-sm"

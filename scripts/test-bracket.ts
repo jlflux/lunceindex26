@@ -14,6 +14,8 @@
  */
 import {
   applyPinnedOrder,
+  clinchedMatchups,
+  projectByRating,
   assignPlaces,
   buildTree,
   defaultSlots,
@@ -984,6 +986,97 @@ console.log("\n16. A locked place is not the same as a good one");
   const barred = { ...deep[0], ineligible: true, qualifies: false } as SeededTeam;
   check("a barred team does not qualify, so it is never offered Clinched",
     lockedAs(barred) === "out");
+}
+
+console.log("\n17. Filling the projections from the Index");
+{
+  const ratings = world();
+  const games = roundRobin();
+  const seeded = seededRegions(ratings, games, undefined, emptyBracketState());
+  const slots = [
+    { region: 1, place: 1 }, { region: 2, place: 4 },
+    { region: 1, place: 2 }, { region: 2, place: 3 },
+  ];
+  const st = stateWith({ ...base_(), slots });
+  const rate = (t: string) => ratings.find((r) => r.name === t)?.rating ?? 0;
+
+  const picks = projectByRating(st, "5A", seeded, games, rate);
+  check("every undecided game gets a pick",
+    Object.keys(picks).length === 3, Object.keys(picks).join(","));
+
+  // It has to cascade: who plays in the final depends on the first round, so
+  // a single pass over a bracket resolved once would leave the last game
+  // unpicked or picked between the wrong two teams.
+  const withPicks = stateWith({ ...base_(), slots, projected: picks });
+  withPicks.showProjections = true;
+  const drawn = resolveBracket(withPicks, "5A", seeded, games, { projected: true })!;
+  check("and the final is decided between the two it actually pairs",
+    drawn.rounds[1][0].top.team !== null && drawn.rounds[1][0].bottom.team !== null,
+    `${drawn.rounds[1][0].top.team} / ${drawn.rounds[1][0].bottom.team}`);
+
+  // R1T1 is the best-rated team in `world()`, so it wins out.
+  check("the best-rated team reaches the final",
+    [drawn.rounds[1][0].top.team, drawn.rounds[1][0].bottom.team].includes("R1T1"),
+    `${drawn.rounds[1][0].top.team} / ${drawn.rounds[1][0].bottom.team}`);
+
+  // A played game is left alone: a projection cannot overturn it anyway, so
+  // storing one would be a decision with no effect.
+  const played = [...games, g("R2T4", "R1T1", 35, 0, { type: "playoff", round: "r1" })];
+  const afterReal = projectByRating(st, "5A", seeded, played, rate);
+  check("a game already played gets no pick",
+    afterReal["r1g0"] === undefined, JSON.stringify(afterReal));
+}
+
+console.log("\n18. A match-up both sides have clinched");
+{
+  const ratings = world();
+  const games = roundRobin();
+  const slots = [
+    { region: 1, place: 1 }, { region: 2, place: 4 },
+    { region: 1, place: 2 }, { region: 2, place: 3 },
+  ];
+  const st = stateWith({ ...base_(), slots });
+
+  const seeded = seededRegions(ratings, games, undefined, st);
+  const nameAt = (region: number, place: number) =>
+    (seeded.get(regionKey("5A", region)) ?? []).find((t) => t.place === place)!.name;
+
+  check("nothing is locked in while the statuses are untouched",
+    clinchedMatchups(st, "5A", seeded, games).length === 0);
+
+  // Mark both sides of the first game Clinched.
+  const a = nameAt(1, 1);
+  const b = nameAt(2, 4);
+  const marked = stateWith({
+    ...base_(), slots,
+    regions: {
+      "1": { note: "", status: { [a]: "clinched" } },
+      "2": { note: "", status: { [b]: "clinched" } },
+    },
+  });
+  const seeded2 = seededRegions(ratings, games, undefined, marked);
+  const locked = clinchedMatchups(marked, "5A", seeded2, games);
+  check("that one match-up is locked in", locked.length === 1,
+    locked.map((m) => `${m.top.team} v ${m.bottom.team}`).join(", "));
+  check("and it names both teams",
+    locked[0] && [locked[0].top.team, locked[0].bottom.team].sort().join("|") ===
+      [a, b].sort().join("|"));
+  check("and the round it falls in", locked[0]?.round === 1 && Boolean(locked[0]?.roundName));
+
+  // One side clinched is not enough — the other could still be anybody.
+  const half = stateWith({
+    ...base_(), slots,
+    regions: { "1": { note: "", status: { [a]: "clinched" } } },
+  });
+  check("one side alone locks nothing in",
+    clinchedMatchups(half, "5A", seededRegions(ratings, games, undefined, half), games)
+      .length === 0);
+
+  // Once played it is a result, and the schedule carries it.
+  const done = [...games, g(a, b, 21, 7, { type: "playoff", round: "r1" })];
+  check("a played match-up drops off the locked-in list",
+    clinchedMatchups(marked, "5A", seededRegions(ratings, done, undefined, marked), done)
+      .length === 0);
 }
 
 console.log(

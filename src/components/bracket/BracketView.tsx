@@ -29,6 +29,7 @@ export default function BracketView({
   bracket,
   onPick,
   onOpenGame,
+  linkTeams = true,
 }: {
   bracket: ResolvedBracket;
   /** Set in the admin, to project a winner. Absent on the public page. */
@@ -39,6 +40,13 @@ export default function BracketView({
    * practice — one tab projects winners, the other enters results.
    */
   onOpenGame?: (game: ResolvedGame) => void;
+  /**
+   * False on an embed. A team name links to its profile on the main site,
+   * which inside somebody else's iframe navigates the frame to a page with
+   * no way back — the reader is left with the ratings site wedged in a box
+   * on a WordPress post. The details card still opens on a click.
+   */
+  linkTeams?: boolean;
 }) {
   // Either admin mode makes the board interactive, and in both of them the
   // team name must not be a link: a click on the name is the obvious click,
@@ -46,6 +54,9 @@ export default function BracketView({
   // Projections tab once already; `onOpenGame` is the second mode and would
   // have caught it again.
   const interactive = Boolean(onPick || onOpenGame);
+  // One flag from here down: the name is plain text unless it is both
+  // allowed to be a link and not standing in for a control.
+  const asLink = linkTeams && !interactive;
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const board = useRef<HTMLDivElement>(null);
@@ -152,7 +163,7 @@ export default function BracketView({
                     first={ri === 0}
                     onOpen={() => (onOpenGame ? onOpenGame(g) : setOpen(g))}
                     onPick={onPick}
-                    interactive={interactive}
+                    interactive={!asLink}
                   />
                 ))}
               </div>

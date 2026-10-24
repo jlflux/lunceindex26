@@ -764,3 +764,127 @@ export function classStateOf(
 ): ClassState | null {
   return state.classes[cls] ?? null;
 }
+
+/**
+ * Fills in every projection from the Index, round by round.
+ *
+ * The starting point a person wants before they start disagreeing: whoever
+ * this site rates higher wins, all the way to the final. Then they change the
+ * three they have an opinion about rather than clicking through thirty-one.
+ *
+ * It has to go round by round rather than in one pass, because who plays in
+ * the second round depends on what was picked in the first. Each round is
+ * resolved with the picks made so far, which is also what keeps the result
+ * consistent with what the board will draw afterwards.
+ *
+ * A game that has actually been played is skipped, not overwritten. A real
+ * result already decides the tie and a projection cannot overturn it, so
+ * storing a pick there would be a decision with no effect — and a misleading
+ * one to find later in the document.
+ */
+export function projectByRating(
+  state: BracketState,
+  cls: Classification,
+  seeded: Map<string, SeededTeam[]>,
+  games: Game[],
+  rating: (team: string) => number,
+): Record<string, "top" | "bottom"> {
+  const picks: Record<string, "top" | "bottom"> = {};
+  const cs = state.classes[cls];
+  if (!cs?.slots?.length) return picks;
+
+  const rounds = buildTree(cs.slots).length;
+
+  for (let r = 1; r <= rounds; r++) {
+    const withPicks: BracketState = {
+      ...state,
+      classes: {
+        ...state.classes,
+        [cls]: { ...cs, projected: { ...cs.projected, ...picks } },
+      },
+    };
+    const drawn = resolveBracket(withPicks, cls, seeded, games, {
+      projected: true,
+    });
+    if (!drawn) break;
+
+    for (const g of drawn.rounds[r - 1] ?? []) {
+      if (g.locked) continue;
+      const a = g.top.team;
+      const b = g.bottom.team;
+      // A bye, or a round above still undecided: nothing to choose between.
+      if (!a || !b) continue;
+      // Level ratings keep the higher seed, which is the top slot — the same
+      // way the bracket itself is ordered.
+      picks[g.id] = rating(b) > rating(a) ? "bottom" : "top";
+    }
+  }
+
+  return picks;
+}
+
+/** A first meeting both sides are already certain of. */
+export interface ClinchedMatchup {
+  classification: Classification;
+  /** 1-based, and its name counted back from the final. */
+  round: number;
+  roundName: string;
+  top: ResolvedSlot;
+  bottom: ResolvedSlot;
+  date: string;
+  time: string;
+  location: string;
+}
+
+/**
+ * Match-ups neither side can avoid.
+ *
+ * Both teams marked Clinched means both places are settled, and a bracket
+ * slot names a place — so the two of them meet whatever else happens. That is
+ * worth saying on a team's own page before the game is on any schedule,
+ * because at that point it is the next thing that team does.
+ *
+ * Deliberately keyed on the status a person set rather than on the arithmetic
+ * `place_locked`. The two usually agree, but Clinched is the editorial act:
+ * it is what the bracket page is telling readers, and a team page that said
+ * something different would be the site disagreeing with itself.
+ *
+ * Games already played are left out — those are results, and the schedule
+ * carries them.
+ */
+export function clinchedMatchups(
+  state: BracketState,
+  cls: Classification,
+  seeded: Map<string, SeededTeam[]>,
+  games: Game[],
+): ClinchedMatchup[] {
+  const drawn = resolveBracket(state, cls, seeded, games);
+  if (!drawn) return [];
+
+  const status = new Map<string, StatusKey>();
+  for (const [key, list] of seeded) {
+    if (!key.startsWith(`${cls}:`)) continue;
+    for (const t of list) status.set(t.name, t.status);
+  }
+  const clinched = (name: string | null) =>
+    name !== null && status.get(name) === "clinched";
+
+  const out: ClinchedMatchup[] = [];
+  for (const round of drawn.rounds) {
+    for (const g of round) {
+      if (g.locked) continue;
+      if (!clinched(g.top.team) || !clinched(g.bottom.team)) continue;
+      out.push({
+        classification: cls,
+        round: g.round,
+        roundName: drawn.roundNames[g.round - 1] ?? `Round ${g.round}`,
+        top: g.top,
+        bottom: g.bottom,
+        date: g.date,
+        time: g.time,
+        location: g.location,
+      });
+    }
+  }
+  return out;
+}

@@ -23,6 +23,8 @@ import {
 import type { Performance } from "@/lib/engine";
 import { hiddenSections } from "@/lib/guard";
 import { isPathHidden } from "@/lib/site-sections";
+import { clinchedMatchups, regionKey, seededRegions } from "@/lib/bracket";
+import { loadBracket } from "@/lib/data";
 
 export const revalidate = 300;
 
@@ -61,6 +63,22 @@ export default async function TeamPage({
   const backHref = isPathHidden("/ratings", await hiddenSections())
     ? "/"
     : "/ratings";
+
+  /**
+   * Playoff games this team cannot avoid.
+   *
+   * Both sides marked Clinched means both places are settled and the slot
+   * names a place, so the meeting is fixed before anyone has put it on a
+   * schedule. Only this team's own classification is resolved — the rest of
+   * the bracket has nothing to say about this page.
+   */
+  const bracketState = await loadBracket();
+  const locked = clinchedMatchups(
+    bracketState,
+    t.classification,
+    seededRegions(data.ratings, data.games, data.odds, bracketState),
+    data.games,
+  ).filter((m) => m.top.team === t.name || m.bottom.team === t.name);
 
   return (
     <AppShell generated={data.generated}>
@@ -138,6 +156,64 @@ export default async function TeamPage({
       <div className="grid items-start gap-5 lg:grid-cols-[1fr_340px]">
         {/* Schedule */}
         <section className="order-2 lg:order-1">
+          {locked.length > 0 && (
+            <div className="mb-5">
+              <SectionTitle icon="grid">Locked in</SectionTitle>
+              <div className="space-y-2">
+                {locked.map((m, i) => {
+                  const them = m.top.team === t.name ? m.bottom : m.top;
+                  const when = [m.date, m.time].filter(Boolean).join(" · ");
+                  return (
+                    <div
+                      key={i}
+                      className="card flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3"
+                      style={{ borderColor: "rgb(var(--brand) / 0.4)" }}
+                    >
+                      <span
+                        className="shrink-0 text-[10px] font-bold uppercase tracking-wider"
+                        style={{ color: "rgb(var(--brand))" }}
+                      >
+                        {m.roundName}
+                      </span>
+                      <span className="text-[14px] font-semibold">
+                        {m.top.team === t.name ? "vs" : "at"}{" "}
+                        {them.slug ? (
+                          <Link href={`/team/${them.slug}`} className="hover:underline">
+                            {them.team}
+                          </Link>
+                        ) : (
+                          them.team
+                        )}
+                      </span>
+                      {them.seed && (
+                        <span
+                          className="shrink-0 text-[11px] font-bold tnum"
+                          style={{ color: "rgb(var(--text-faint))" }}
+                        >
+                          {them.seed}
+                        </span>
+                      )}
+                      <span
+                        className="ml-auto shrink-0 text-[12px]"
+                        style={{ color: "rgb(var(--text-muted))" }}
+                      >
+                        {[when, m.location].filter(Boolean).join(" · ") ||
+                          "Date to be confirmed"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p
+                className="mt-2 text-xs leading-relaxed"
+                style={{ color: "rgb(var(--text-faint))" }}
+              >
+                Both seeds are settled, so this meeting is fixed whatever else
+                happens. It joins the schedule below once it is played.
+              </p>
+            </div>
+          )}
+
           <SectionTitle icon="calendar">Schedule &amp; results</SectionTitle>
           {schedule.length === 0 ? (
             <div
@@ -267,7 +343,7 @@ function SectionTitle({
   icon,
   children,
 }: {
-  icon: "calendar" | "sliders" | "chart";
+  icon: "calendar" | "sliders" | "chart" | "grid";
   children: React.ReactNode;
 }) {
   return (

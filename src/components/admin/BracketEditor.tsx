@@ -7,6 +7,7 @@ import {
   assignPlaces,
   defaultSlots,
   regionKey,
+  projectByRating,
   resolveBracket,
   type ResolvedBracket,
   type ResolvedGame,
@@ -73,6 +74,7 @@ export default function BracketEditor({
   classes,
   playoffGames = [],
   playoffWeek = 12,
+  ratings = {},
 }: {
   initial: BracketState;
   classes: EditorClass[];
@@ -80,6 +82,8 @@ export default function BracketEditor({
   playoffGames?: Game[];
   /** Week number the first playoff round sits in; later rounds count on. */
   playoffWeek?: number;
+  /** Index rating by team name, for filling projections from the board. */
+  ratings?: Record<string, number>;
 }) {
   const [state, setState] = useState<BracketState>(initial);
   const [tab, setTab] = useState<Tab>("seeding");
@@ -139,14 +143,30 @@ export default function BracketEditor({
    * Seeded off `liveRegions` rather than `block.regions` so a pin or a drag in
    * the Seeding tab moves the bracket too.
    */
-  const liveBracket = useMemo(() => {
-    const seeded = new Map(
-      liveRegions.map((r) => [regionKey(cls, r.region), r.shown]),
-    );
-    return resolveBracket(state, cls, seeded, games, {
-      projected: true,
-    });
-  }, [liveRegions, state, cls, games]);
+  const liveSeeded = useMemo(
+    () =>
+      new Map(liveRegions.map((r) => [regionKey(cls, r.region), r.shown])),
+    [liveRegions, cls],
+  );
+
+  /**
+   * Two resolutions, because the two tabs are asking different questions.
+   *
+   * The Bracket tab is where results are entered, and a projected winner
+   * drawn there is a team that has not played — indistinguishable at a glance
+   * from one that has, in the one place where the difference is the whole
+   * point. It gets the bracket as played.
+   */
+  const liveBracket = useMemo(
+    () => resolveBracket(state, cls, liveSeeded, games),
+    [liveSeeded, state, cls, games],
+  );
+
+  /** The Projections tab, where a projected winner is the thing being made. */
+  const projectedBracket = useMemo(
+    () => resolveBracket(state, cls, liveSeeded, games, { projected: true }),
+    [liveSeeded, state, cls, games],
+  );
 
   const pinnedCount = useMemo(
     () =>
@@ -426,7 +446,7 @@ export default function BracketEditor({
 
       {tab === "projections" && block && (
         <Projections
-          bracket={liveBracket}
+          bracket={projectedBracket}
           picks={state.classes[cls]?.projected ?? {}}
           published={state.showProjections}
           onPick={(id, side) =>
@@ -438,6 +458,18 @@ export default function BracketEditor({
             })
           }
           onClear={() => editClass(cls, (cs) => ({ ...cs, projected: {} }))}
+          onFollowIndex={() =>
+            editClass(cls, (cs) => ({
+              ...cs,
+              projected: projectByRating(
+                state,
+                cls,
+                liveSeeded,
+                games,
+                (t) => ratings[t] ?? 0,
+              ),
+            }))
+          }
         />
       )}
     </div>
@@ -1116,12 +1148,15 @@ function Projections({
   published,
   onPick,
   onClear,
+  onFollowIndex,
 }: {
   bracket: ResolvedBracket | null;
   picks: Record<string, "top" | "bottom">;
   published: boolean;
   onPick: (id: string, side: "top" | "bottom") => void;
   onClear: () => void;
+  /** Fills every undecided game from the Index, as a starting point. */
+  onFollowIndex: () => void;
 }) {
   if (!bracket) {
     return (
@@ -1134,8 +1169,11 @@ function Projections({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
         <p className="text-xs leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
-          Click a team to advance it; click it again to undo. A game with a real
-          result is locked to that result and cannot be projected away from it.{" "}
+          Click a team to advance it; click it again to undo.{" "}
+          <strong>Follow the Index</strong> fills every undecided game with the
+          higher-rated side, which is a starting point rather than an opinion —
+          change the ones you disagree with. A game with a real result is locked
+          to that result and cannot be projected away from it.{" "}
           {published ? (
             <strong style={{ color: "rgb(var(--warn))" }}>
               Projections are public.
@@ -1144,9 +1182,18 @@ function Projections({
             <>Projections are private until switched on under Settings.</>
           )}
         </p>
-        <button className="btn ml-auto !py-1.5 !text-xs" onClick={onClear}>
-          Clear all ({Object.keys(picks).length})
-        </button>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <button
+            className="btn btn-primary !py-1.5 !text-xs"
+            title="Pick the higher-rated side in every game that has not been played, round by round. Change whichever ones you disagree with afterwards."
+            onClick={onFollowIndex}
+          >
+            Follow the Index
+          </button>
+          <button className="btn !py-1.5 !text-xs" onClick={onClear}>
+            Clear all ({Object.keys(picks).length})
+          </button>
+        </div>
       </div>
       <div className="card p-4">
         <BracketView bracket={bracket} onPick={onPick} />

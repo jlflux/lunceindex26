@@ -63,6 +63,9 @@ export default async function AdminBracketPage() {
         // bracket itself, from its own state, so an edit is drawn without a
         // round trip — there is no second server-resolved copy to drift.
         playoffGames={data.games.filter((g) => g.type === "playoff")}
+        ratings={Object.fromEntries(
+          data.ratings.map((t) => [t.name, t.rating]),
+        )}
         // Where the first playoff round sits on the calendar: one past the
         // last regular-season week anyone has a fixture in. Derived rather
         // than configured so it cannot go stale when the season moves, and

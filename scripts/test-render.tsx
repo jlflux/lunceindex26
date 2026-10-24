@@ -97,6 +97,19 @@ console.log("\nThe slot in reader mode and in pick mode");
     <BracketView bracket={bracket} onPick={() => {}} onOpenGame={() => {}} />,
   );
   check("and with both handlers set", !/href="\/team\//.test(both));
+
+  // The embed mode. A reader on somebody else's page gets the same bracket,
+  // but the link would navigate the iframe to this site inside their layout,
+  // which breaks the page it is embedded in. No handlers here, so the guard
+  // that covers the two admin modes does not cover this one.
+  const embed = renderToStaticMarkup(
+    <BracketView bracket={bracket} linkTeams={false} />,
+  );
+  check("in an embed the name is not a link",
+    !/href="\/team\//.test(embed),
+    (embed.match(/href="[^"]*"/g) ?? []).slice(0, 3).join(" "));
+  check("and the name is still shown there", embed.includes("R1T1"));
+  check("and a game can still be opened", embed.includes("R2T4"));
 }
 
 console.log(

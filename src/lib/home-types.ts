@@ -112,6 +112,7 @@ export const SITE_PAGES: { href: string; label: string }[] = [
   { href: "/ratings", label: "Power Index" },
   { href: "/resume", label: "Résumé" },
   { href: "/rpi", label: "RPI" },
+  { href: "/psr", label: "PSR" },
   { href: "/composite", label: "Composite" },
   { href: "/aswa", label: "ASWA" },
   { href: "/teams", label: "Region Standings" },

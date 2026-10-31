@@ -13,6 +13,7 @@ import {
   fmtSigned,
   record,
 } from "@/lib/format";
+import { WIN_VALUE, computePsr, type PsrRow } from "@/lib/psr";
 import {
   CLS_FILTER_ORDER,
   type Classification,
@@ -21,7 +22,7 @@ import {
   type RpiRow,
 } from "@/lib/types";
 
-type Mode = "index" | "rpi" | "resume";
+type Mode = "index" | "rpi" | "resume" | "psr";
 
 /**
  * Rank within a numeric column across the whole field, so a figure can be read
@@ -111,8 +112,25 @@ export default function RatingsTable({
     });
   }, [ratings]);
 
+  /**
+   * PSR, like the résumé board, is derived here rather than carried in the
+   * payload: it is a function of the games and the field, both of which are
+   * already in hand, and deriving it means a board that is correct the moment
+   * a result is entered rather than at the next publish.
+   */
+  const psrRows = useMemo(
+    () => (mode === "psr" ? computePsr(ratings, payload.games) : []),
+    [mode, ratings, payload.games],
+  );
+
   const source =
-    mode === "index" ? ratings : mode === "resume" ? resumeRows : rpi;
+    mode === "index"
+      ? ratings
+      : mode === "resume"
+        ? resumeRows
+        : mode === "psr"
+          ? psrRows
+          : rpi;
 
   const ranks = useMemo(
     () => ({
@@ -308,10 +326,21 @@ export default function RatingsTable({
                 </>
               ) : (
                 <>
-                  <th className="th hidden !text-right md:table-cell">Win%</th>
+                  <th
+                    className="th hidden !text-right md:table-cell"
+                    title={
+                      mode === "psr"
+                        ? `Weighted wins over contests played. A win over a school outside the association counts ${WIN_VALUE.nonMember}.`
+                        : undefined
+                    }
+                  >
+                    Win%
+                  </th>
                   <th className="th hidden !text-right md:table-cell">OWP</th>
                   <th className="th hidden !text-right lg:table-cell">OOWP</th>
-                  <th className="th !px-2 !text-right sm:!pr-4">RPI</th>
+                  <th className="th !px-2 !text-right sm:!pr-4">
+                    {mode === "psr" ? "PSR" : "RPI"}
+                  </th>
                 </>
               )}
             </tr>
@@ -337,7 +366,13 @@ export default function RatingsTable({
               const ir = mode === "index" ? (r as RatingRow) : null;
               const sr = mode === "resume" ? (r as RatingRow) : null;
               const rr = mode === "rpi" ? (r as RpiRow) : null;
+              const pr = mode === "psr" ? (r as PsrRow) : null;
+              // RPI and PSR are the same three columns with different weights
+              // behind them, so they are drawn once.
+              const ratio = rr ?? pr;
               const games = r.wins + r.losses > 0;
+              // PSR counts contests, which includes a tie.
+              const played = pr ? pr.games > 0 : games;
               // Efficiency needs opponents who have played somebody else.
               const eff = r.wins + r.losses >= MIN_GAMES_FOR_EFFICIENCY;
               // The adjusted split is prior-dominated until a few games in.
@@ -484,26 +519,36 @@ export default function RatingsTable({
                         </span>
                       </td>
                     </>
-                  ) : rr ? (
+                  ) : ratio ? (
                     <>
                       <Cell
                         className="hidden md:table-cell"
-                        value={games ? fmtPct(rr.win_pct) : "—"}
+                        // A team whose only game was a tie has played, even
+                        // though its record reads 0-0.
+                        value={played ? fmtPct(ratio.win_pct) : "—"}
+                        title={
+                          pr && played
+                            ? `${fmt(pr.weighted_wins, 2)} weighted wins in ${pr.games} contests` +
+                              (pr.non_member_wins
+                                ? `, ${pr.non_member_wins} of them over a school outside the association at ${WIN_VALUE.nonMember} each`
+                                : "")
+                            : undefined
+                        }
                       />
                       <Cell
                         className="hidden md:table-cell"
-                        value={games ? fmtPct(rr.opp_win_pct) : "—"}
+                        value={played ? fmtPct(ratio.opp_win_pct) : "—"}
                       />
                       <Cell
                         className="hidden lg:table-cell"
-                        value={games ? fmtPct(rr.opp_opp_win_pct) : "—"}
+                        value={played ? fmtPct(ratio.opp_opp_win_pct) : "—"}
                       />
                       <td className="td !px-2 !text-right sm:!pr-4">
                         <span
                           className="text-[19px] font-extrabold tracking-[-0.03em] tnum"
                           style={{ color: "rgb(var(--rating))" }}
                         >
-                          {rr.rpi.toFixed(4)}
+                          {(rr ? rr.rpi : pr!.psr).toFixed(4)}
                         </span>
                       </td>
                     </>
@@ -572,11 +617,13 @@ function Cell({
   value,
   rank,
   tone,
+  title,
   className = "",
 }: {
   value: string;
   rank?: number;
   tone?: number;
+  title?: string;
   className?: string;
 }) {
   const color =
@@ -589,7 +636,7 @@ function Cell({
           : "rgb(var(--text-muted))";
 
   return (
-    <td className={`td !text-right ${className}`}>
+    <td className={`td !text-right ${className}`} title={title}>
       <span className="text-[13px] font-semibold tnum" style={{ color }}>
         {value}
       </span>

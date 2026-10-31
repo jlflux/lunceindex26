@@ -34,6 +34,8 @@ export const SITE_SECTIONS: SiteSection[] = [
     note: "Who has earned it." },
   { key: "rpi", href: "/rpi", label: "RPI", row: "rankings",
     note: "What the schedule alone implies." },
+  { key: "psr", href: "/psr", label: "PSR", row: "rankings",
+    note: "Georgia's seeding formula, run on our field." },
   { key: "composite", href: "/composite", label: "Composite", row: "rankings",
     note: "Your rank averaged with four outside polls." },
   { key: "aswa", href: "/aswa", label: "ASWA", row: "rankings",

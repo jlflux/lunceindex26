@@ -113,6 +113,7 @@ export const SITE_PAGES: { href: string; label: string }[] = [
   { href: "/resume", label: "Résumé" },
   { href: "/rpi", label: "RPI" },
   { href: "/psr", label: "PSR" },
+  { href: "/schsl", label: "SCHSL" },
   { href: "/composite", label: "Composite" },
   { href: "/aswa", label: "ASWA" },
   { href: "/teams", label: "Region Standings" },

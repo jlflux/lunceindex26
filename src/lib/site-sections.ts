@@ -36,6 +36,8 @@ export const SITE_SECTIONS: SiteSection[] = [
     note: "What the schedule alone implies." },
   { key: "psr", href: "/psr", label: "PSR", row: "rankings",
     note: "Georgia's seeding formula, run on our field." },
+  { key: "schsl", href: "/schsl", label: "SCHSL", row: "rankings",
+    note: "South Carolina's seeding formula, run on our field." },
   { key: "composite", href: "/composite", label: "Composite", row: "rankings",
     note: "Your rank averaged with four outside polls." },
   { key: "aswa", href: "/aswa", label: "ASWA", row: "rankings",

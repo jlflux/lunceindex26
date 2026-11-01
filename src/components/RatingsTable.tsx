@@ -13,7 +13,11 @@ import {
   fmtSigned,
   record,
 } from "@/lib/format";
-import { WIN_VALUE, computePsr, type PsrRow } from "@/lib/psr";
+import {
+  FORMULA_BOARDS,
+  rankBy,
+  type FormulaRow,
+} from "@/lib/formula-boards";
 import {
   CLS_FILTER_ORDER,
   type Classification,
@@ -22,7 +26,7 @@ import {
   type RpiRow,
 } from "@/lib/types";
 
-type Mode = "index" | "rpi" | "resume" | "psr";
+type Mode = "index" | "rpi" | "resume" | "psr" | "schsl";
 
 /**
  * Rank within a numeric column across the whole field, so a figure can be read
@@ -113,14 +117,22 @@ export default function RatingsTable({
   }, [ratings]);
 
   /**
-   * PSR, like the résumé board, is derived here rather than carried in the
-   * payload: it is a function of the games and the field, both of which are
-   * already in hand, and deriving it means a board that is correct the moment
-   * a result is entered rather than at the next publish.
+   * Which published formula this board is, if it is one of them. The weights
+   * and the win values come from the spec rather than from here, so adding a
+   * third state's board is a table entry and a page.
    */
-  const psrRows = useMemo(
-    () => (mode === "psr" ? computePsr(ratings, payload.games) : []),
-    [mode, ratings, payload.games],
+  const formula =
+    mode === "psr" || mode === "schsl" ? FORMULA_BOARDS[mode] : null;
+
+  /**
+   * These boards, like the résumé board, are derived here rather than carried
+   * in the payload: each is a function of the games and the field, both of
+   * which are already in hand, and deriving it means a board that is correct
+   * the moment a result is entered rather than at the next publish.
+   */
+  const formulaRows = useMemo(
+    () => (formula ? rankBy(formula, ratings, payload.games) : []),
+    [formula, ratings, payload.games],
   );
 
   const source =
@@ -128,8 +140,8 @@ export default function RatingsTable({
       ? ratings
       : mode === "resume"
         ? resumeRows
-        : mode === "psr"
-          ? psrRows
+        : formula
+          ? formulaRows
           : rpi;
 
   const ranks = useMemo(
@@ -329,8 +341,8 @@ export default function RatingsTable({
                   <th
                     className="th hidden !text-right md:table-cell"
                     title={
-                      mode === "psr"
-                        ? `Weighted wins over contests played. A win over a school outside the association counts ${WIN_VALUE.nonMember}.`
+                      formula && formula.winValue.nonMember !== 1
+                        ? `Weighted wins over contests played. A win over a school outside the association counts ${formula.winValue.nonMember}.`
                         : undefined
                     }
                   >
@@ -339,7 +351,7 @@ export default function RatingsTable({
                   <th className="th hidden !text-right md:table-cell">OWP</th>
                   <th className="th hidden !text-right lg:table-cell">OOWP</th>
                   <th className="th !px-2 !text-right sm:!pr-4">
-                    {mode === "psr" ? "PSR" : "RPI"}
+                    {formula ? formula.label : "RPI"}
                   </th>
                 </>
               )}
@@ -366,9 +378,10 @@ export default function RatingsTable({
               const ir = mode === "index" ? (r as RatingRow) : null;
               const sr = mode === "resume" ? (r as RatingRow) : null;
               const rr = mode === "rpi" ? (r as RpiRow) : null;
-              const pr = mode === "psr" ? (r as PsrRow) : null;
-              // RPI and PSR are the same three columns with different weights
-              // behind them, so they are drawn once.
+              const pr = formula ? (r as FormulaRow) : null;
+              // RPI and the published formula boards are the same three
+              // columns with different weights behind them, so they are drawn
+              // once.
               const ratio = rr ?? pr;
               const games = r.wins + r.losses > 0;
               // PSR counts contests, which includes a tie.
@@ -527,10 +540,11 @@ export default function RatingsTable({
                         // though its record reads 0-0.
                         value={played ? fmtPct(ratio.win_pct) : "—"}
                         title={
-                          pr && played
+                          pr && played && formula
                             ? `${fmt(pr.weighted_wins, 2)} weighted wins in ${pr.games} contests` +
-                              (pr.non_member_wins
-                                ? `, ${pr.non_member_wins} of them over a school outside the association at ${WIN_VALUE.nonMember} each`
+                              (pr.non_member_wins &&
+                              formula.winValue.nonMember !== 1
+                                ? `, ${pr.non_member_wins} of them over a school outside the association at ${formula.winValue.nonMember} each`
                                 : "")
                             : undefined
                         }
@@ -548,7 +562,7 @@ export default function RatingsTable({
                           className="text-[19px] font-extrabold tracking-[-0.03em] tnum"
                           style={{ color: "rgb(var(--rating))" }}
                         >
-                          {(rr ? rr.rpi : pr!.psr).toFixed(4)}
+                          {(rr ? rr.rpi : pr!.value).toFixed(4)}
                         </span>
                       </td>
                     </>

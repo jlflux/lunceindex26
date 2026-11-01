@@ -13,6 +13,7 @@ import {
   fmtSigned,
   record,
 } from "@/lib/format";
+import { rankWilson, type WilsonRow } from "@/lib/wilson";
 import {
   FORMULA_BOARDS,
   rankBy,
@@ -26,7 +27,7 @@ import {
   type RpiRow,
 } from "@/lib/types";
 
-type Mode = "index" | "rpi" | "resume" | "psr" | "schsl";
+type Mode = "index" | "rpi" | "resume" | "psr" | "schsl" | "wilson";
 
 /**
  * Rank within a numeric column across the whole field, so a figure can be read
@@ -135,14 +136,27 @@ export default function RatingsTable({
     [formula, ratings, payload.games],
   );
 
+  /**
+   * The Wilson rating solves a circular definition rather than evaluating a
+   * formula, so it is iterated rather than summed — but it reads the same two
+   * things the others do, and takes a few tens of milliseconds over the whole
+   * field, so it is derived here beside them.
+   */
+  const wilsonRows = useMemo(
+    () => (mode === "wilson" ? rankWilson(ratings, payload.games) : []),
+    [mode, ratings, payload.games],
+  );
+
   const source =
     mode === "index"
       ? ratings
       : mode === "resume"
         ? resumeRows
-        : formula
-          ? formulaRows
-          : rpi;
+        : mode === "wilson"
+          ? wilsonRows
+          : formula
+            ? formulaRows
+            : rpi;
 
   const ranks = useMemo(
     () => ({
@@ -336,6 +350,16 @@ export default function RatingsTable({
                     Résumé
                   </th>
                 </>
+              ) : mode === "wilson" ? (
+                <>
+                  <th
+                    className="th hidden !text-right md:table-cell"
+                    title="The average rating of everyone this team has played"
+                  >
+                    Opp
+                  </th>
+                  <th className="th !px-2 !text-right sm:!pr-4">Wilson</th>
+                </>
               ) : (
                 <>
                   <th
@@ -365,7 +389,9 @@ export default function RatingsTable({
                     ? 7 + (hasSplit ? 2 : 0) + (SHOW_EFFICIENCY ? 2 : 0)
                     : mode === "resume"
                       ? 6
-                      : 7
+                      : mode === "wilson"
+                        ? 5
+                        : 7
                 }
                 label={
                   scoped ? `Top ${HIGHLIGHT_IN_CLASS}` : `Top ${HIGHLIGHT_OVERALL}`
@@ -379,6 +405,7 @@ export default function RatingsTable({
               const sr = mode === "resume" ? (r as RatingRow) : null;
               const rr = mode === "rpi" ? (r as RpiRow) : null;
               const pr = formula ? (r as FormulaRow) : null;
+              const wr = mode === "wilson" ? (r as WilsonRow) : null;
               // RPI and the published formula boards are the same three
               // columns with different weights behind them, so they are drawn
               // once.
@@ -529,6 +556,21 @@ export default function RatingsTable({
                           }}
                         >
                           {fmtSigned(sr.sor ?? 0, 2)}
+                        </span>
+                      </td>
+                    </>
+                  ) : wr ? (
+                    <>
+                      <Cell
+                        className="hidden md:table-cell"
+                        value={wr.games ? String(wr.opp_rating) : "—"}
+                      />
+                      <td className="td !px-2 !text-right sm:!pr-4">
+                        <span
+                          className="text-[19px] font-extrabold tracking-[-0.03em] tnum"
+                          style={{ color: "rgb(var(--rating))" }}
+                        >
+                          {wr.rating}
                         </span>
                       </td>
                     </>

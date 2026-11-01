@@ -34,6 +34,8 @@
     "test:ineligible": "tsx scripts/test-ineligible.ts",
     "test:bracket": "tsx scripts/test-bracket.ts",
     "test:boards": "tsx scripts/test-boards.ts",
+    "test:wilson": "tsx scripts/test-wilson.ts",
+    "validate:wilson": "tsx scripts/validate-wilson.ts",
     "test:home": "tsx scripts/test-home.ts",
     "test:render": "tsx --tsconfig scripts/tsconfig.render.json scripts/test-render.tsx",
     "import:bracket": "tsx scripts/import-bracket.ts",

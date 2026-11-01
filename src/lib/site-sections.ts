@@ -38,6 +38,8 @@ export const SITE_SECTIONS: SiteSection[] = [
     note: "Georgia's seeding formula, run on our field." },
   { key: "schsl", href: "/schsl", label: "SCHSL", row: "rankings",
     note: "South Carolina's seeding formula, run on our field." },
+  { key: "wilson", href: "/wilson", label: "Wilson", row: "rankings",
+    note: "David Wilson's rating, solved over the whole state." },
   { key: "composite", href: "/composite", label: "Composite", row: "rankings",
     note: "Your rank averaged with four outside polls." },
   { key: "aswa", href: "/aswa", label: "ASWA", row: "rankings",

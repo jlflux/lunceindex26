@@ -21,6 +21,7 @@ import {
   type Slot,
   type StatusKey,
 } from "@/lib/bracket-types";
+import { defaultKickoff, type Kickoff } from "@/lib/playoff-calendar";
 import { PROSE_COLOURS } from "@/lib/sanitize";
 import { CLS_FILTER_ORDER, type Classification, type Game } from "@/lib/types";
 
@@ -435,6 +436,7 @@ export default function BracketEditor({
       {tab === "bracket" && block && (
         <SlotEditor
           cls={cls}
+          season={state.season}
           regions={liveRegions}
           slots={state.classes[cls]?.slots ?? []}
           onSlots={(slots) => editClass(cls, (cs) => ({ ...cs, slots }))}
@@ -735,6 +737,7 @@ function RegionEditor({
 
 function SlotEditor({
   cls,
+  season,
   regions,
   slots,
   onSlots,
@@ -745,6 +748,8 @@ function SlotEditor({
   saveScore,
 }: {
   cls: Classification;
+  /** The bracket's season, which decides whether the calendar applies. */
+  season: string;
   regions: EditorRegion[];
   slots: Slot[];
   onSlots: (s: Slot[]) => void;
@@ -894,6 +899,11 @@ function SlotEditor({
         <GameEditor
           id={open}
           editorial={results[open] ?? {}}
+          kickoff={(() => {
+            const g = bracket?.rounds.flat().find((x) => x.id === open);
+            if (!g || !bracket) return null;
+            return defaultKickoff(season, cls, g.round, bracket.rounds.length);
+          })()}
           played={playedFor(bracket?.rounds.flat().find((x) => x.id === open))}
           onScore={(() => {
             const g = bracket?.rounds.flat().find((x) => x.id === open);
@@ -931,6 +941,7 @@ function SlotEditor({
 function GameEditor({
   id,
   editorial,
+  kickoff,
   labels,
   played,
   onClose,
@@ -939,6 +950,8 @@ function GameEditor({
 }: {
   id: string;
   editorial: ClassState["results"][string];
+  /** What this round starts at unless this game says otherwise. */
+  kickoff: Kickoff | null;
   labels: [string, string];
   /** The stored playoff game for this pair, if one exists yet. */
   played: Game | null;
@@ -1067,8 +1080,8 @@ function GameEditor({
         <div className="grid gap-3 sm:grid-cols-2">
           {(
             [
-              ["date", "Date", "e.g. Fri, Nov 13"],
-              ["time", "Time", "e.g. 7:00 PM"],
+              ["date", "Date", kickoff?.date || "e.g. Fri, Nov 13"],
+              ["time", "Time", kickoff?.time || "e.g. 7:00 PM"],
             ] as const
           ).map(([k, label, ph]) => (
             <label key={k} className="block">
@@ -1082,6 +1095,16 @@ function GameEditor({
             </label>
           ))}
         </div>
+        {kickoff && (
+          <p className="text-[11px] leading-relaxed" style={{ color: "rgb(var(--text-faint))" }}>
+            Left empty, this game reads{" "}
+            <strong>
+              {kickoff.date} · {kickoff.time}
+            </strong>{" "}
+            — the association&rsquo;s slot for this round. Type over either one
+            to move this game alone; empty the field again to put it back.
+          </p>
+        )}
 
         <label className="block">
           <span className="label">Location</span>

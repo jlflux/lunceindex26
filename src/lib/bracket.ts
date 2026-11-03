@@ -27,6 +27,7 @@ import type {
   StatusKey,
 } from "./bracket-types";
 import { isPlayed, officialWinner } from "./result";
+import { defaultKickoff } from "./playoff-calendar";
 import { QUALIFIERS, roundNames, type OddsReport } from "./playoffs";
 import { regionRecords, tieDataFor, orderRegionStandings } from "./season";
 import type { Record2 } from "./season";
@@ -594,6 +595,12 @@ export function resolveBracket(
       const decided = Boolean(w) && !byeGame;
       const real = gameFor(top, bot);
       const topWon = Boolean(w && nameOf(w) && nameOf(w) === nameOf(top));
+      // The association's calendar, for a game nobody has dated by hand. A
+      // bye is not played, so it gets no kickoff however the round is
+      // scheduled.
+      const kickoff = byeGame
+        ? null
+        : defaultKickoff(state.season, cls, g.round, rounds.length);
 
       return {
         id: g.id,
@@ -601,8 +608,10 @@ export function resolveBracket(
         top: draw(top, bot, editorial, "top", topWon, decided),
         bottom: draw(bot, top, editorial, "bottom", !topWon, decided),
         locked: Boolean(real && officialWinner(real)),
-        date: editorial.date ?? "",
-        time: editorial.time ?? "",
+        // `||`, not `??`: clearing the field leaves an empty string behind,
+        // and an empty field is how somebody asks for the default back.
+        date: editorial.date || kickoff?.date || "",
+        time: editorial.time || kickoff?.time || "",
         location: editorial.location ?? "",
         note: editorial.note ?? "",
       };

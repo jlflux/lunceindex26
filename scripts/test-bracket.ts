@@ -36,7 +36,13 @@ import {
   renderRichText,
   sanitizeHtml,
 } from "../src/lib/sanitize";
-import type { Classification, Game, RatingRow } from "../src/lib/types";
+import { defaultKickoff } from "../src/lib/playoff-calendar";
+import {
+  CLS_FILTER_ORDER,
+  type Classification,
+  type Game,
+  type RatingRow,
+} from "../src/lib/types";
 
 let failures = 0;
 function check(label: string, cond: boolean, detail = "") {
@@ -1077,6 +1083,118 @@ console.log("\n18. A match-up both sides have clinched");
   check("a played match-up drops off the locked-in list",
     clinchedMatchups(marked, "5A", seededRegions(ratings, done, undefined, marked), done)
       .length === 0);
+}
+
+/* ----------------------------------------------------------------- 19 */
+console.log("\n19. The association's calendar");
+{
+  const ratings = world();
+  const games = roundRobin();
+  // Four slots: one round of two games, then the championship.
+  const slots = [
+    { region: 1, place: 1 }, { region: 2, place: 4 },
+    { region: 1, place: 2 }, { region: 2, place: 3 },
+  ];
+  const st = stateWith({ ...base_(), slots });
+  const seeded = seededRegions(ratings, games, undefined, st);
+  const drawn = resolveBracket(st, "5A", seeded, games)!;
+
+  const r1 = drawn.rounds[0];
+  const final = drawn.rounds[1][0];
+
+  check("a first-round game gets the first Friday",
+    r1.every((x) => x.date === "Fri, Nov 6" && x.time === "7:00 PM"),
+    r1.map((x) => `${x.date} ${x.time}`).join(" | "));
+  check("and the last round gets the class's championship slot",
+    final.date === "Fri, Dec 4" && final.time === "7:00 PM",
+    `${final.date} ${final.time}`);
+
+  // The championship is the last round whatever the bracket's size, so a
+  // class that starts smaller still lands on its own slot rather than on
+  // whichever Friday happens to be fourth.
+  const twoA = emptyBracketState();
+  twoA.classes["2A"] = { ...base_(), slots };
+  const ratings2A = ratings.map((t) => ({ ...t, classification: "2A" as Classification }));
+  const seeded2A = seededRegions(ratings2A, games, undefined, twoA);
+  const drawn2A = resolveBracket(twoA, "2A", seeded2A, games)!;
+  // 2A and 5A share a day and not a kickoff, which is the point of keying
+  // the championship to the class rather than to the round.
+  check("2A's championship is its own",
+    drawn2A.rounds[1][0].date === "Fri, Dec 4" &&
+    drawn2A.rounds[1][0].time === "11:00 AM",
+    `${drawn2A.rounds[1][0].date} ${drawn2A.rounds[1][0].time}`);
+  check("while its first round is the same Friday as everyone else's",
+    drawn2A.rounds[0][0].date === "Fri, Nov 6");
+
+  // A game somebody has dated by hand keeps that date.
+  const moved = stateWith({
+    ...base_(), slots,
+    results: { r1g0: { date: "Thu, Nov 5", time: "6:30 PM" } },
+  });
+  const movedDrawn = resolveBracket(moved, "5A",
+    seededRegions(ratings, games, undefined, moved), games)!;
+  check("a game moved by hand keeps its own kickoff",
+    movedDrawn.rounds[0][0].date === "Thu, Nov 5" &&
+    movedDrawn.rounds[0][0].time === "6:30 PM");
+  check("and the one beside it still reads the default",
+    movedDrawn.rounds[0][1].date === "Fri, Nov 6");
+
+  // Half an override is half an override: a time of its own, the round's date.
+  const timeOnly = stateWith({
+    ...base_(), slots,
+    results: { r1g0: { time: "1:00 PM" } },
+  });
+  const timeDrawn = resolveBracket(timeOnly, "5A",
+    seededRegions(ratings, games, undefined, timeOnly), games)!;
+  check("a time of its own leaves the date alone",
+    timeDrawn.rounds[0][0].date === "Fri, Nov 6" &&
+    timeDrawn.rounds[0][0].time === "1:00 PM");
+
+  // Emptying the field is how the default is asked for back.
+  const cleared = stateWith({
+    ...base_(), slots,
+    results: { r1g0: { date: "", time: "" } },
+  });
+  const clearedDrawn = resolveBracket(cleared, "5A",
+    seededRegions(ratings, games, undefined, cleared), games)!;
+  check("an emptied field falls back to the round",
+    clearedDrawn.rounds[0][0].date === "Fri, Nov 6");
+
+  // A bye is not played, so it is not scheduled.
+  // An empty slot is a bye, the way a region of six is drawn into eight.
+  const byeState = stateWith({
+    ...base_(),
+    slots: [
+      { region: 1, place: 1 }, null,
+      { region: 1, place: 2 }, { region: 2, place: 3 },
+    ],
+  });
+  const byeDrawn = resolveBracket(byeState, "5A",
+    seededRegions(ratings, games, undefined, byeState), games);
+  const byeGame = byeDrawn?.rounds[0].find((x) => x.top.bye || x.bottom.bye);
+  check("a bye carries no kickoff",
+    Boolean(byeGame) && byeGame!.date === "" && byeGame!.time === "",
+    byeGame ? `[${byeGame.date}] [${byeGame.time}]` : "no bye drawn");
+
+  // A calendar is only right for one year.
+  const next = stateWith({ ...base_(), slots });
+  next.season = "2027";
+  const nextDrawn = resolveBracket(next, "5A",
+    seededRegions(ratings, games, undefined, next), games)!;
+  check("another season gets no defaults at all",
+    nextDrawn.rounds[0][0].date === "" && nextDrawn.rounds[1][0].time === "");
+
+  // Every class has a championship slot, and no two share one.
+  const byClass = CLS_FILTER_ORDER.map((c) => {
+    const k = defaultKickoff("2026", c, 5, 5);
+    return `${c}:${k ? `${k.date} ${k.time}` : "—"}`;
+  });
+  check("every class has a championship slot",
+    byClass.every((x) => !x.endsWith(":—")), byClass.join(", "));
+  check("and no two classes kick off at the same moment",
+    new Set(byClass.map((x) => x.split(":").slice(1).join(":"))).size ===
+      CLS_FILTER_ORDER.length,
+    byClass.join(", "));
 }
 
 console.log(
